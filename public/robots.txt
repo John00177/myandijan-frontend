@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# Every route is language-prefixed (/uz/admin, /ru/dashboard, ...), so the
+# bare paths below are matched with a wildcard as well — "Disallow: /admin"
+# alone would not cover "/uz/admin".
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /owner
+Disallow: /*/admin
+Disallow: /*/dashboard
+Disallow: /*/owner
+Disallow: /*/profile
+Disallow: /*/favorites
+
+Sitemap: https://myandijan.uz/sitemap.xml
