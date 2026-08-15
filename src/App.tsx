@@ -4,6 +4,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { Navigate, Route, BrowserRouter, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import LangShell from "./components/LangShell";
+import Toaster from "./components/ui/Toaster";
 import { AuthProvider } from "./contexts/AuthContext";
 
 /*
@@ -28,6 +29,7 @@ export default function App() {
       {/* reducedMotion="user" makes every motion component below respect
           prefers-reduced-motion without each one opting in individually. */}
       <MotionConfig reducedMotion="user">
+        <Toaster />
         <BrowserRouter>
           <AuthProvider>
             <Routes>

@@ -16,7 +16,10 @@ export default function CategoriesSection() {
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-16">
-      <h2 className="text-2xl font-bold text-ink mb-8">{t("categories.title")}</h2>
+      <div className="mb-8">
+        <div className="uppercase tracking-widest text-[10px] text-ink-muted mb-1">{t("categories.eyebrow")}</div>
+        <h2 className="text-3xl font-extrabold tracking-tight text-ink">{t("categories.title")}</h2>
+      </div>
 
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">

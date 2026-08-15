@@ -63,6 +63,7 @@ export default function HeroSection() {
 
   return (
     <section className="relative min-h-[600px] bg-gradient-to-br from-base via-[#0F172A] to-[#1E3A5F] overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(59,130,246,0.12),transparent)] pointer-events-none" />
       <div
         className="absolute inset-0 pointer-events-none"
         style={{

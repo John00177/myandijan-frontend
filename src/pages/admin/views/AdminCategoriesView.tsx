@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast as sonnerToast } from "sonner";
 import Button from "../../../components/ui/Button";
 import Skeleton from "../../../components/ui/Skeleton";
 import { useLanguage } from "../../../contexts/LanguageContext";
@@ -45,14 +46,18 @@ export default function AdminCategoriesView() {
       if (editing) {
         await updateAdminCategory(editing.id, payload);
         setToast("Turkum yangilandi");
+        sonnerToast.success("Turkum yangilandi");
       } else {
         await createAdminCategory(payload);
         setToast("Turkum qo'shildi");
+        sonnerToast.success("Turkum qo'shildi");
       }
       setModalOpen(false);
       reload();
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Saqlashda xatolik yuz berdi");
+      const message = err instanceof ApiError ? err.message : "Saqlashda xatolik yuz berdi";
+      setSaveError(message);
+      sonnerToast.error(message);
     } finally {
       setSaving(false);
     }

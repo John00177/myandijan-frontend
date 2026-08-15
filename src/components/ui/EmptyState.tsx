@@ -14,8 +14,8 @@ interface EmptyStateProps {
 export default function EmptyState({ icon: Icon, title, body, actionLabel, onAction, children }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center text-center py-12">
-      <Icon size={32} className="text-primary/60" />
-      <h3 className="font-bold text-lg text-ink mt-3">{title}</h3>
+      <Icon size={28} className="text-ink-muted" />
+      <h3 className="font-semibold text-lg text-ink mt-3">{title}</h3>
       <p className="text-sm text-ink-muted max-w-[240px] mt-2">{body}</p>
       {actionLabel && (
         <Button variant="primary" size="sm" className="mt-4" onClick={onAction}>

@@ -6,7 +6,7 @@ import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/mo
 import type { Category } from "../../types";
 
 const inputClasses =
-  "h-12 bg-elevated border border-white/[0.10] rounded-xl px-4 text-ink placeholder:text-ink-muted outline-none focus:border-primary/50";
+  "h-12 bg-elevated border border-white/[0.10] rounded-xl px-4 text-ink placeholder:text-ink-muted outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 transition-all duration-200";
 
 export const PRESET_COLORS = [
   "#3B82F6",

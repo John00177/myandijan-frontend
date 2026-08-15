@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Building2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import MetaTags from "../../components/seo/MetaTags";
 import EmptyState from "../../components/ui/EmptyState";
 import { useAuth } from "../../contexts/AuthContext";
@@ -136,13 +137,16 @@ export default function AddBusinessPage() {
     try {
       await createBusiness(payload);
       setNotice({ tone: "success", text: t("addBusiness.success") });
+      toast.success(t("addBusiness.success"));
       setTimeout(() => navigate(`/${lang}/dashboard`, { state: { view: "businesses" } }), 1200);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {
         console.log("[AddBusinessPage] POST /businesses is not live yet. Payload that would have been sent:", payload);
         setNotice({ tone: "info", text: t("addBusiness.comingSoon") });
       } else {
-        setNotice({ tone: "error", text: err instanceof ApiError ? err.message : t("common.genericError") });
+        const message = err instanceof ApiError ? err.message : t("common.genericError");
+        setNotice({ tone: "error", text: message });
+        toast.error(message);
       }
     } finally {
       setSubmitting(false);

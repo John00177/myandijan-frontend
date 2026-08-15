@@ -19,8 +19,14 @@ export default function FeaturedBusinesses() {
   return (
     <section className="max-w-7xl mx-auto px-6 py-16">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-ink">{t("featured.title")}</h2>
-        <Link to={`/${lang}/search`} className="text-sm text-primary hover:text-blue-300 transition-colors">
+        <div>
+          <div className="uppercase tracking-widest text-[10px] text-ink-muted mb-1">{t("featured.eyebrow")}</div>
+          <h2 className="text-3xl font-extrabold tracking-tight text-ink">{t("featured.title")}</h2>
+        </div>
+        <Link
+          to={`/${lang}/search`}
+          className="text-sm text-primary hover:text-blue-300 transition-colors duration-200"
+        >
           {t("featured.seeAll")} →
         </Link>
       </div>
@@ -47,9 +53,13 @@ export default function FeaturedBusinesses() {
                 onClick={() => navigate(`/${lang}/business/${business.slug}`)}
                 className="overflow-hidden"
               >
-                <div className="aspect-[16/10] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22] relative">
+                <div className="aspect-[16/10] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22] relative overflow-hidden">
                   {business.coverImageUrl && (
-                    <img src={business.coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                    <img
+                      src={business.coverImageUrl}
+                      alt=""
+                      className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                    />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-base/90 via-transparent to-transparent" />
                   {business.category && (

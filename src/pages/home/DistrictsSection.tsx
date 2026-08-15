@@ -20,8 +20,14 @@ export default function DistrictsSection() {
   return (
     <section className="max-w-7xl mx-auto px-6 py-16">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold text-ink">{t("districts.title")}</h2>
-        <Link to={`/${lang}/search`} className="text-sm text-primary hover:text-blue-300 transition-colors">
+        <div>
+          <div className="uppercase tracking-widest text-[10px] text-ink-muted mb-1">{t("districts.eyebrow")}</div>
+          <h2 className="text-3xl font-extrabold tracking-tight text-ink">{t("districts.title")}</h2>
+        </div>
+        <Link
+          to={`/${lang}/search`}
+          className="text-sm text-primary hover:text-blue-300 transition-colors duration-200"
+        >
           {t("districts.seeAll")} →
         </Link>
       </div>

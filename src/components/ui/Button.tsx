@@ -4,7 +4,8 @@ type Variant = "primary" | "secondary" | "ghost";
 type Size = "sm" | "md" | "lg" | "block";
 
 const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-primary hover:bg-blue-400 text-white",
+  primary:
+    "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white shadow-lg shadow-blue-500/25",
   secondary: "bg-card border border-white/[0.10] text-ink hover:border-primary/30",
   ghost: "text-ink-muted hover:text-ink hover:bg-card",
 };
@@ -31,7 +32,7 @@ export default function Button({
 }: ButtonProps) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 font-semibold rounded-btn transition-all duration-150 select-none active:scale-[0.97] ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 font-semibold rounded-btn transition-all duration-150 select-none active:scale-[0.96] ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
       {...rest}
     >
       {children}
