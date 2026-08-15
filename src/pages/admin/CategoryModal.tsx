@@ -43,9 +43,18 @@ interface CategoryModalProps {
   category: Category | null;
   onClose: () => void;
   onSave: (form: CategoryFormState) => void;
+  submitting?: boolean;
+  error?: string | null;
 }
 
-export default function CategoryModal({ open, category, onClose, onSave }: CategoryModalProps) {
+export default function CategoryModal({
+  open,
+  category,
+  onClose,
+  onSave,
+  submitting = false,
+  error = null,
+}: CategoryModalProps) {
   const [form, setForm] = useState<CategoryFormState>(EMPTY_FORM);
   const shouldAnimate = useShouldAnimate();
   const backdropTransition = useMotionTransition(TRANSITIONS.fast);
@@ -173,11 +182,13 @@ export default function CategoryModal({ open, category, onClose, onSave }: Categ
                   </div>
                 </div>
 
+                {error && <p className="text-sm text-danger">{error}</p>}
+
                 <div className="flex gap-2 mt-2">
-                  <Button type="submit" variant="primary" size="lg" className="flex-1">
-                    Saqlash
+                  <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={submitting}>
+                    {submitting ? "Saqlanmoqda..." : "Saqlash"}
                   </Button>
-                  <Button type="button" variant="ghost" size="lg" onClick={onClose}>
+                  <Button type="button" variant="ghost" size="lg" onClick={onClose} disabled={submitting}>
                     Bekor qilish
                   </Button>
                 </div>

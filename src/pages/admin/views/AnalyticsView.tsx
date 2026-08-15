@@ -28,6 +28,11 @@ function statValue(value: number | null | undefined): string | number {
   return typeof value === "number" ? value : "—";
 }
 
+function sumValues(record: Record<string, number> | undefined): number | undefined {
+  if (!record) return undefined;
+  return Object.values(record).reduce((sum, n) => sum + n, 0);
+}
+
 function ChartSkeletonGrid({ height }: { height: number }) {
   return (
     <>
@@ -79,14 +84,14 @@ export default function AnalyticsView() {
         <SparklineKpiCard
           icon={Building2}
           label="Jami bizneslar"
-          value={statValue(data?.businesses)}
+          value={statValue(sumValues(data?.businessesByStatus))}
           data={SPARK_BUSINESSES}
           kind="line"
         />
         <SparklineKpiCard
           icon={Users}
-          label="Faol foydalanuvchilar"
-          value={statValue(data?.users)}
+          label="Jami foydalanuvchilar"
+          value={statValue(sumValues(data?.usersByRole))}
           data={SPARK_ACTIVE_USERS}
           kind="bar"
         />
@@ -99,8 +104,8 @@ export default function AnalyticsView() {
         />
         <SparklineKpiCard
           icon={MessageSquare}
-          label="Yangi sharhlar"
-          value={statValue(data?.reviews)}
+          label="Kutilayotgan sharhlar"
+          value={statValue(data?.pendingReviews)}
           data={SPARK_NEW_REVIEWS}
           kind="line"
         />

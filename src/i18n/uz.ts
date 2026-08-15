@@ -78,6 +78,7 @@ const uz = {
   "districts.title": "Tumanlar",
   "districts.seeAll": "Barchasini ko'rish",
   "districts.center": "Markaz",
+  "districts.viewBusinesses": "Bizneslarni ko'rish",
   "categories.title": "Turkumlar",
   "featured.title": "Tavsiya etilgan",
   "featured.seeAll": "Barchasi",

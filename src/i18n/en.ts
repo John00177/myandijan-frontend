@@ -80,6 +80,7 @@ const en: Record<keyof typeof uz, string> = {
   "districts.title": "Districts",
   "districts.seeAll": "See all",
   "districts.center": "Center",
+  "districts.viewBusinesses": "View businesses",
   "categories.title": "Categories",
   "featured.title": "Featured",
   "featured.seeAll": "See all",

@@ -80,6 +80,7 @@ const ru: Record<keyof typeof uz, string> = {
   "districts.title": "Районы",
   "districts.seeAll": "Смотреть все",
   "districts.center": "Центр",
+  "districts.viewBusinesses": "Смотреть бизнесы",
   "categories.title": "Категории",
   "featured.title": "Рекомендуемые",
   "featured.seeAll": "Все",

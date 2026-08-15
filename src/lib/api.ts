@@ -1,5 +1,7 @@
 import type {
+  AdminAuditLog,
   AdminBusiness,
+  AdminCategoryPayload,
   AdminEvent,
   AdminListResult,
   AdminStats,
@@ -11,6 +13,10 @@ import type {
   Event,
   Lang,
   LoginPayload,
+  MyBusiness,
+  MyEvent,
+  MyReview,
+  MyStats,
   PaginatedResponse,
   Region,
   RegisterPayload,
@@ -179,7 +185,7 @@ async function authedDelete(path: string): Promise<void> {
  * likely real shape so it activates the moment the backend ships it; callers
  * should treat a 404 ApiError as "not launched yet".
  */
-async function authedPostJson<T>(path: string, body: unknown): Promise<T> {
+async function authedJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -189,7 +195,7 @@ async function authedPostJson<T>(path: string, body: unknown): Promise<T> {
 
   try {
     const res = await fetch(new URL(path, BASE).toString(), {
-      method: "POST",
+      method,
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -203,6 +209,14 @@ async function authedPostJson<T>(path: string, body: unknown): Promise<T> {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+function authedPostJson<T>(path: string, body: unknown): Promise<T> {
+  return authedJson<T>("POST", path, body);
+}
+
+function authedPatchJson<T>(path: string, body: unknown): Promise<T> {
+  return authedJson<T>("PATCH", path, body);
 }
 
 export function createBusiness(payload: CreateBusinessPayload): Promise<Business> {
@@ -268,6 +282,50 @@ export async function getAdminEvents(): Promise<AdminListResult<AdminEvent>> {
 export async function getAdminCategories(): Promise<AdminListResult<Category>> {
   const raw = await request<unknown>("/admin/categories");
   return normalizeAdminList<Category>(raw);
+}
+
+// Confirmed live (2026-08-14): POST/PATCH /admin/categories, ADMIN-gated.
+export function createAdminCategory(payload: AdminCategoryPayload): Promise<Category> {
+  return authedPostJson<Category>("/admin/categories", payload);
+}
+
+export function updateAdminCategory(id: number, payload: AdminCategoryPayload): Promise<Category> {
+  return authedPatchJson<Category>(`/admin/categories/${id}`, payload);
+}
+
+/*
+ * Owner API (/me/*). Confirmed live and working (2026-08-15) — request()
+ * already attaches the bearer token to every GET when one is present, so
+ * these need no separate authed variant.
+ */
+
+export function getMyStats(): Promise<MyStats> {
+  return request<MyStats>("/me/stats");
+}
+
+export function getMyBusinesses(): Promise<MyBusiness[]> {
+  return request<MyBusiness[]>("/me/businesses");
+}
+
+export function getMyReviews(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<MyReview>> {
+  return request<PaginatedResponse<MyReview>>("/me/reviews", params);
+}
+
+export function replyToMyReview(reviewId: number, body: string): Promise<unknown> {
+  return authedPostJson(`/me/reviews/${reviewId}/reply`, { body });
+}
+
+export function getMyEvents(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<MyEvent>> {
+  return request<PaginatedResponse<MyEvent>>("/me/events", params);
+}
+
+// Confirmed live (2026-08-15): GET /admin/audit — not /admin/audit-logs, the
+// path an earlier session probed and concluded was 404.
+export function getAdminAuditLogs(params?: {
+  page?: number;
+  limit?: number;
+}): Promise<PaginatedResponse<AdminAuditLog>> {
+  return request<PaginatedResponse<AdminAuditLog>>("/admin/audit", params);
 }
 
 export { ApiError };

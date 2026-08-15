@@ -75,6 +75,11 @@ export default function InventoryView() {
 
   return (
     <div>
+      <div className="mb-4 rounded-lg bg-elevated border border-white/[0.10] px-4 py-2.5 text-sm text-ink-muted">
+        <span className="font-semibold text-ink-body">Demo rejimi.</span> Omborxona hali API bilan bog'lanmagan —
+        bu yerdagi mahsulotlar faqat interfeysni ko'rsatish uchun va saqlanmaydi.
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-ink-muted">{products.length} ta mahsulot</p>
         <Button variant="primary" size="sm" onClick={openAddModal}>

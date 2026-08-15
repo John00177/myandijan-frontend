@@ -49,7 +49,7 @@ export default function DistrictsSection() {
                       <span className="text-lg font-semibold text-ink">{localizedName(district, lang)}</span>
                       {isCenter && <Badge tone="blue">{t("districts.center")}</Badge>}
                     </div>
-                    <div className="text-sm text-ink-muted mt-1">{t("common.comingSoon")}</div>
+                    <div className="text-sm text-ink-muted mt-1">{t("districts.viewBusinesses")}</div>
                   </div>
                   <MapPin size={16} className="text-ink-muted" />
                 </AnimatedCard>

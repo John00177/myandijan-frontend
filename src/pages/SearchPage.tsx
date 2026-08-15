@@ -1,6 +1,6 @@
-import { SearchX } from "lucide-react";
+import { SearchX, Store } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import EmptyState from "../components/ui/EmptyState";
 import MetaTags from "../components/seo/MetaTags";
 import StaggerContainer, { StaggerItem } from "../components/StaggerContainer";
@@ -10,6 +10,7 @@ import { useCategories } from "../hooks/useCategories";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useRegions } from "../hooks/useRegions";
 import { useSearchBusinesses } from "../hooks/useSearchBusinesses";
+import { localizedName } from "../lib/localize";
 import BusinessListCard from "./search/BusinessListCard";
 import Pagination from "./search/Pagination";
 import SearchMap from "./search/SearchMap";
@@ -31,6 +32,7 @@ function sortBusinesses(businesses: Business[], sort: SortOption, lang: "uz" | "
 
 export default function SearchPage() {
   const { lang } = useLanguage();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
@@ -147,11 +149,31 @@ export default function SearchPage() {
                 ))}
               </div>
             ) : error || sortedBusinesses.length === 0 ? (
-              <EmptyState
-                icon={SearchX}
-                title="Hech narsa topilmadi"
-                body="Boshqa kalit so'z yoki filtrlarni sinab ko'ring."
-              />
+              (() => {
+                const selectedDistrict = district ? districts.find((d) => String(d.id) === district) : undefined;
+                // No query/category on top of the district filter: this is
+                // "browsing this district found nothing", not "this search
+                // found nothing" — different message, and worth a direct CTA
+                // to add the first business there rather than "try again".
+                if (!error && selectedDistrict && !debouncedQuery && !category) {
+                  return (
+                    <EmptyState
+                      icon={Store}
+                      title={`Hozircha ${localizedName(selectedDistrict, lang)}da biznes yo'q`}
+                      body="Bu tumandagi birinchi biznes bo'ling."
+                      actionLabel="Birinchi bo'lib qo'shing"
+                      onAction={() => navigate(`/${lang}/dashboard/business/new`)}
+                    />
+                  );
+                }
+                return (
+                  <EmptyState
+                    icon={SearchX}
+                    title="Hech narsa topilmadi"
+                    body="Boshqa kalit so'z yoki filtrlarni sinab ko'ring."
+                  />
+                );
+              })()
             ) : (
               <StaggerContainer className="flex flex-col gap-4">
                 {sortedBusinesses.map((business) => (

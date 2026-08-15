@@ -88,7 +88,7 @@ export default function SearchMap({ businesses }: SearchMapProps) {
       {pins.length === 0 && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[400] bg-surface/95 backdrop-blur-xl border border-white/[0.10] rounded-xl px-4 py-2.5 flex items-center gap-2 shadow-card pointer-events-none">
           <MapPin size={16} className="text-primary/70 shrink-0" />
-          <span className="text-xs text-ink-body">Bizneslar koordinatalari tez orada qo'shiladi</span>
+          <span className="text-xs text-ink-body">Bu natijalar uchun xarita koordinatalari mavjud emas</span>
         </div>
       )}
     </div>

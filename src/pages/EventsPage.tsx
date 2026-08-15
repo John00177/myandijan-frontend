@@ -28,7 +28,7 @@ export default function EventsPage() {
           <EmptyState
             icon={Calendar}
             title="Hozircha tadbirlar yo'q"
-            body="Tez orada yangi tadbirlar qo'shiladi"
+            body="Bizneslar tadbir qo'shganda shu yerda ko'rinadi."
           />
         ) : (
           <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

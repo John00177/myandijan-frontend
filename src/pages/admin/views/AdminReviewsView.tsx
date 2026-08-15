@@ -10,7 +10,8 @@ const inputClasses =
   "h-10 bg-elevated border border-white/[0.10] rounded-lg px-3 text-sm text-ink outline-none focus:border-primary/50";
 
 export default function AdminReviewsView() {
-  // /admin/reviews returns 404 — this list is mock. See adminMockData.ts.
+  // No GET /admin/reviews list endpoint exists yet (only POST .../hide and
+  // .../restore on a single review) — this list is mock. See adminMockData.ts.
   const [reviews, setReviews] = useState<AdminMockReview[]>(ADMIN_MOCK_REVIEWS);
   const [businessFilter, setBusinessFilter] = useState("");
   const [ratingFilter, setRatingFilter] = useState("");
@@ -32,6 +33,10 @@ export default function AdminReviewsView() {
 
   return (
     <div>
+      <div className="mb-4 rounded-lg bg-elevated border border-white/[0.10] px-4 py-2.5 text-sm text-ink-muted">
+        <span className="font-semibold text-ink-body">Demo rejimi.</span> Sharhlar ro'yxati API'ga hali ulanmagan.
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className={inputClasses}>
           <option value="">Barcha bizneslar</option>

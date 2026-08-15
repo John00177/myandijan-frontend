@@ -1,4 +1,4 @@
-import { Heart, MapPin, Phone, Star } from "lucide-react";
+import { Heart, MapPin, Phone, Star, Store } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useFeaturedBusinesses } from "../../hooks/useFeaturedBusinesses";
@@ -6,7 +6,7 @@ import { localizedName } from "../../lib/localize";
 import AnimatedCard from "../../components/AnimatedCard";
 import StaggerContainer, { StaggerItem } from "../../components/StaggerContainer";
 import Badge from "../../components/ui/Badge";
-import Card from "../../components/ui/Card";
+import EmptyState from "../../components/ui/EmptyState";
 import Skeleton from "../../components/ui/Skeleton";
 
 const GRID_CLASSES = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4";
@@ -32,22 +32,13 @@ export default function FeaturedBusinesses() {
           ))}
         </div>
       ) : businesses.length === 0 ? (
-        <StaggerContainer className={GRID_CLASSES}>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <StaggerItem key={i}>
-              {/* Placeholder cards are not interactive, so they keep the plain Card. */}
-              <Card className="overflow-hidden">
-                <div className="aspect-[16/10] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22] relative flex items-center justify-center">
-                  <span className="text-sm font-medium text-ink-muted">{t("common.comingSoon")}</span>
-                </div>
-                <div className="p-4">
-                  <div className="h-4 w-2/3 rounded bg-white/[0.06]" />
-                  <div className="h-3 w-1/3 rounded bg-white/[0.06] mt-3" />
-                </div>
-              </Card>
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+        <EmptyState
+          icon={Store}
+          title="Hozircha tavsiya etilgan bizneslar yo'q"
+          body="Bizneslar qo'shilgach, shu yerda ko'rinadi."
+          actionLabel="Birinchi bo'lib qo'shing"
+          onAction={() => navigate(`/${lang}/dashboard/business/new`)}
+        />
       ) : (
         <StaggerContainer className={GRID_CLASSES}>
           {businesses.map((business) => (

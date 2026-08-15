@@ -252,17 +252,142 @@ export interface AdminEvent {
   location?: string | null;
 }
 
+/**
+ * Matches the live GET /admin/stats response exactly (confirmed 2026-08-15,
+ * not guessed) — it does NOT have flat `businesses`/`users`/`reviews`/`events`
+ * fields the way the old (never-actually-observed) shape assumed. Totals are
+ * broken down by status/role instead, and "reviews"/"events" only ever exist
+ * as pending counts — there is no all-time total for either.
+ */
 export interface AdminStats {
-  businesses?: number | null;
-  pendingBusinesses?: number | null;
-  users?: number | null;
-  reviews?: number | null;
-  events?: number | null;
-  createdToday?: number | null;
+  businessesByStatus: Record<BusinessStatusValue, number>;
+  usersByRole: Record<string, number>;
+  pendingClaims: number;
+  pendingReviews: number;
+  pendingEvents: number;
+  openReports: number;
+  newSignups7d: number;
 }
 
 /** Normalized list result: the API may return a bare array or {data, meta}. */
 export interface AdminListResult<T> {
   items: T[];
   total: number | null;
+}
+
+/** Matches the live API's CreateCategoryDto/UpdateCategoryDto (both POST and PATCH accept the same shape). */
+export interface AdminCategoryPayload {
+  nameUz: string;
+  nameRu: string;
+  nameEn: string;
+  slug?: string;
+  icon?: string;
+  colorHex?: string;
+}
+
+/**
+ * Owner-scoped (/me/*) response shapes. Deliberately separate from the public
+ * Business/Branch/Review/Event types above: those are shaped for the
+ * localized (nameUz/nameRu/nameEn) public read API, while /me/* returns the
+ * raw Prisma shape — a single `name`, `comment` not `text`, `body` not
+ * `text` on replies, etc. Confirmed against the real API responses
+ * (2026-08-14/15), not guessed.
+ */
+export type BusinessStatusValue = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+export type ReviewStatusValue = "PENDING" | "PUBLISHED" | "REJECTED" | "HIDDEN";
+export type EventStatusValue = "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | "CANCELLED" | "COMPLETED";
+
+interface MyDistrictRef {
+  id: number;
+  slug: string;
+  nameUz: string;
+  nameRu?: string;
+  nameEn?: string;
+}
+
+export interface MyBranchHour {
+  dayOfWeek: number;
+  openTime: string | null;
+  closeTime: string | null;
+  isClosed: boolean;
+}
+
+export interface MyBranch {
+  id: number;
+  name: string;
+  address: string;
+  landmark?: string | null;
+  phone: string;
+  isPrimary: boolean;
+  district?: MyDistrictRef | null;
+  city?: MyDistrictRef | null;
+  hours?: MyBranchHour[];
+}
+
+export interface MyBusiness {
+  id: number;
+  slug: string;
+  name: string;
+  status: BusinessStatusValue;
+  category?: { id: number; slug: string; nameUz: string } | null;
+  businessType?: { id: number; slug: string; nameUz: string } | null;
+  branches: MyBranch[];
+  _count?: { branches: number };
+}
+
+export interface MyStats {
+  businessCount: number;
+  totalReviews: number;
+  avgRating: number;
+  upcomingEvents: number;
+  pendingClaims: number;
+  healthScore: {
+    average: number | null;
+    businessesScored: number;
+    openRecommendations: number;
+  };
+}
+
+export interface MyReview {
+  id: number;
+  rating: number;
+  title?: string | null;
+  comment: string;
+  status: ReviewStatusValue;
+  createdAt: string;
+  user?: { id: number; fullName: string; avatarUrl?: string | null } | null;
+  reply?: { id: number; body: string; createdAt: string } | null;
+  branch?: { id: number; name: string; business?: { id: number; slug: string; name: string } | null } | null;
+}
+
+export type AuditActionValue =
+  | "CREATE"
+  | "UPDATE"
+  | "DELETE"
+  | "APPROVE"
+  | "REJECT"
+  | "SUSPEND"
+  | "RESTORE"
+  | "LOGIN"
+  | "ROLE_CHANGE";
+
+export interface AdminAuditLog {
+  id: number;
+  action: AuditActionValue;
+  entityType: string;
+  entityId: number | null;
+  note: string | null;
+  createdAt: string;
+  actor: { id: number; fullName: string; role: string } | null;
+}
+
+export interface MyEvent {
+  id: number;
+  slug: string;
+  title: string;
+  status: EventStatusValue;
+  startAt: string;
+  endAt: string;
+  district?: MyDistrictRef | null;
+  business?: { id: number; slug: string; name: string } | null;
 }

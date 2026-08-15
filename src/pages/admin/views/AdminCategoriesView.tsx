@@ -1,10 +1,10 @@
 import { Plus } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Button from "../../../components/ui/Button";
 import Skeleton from "../../../components/ui/Skeleton";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAdminResource } from "../../../hooks/useAdminResource";
-import { getAdminCategories } from "../../../lib/api";
+import { ApiError, createAdminCategory, getAdminCategories, updateAdminCategory } from "../../../lib/api";
 import { categoryColor, categoryIcon, hexToRgba } from "../../../lib/categoryVisuals";
 import { localizedName } from "../../../lib/localize";
 import type { Category } from "../../../types";
@@ -14,15 +14,48 @@ import CategoryModal, { type CategoryFormState } from "../CategoryModal";
 export default function AdminCategoriesView() {
   const { lang } = useLanguage();
   const fetcher = useCallback(() => getAdminCategories(), []);
-  const { data, state, status } = useAdminResource(fetcher);
+  const { data, state, status, reload } = useAdminResource(fetcher);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  // No POST/PUT /admin/categories was verified as reachable, so saving only
-  // closes the modal. Wire to the real mutation once it is available.
-  function handleSave(_form: CategoryFormState) {
-    setModalOpen(false);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  async function handleSave(form: CategoryFormState) {
+    setSaving(true);
+    setSaveError(null);
+
+    const payload = {
+      nameUz: form.nameUz,
+      nameRu: form.nameRu,
+      nameEn: form.nameEn,
+      slug: form.slug,
+      icon: form.icon || undefined,
+      colorHex: form.colorHex,
+    };
+
+    try {
+      if (editing) {
+        await updateAdminCategory(editing.id, payload);
+        setToast("Turkum yangilandi");
+      } else {
+        await createAdminCategory(payload);
+        setToast("Turkum qo'shildi");
+      }
+      setModalOpen(false);
+      reload();
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Saqlashda xatolik yuz berdi");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const stateEl = renderAdminState(state, status);
@@ -30,6 +63,12 @@ export default function AdminCategoriesView() {
 
   return (
     <div>
+      {toast && (
+        <div className="mb-4 rounded-lg bg-success/10 border border-success/20 text-success px-4 py-2.5 text-sm">
+          {toast}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-ink-muted">{state === "ok" ? `${categories.length} ta turkum` : "Turkumlar"}</p>
         <Button
@@ -37,6 +76,7 @@ export default function AdminCategoriesView() {
           size="sm"
           onClick={() => {
             setEditing(null);
+            setSaveError(null);
             setModalOpen(true);
           }}
         >
@@ -86,6 +126,7 @@ export default function AdminCategoriesView() {
                       size="sm"
                       onClick={() => {
                         setEditing(category);
+                        setSaveError(null);
                         setModalOpen(true);
                       }}
                     >
@@ -106,6 +147,8 @@ export default function AdminCategoriesView() {
         category={editing}
         onClose={() => setModalOpen(false)}
         onSave={handleSave}
+        submitting={saving}
+        error={saveError}
       />
     </div>
   );

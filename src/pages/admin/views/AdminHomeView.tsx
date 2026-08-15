@@ -1,11 +1,13 @@
-import { Building2, Calendar, Clock, MessageSquare, Plus, Users } from "lucide-react";
+import { Building2, Calendar, Clock, History, MessageSquare, Plus, Users } from "lucide-react";
 import { useCallback } from "react";
 import Button from "../../../components/ui/Button";
+import EmptyState from "../../../components/ui/EmptyState";
+import Skeleton from "../../../components/ui/Skeleton";
 import { useAdminResource } from "../../../hooks/useAdminResource";
-import { getAdminStats } from "../../../lib/api";
+import { getAdminAuditLogs, getAdminStats } from "../../../lib/api";
 import KpiCard from "../../dashboard/KpiCard";
-import { ACTIVITY_DOT_CLASSES, ADMIN_ACTIVITY } from "../adminMockData";
 import { AdminForbidden } from "../AdminFetchState";
+import { ACTION_DOT_CLASSES, describeAuditLog, timeAgo } from "../auditFormat";
 import type { AdminView } from "../types";
 
 interface AdminHomeViewProps {
@@ -18,11 +20,21 @@ function statValue(value: number | null | undefined, loading: boolean): string |
   return typeof value === "number" ? value : "—";
 }
 
+function sumValues(record: Record<string, number> | undefined): number | undefined {
+  if (!record) return undefined;
+  return Object.values(record).reduce((sum, n) => sum + n, 0);
+}
+
 export default function AdminHomeView({ onSelectView }: AdminHomeViewProps) {
   const fetcher = useCallback(() => getAdminStats(), []);
   const { data, state, status } = useAdminResource(fetcher);
 
+  const auditFetcher = useCallback(() => getAdminAuditLogs({ limit: 5 }), []);
+  const { data: auditData, state: auditState } = useAdminResource(auditFetcher);
+
   const loading = state === "loading";
+  const totalBusinesses = sumValues(data?.businessesByStatus);
+  const totalUsers = sumValues(data?.usersByRole);
 
   return (
     <div className="flex flex-col gap-8">
@@ -32,33 +44,47 @@ export default function AdminHomeView({ onSelectView }: AdminHomeViewProps) {
         than six times across the cards.
       */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard icon={Building2} label="Jami bizneslar" value={statValue(data?.businesses, loading)} />
+        <KpiCard icon={Building2} label="Jami bizneslar" value={statValue(totalBusinesses, loading)} />
         <KpiCard
           icon={Clock}
-          label="Kutilayotganlar"
-          value={statValue(data?.pendingBusinesses, loading)}
+          label="Kutilayotgan bizneslar"
+          value={statValue(data?.businessesByStatus.PENDING, loading)}
           trend="Tasdiqlash kutilmoqda"
           trendTone="amber"
         />
-        <KpiCard icon={Users} label="Foydalanuvchilar" value={statValue(data?.users, loading)} />
-        <KpiCard icon={MessageSquare} label="Sharhlar" value={statValue(data?.reviews, loading)} />
-        <KpiCard icon={Calendar} label="Tadbirlar" value={statValue(data?.events, loading)} />
-        <KpiCard icon={Plus} label="Bugun qo'shilgan" value={statValue(data?.createdToday, loading)} />
+        <KpiCard icon={Users} label="Foydalanuvchilar" value={statValue(totalUsers, loading)} />
+        <KpiCard icon={MessageSquare} label="Kutilayotgan sharhlar" value={statValue(data?.pendingReviews, loading)} />
+        <KpiCard icon={Calendar} label="Kutilayotgan tadbirlar" value={statValue(data?.pendingEvents, loading)} />
+        <KpiCard icon={Plus} label="Yangi ro'yxatdan o'tganlar (7 kun)" value={statValue(data?.newSignups7d, loading)} />
       </div>
 
       {state === "forbidden" && <AdminForbidden status={status} />}
 
       <div>
         <h2 className="text-lg font-bold text-ink mb-4">So'nggi faoliyat</h2>
-        <div className="flex flex-col gap-2">
-          {ADMIN_ACTIVITY.map((activity) => (
-            <div key={activity.id} className="flex items-center gap-3 p-3 bg-white/[0.03] rounded-lg">
-              <span className={`size-2 rounded-full shrink-0 ${ACTIVITY_DOT_CLASSES[activity.kind]}`} />
-              <span className="text-sm text-ink-body">{activity.text}</span>
-              <span className="text-xs text-ink-muted ml-auto shrink-0">{activity.timeAgo}</span>
-            </div>
-          ))}
-        </div>
+        {auditState === "loading" && (
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-[44px]" />
+            ))}
+          </div>
+        )}
+        {auditState === "ok" && (auditData?.data.length ?? 0) === 0 && (
+          <EmptyState icon={History} title="Hozircha faoliyat yo'q" body="Admin harakatlari shu yerda ko'rinadi." />
+        )}
+        {auditState === "ok" && auditData && auditData.data.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {auditData.data.map((log) => (
+              <div key={log.id} className="flex items-center gap-3 p-3 bg-white/[0.03] rounded-lg">
+                <span className={`size-2 rounded-full shrink-0 ${ACTION_DOT_CLASSES[log.action]}`} />
+                <span className="text-sm text-ink-body">
+                  {log.actor?.fullName ?? "Tizim"} — {describeAuditLog(log)}
+                </span>
+                <span className="text-xs text-ink-muted ml-auto shrink-0">{timeAgo(log.createdAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>

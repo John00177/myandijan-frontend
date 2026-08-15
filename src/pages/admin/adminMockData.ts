@@ -1,46 +1,16 @@
 /**
  * Placeholder data for the admin areas whose endpoints genuinely do not exist.
- * Probed 2026-08-13: /admin/reviews, /admin/audit-logs and /admin/settings all
- * return 404 with and without auth. Swap these for real fetches once the backend
- * ships those routes.
  *
- * The activity feed has no candidate endpoint at all, so it is mock too.
+ * Re-checked 2026-08-15 against the actual backend source (not just probed
+ * URLs): GET /admin/audit is real — an earlier session tried the wrong path
+ * (/admin/audit-logs) and wrongly concluded it was missing. That view now
+ * uses getAdminAuditLogs() from lib/api.ts instead of the mock data below.
+ *
+ * Genuinely absent: a review *list* endpoint (only POST /admin/reviews/:id/hide
+ * and /restore exist, no GET) and /admin/settings. Those stay mock.
  */
 
 export type ActivityKind = "add" | "edit" | "delete" | "warning";
-
-export interface AdminActivity {
-  id: number;
-  kind: ActivityKind;
-  text: string;
-  timeAgo: string;
-}
-
-export const ADMIN_ACTIVITY: AdminActivity[] = [
-  { id: 1, kind: "add", text: "Yangi biznes qo'shildi: 'Ali Cafe'", timeAgo: "10 daqiqa oldin" },
-  { id: 2, kind: "add", text: "Foydalanuvchi ro'yxatdan o'tdi: +99890...", timeAgo: "25 daqiqa oldin" },
-  { id: 3, kind: "edit", text: "Sharh tasdiqlandi", timeAgo: "1 soat oldin" },
-  { id: 4, kind: "delete", text: "Biznes o'chirildi", timeAgo: "2 soat oldin" },
-  { id: 5, kind: "warning", text: "Spam sharh aniqlandi", timeAgo: "3 soat oldin" },
-];
-
-export interface AdminAuditLog {
-  id: number;
-  at: string;
-  actor: string;
-  action: string;
-  details: string;
-  kind: ActivityKind;
-}
-
-export const ADMIN_AUDIT_LOGS: AdminAuditLog[] = [
-  { id: 1, at: "2026-08-12 14:30", actor: "admin@myandijan.uz", action: "Biznes tasdiqladi", details: "Ali Cafe", kind: "add" },
-  { id: 2, at: "2026-08-12 13:15", actor: "moderator", action: "Sharh o'chirdi", details: "Spam", kind: "delete" },
-  { id: 3, at: "2026-08-12 11:02", actor: "admin@myandijan.uz", action: "Turkum tahrirladi", details: "Oziq-ovqat", kind: "edit" },
-  { id: 4, at: "2026-08-11 18:47", actor: "admin@myandijan.uz", action: "Foydalanuvchi blokladi", details: "+998901112233", kind: "warning" },
-  { id: 5, at: "2026-08-11 16:20", actor: "moderator", action: "Biznes rad etdi", details: "Test Biznes", kind: "delete" },
-  { id: 6, at: "2026-08-11 09:05", actor: "admin@myandijan.uz", action: "Tadbir tasdiqladi", details: "Yozgi chegirmalar", kind: "add" },
-];
 
 export interface AdminMockReview {
   id: number;

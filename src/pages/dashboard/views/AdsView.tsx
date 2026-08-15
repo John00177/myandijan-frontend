@@ -5,8 +5,8 @@ export default function AdsView() {
   return (
     <EmptyState
       icon={Megaphone}
-      title="Reklamalar tez orada"
-      body="Biznesingizni reklama qilish imkoniyati tez orada qo'shiladi."
+      title="Reklamalar hali mavjud emas"
+      body="Biznesingizni reklama qilish imkoniyati hozircha ishlab chiqilmoqda."
     />
   );
 }
