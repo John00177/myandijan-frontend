@@ -10,14 +10,14 @@ interface BranchesSectionProps {
 }
 
 export default function BranchesSection({ branches }: BranchesSectionProps) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
 
   return (
     <section className="mt-10">
-      <h2 className="text-xl font-bold text-ink mb-4">Filiallar</h2>
+      <h2 className="text-xl font-bold text-ink mb-4">{t("branches")}</h2>
 
       {!branches || branches.length === 0 ? (
-        <EmptyState icon={MapPin} title="Filiallar yo'q" body="Bu biznes uchun qo'shimcha filiallar ko'rsatilmagan." />
+        <EmptyState icon={MapPin} title={t("noBranches")} body={t("noBranchesBody")} />
       ) : (
         <div className="flex flex-col gap-3">
           {branches.map((branch) => (

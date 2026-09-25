@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApiError, getBusiness } from "../lib/api";
 import type { Business, Lang } from "../types";
 
@@ -7,6 +7,8 @@ interface UseBusinessResult {
   loading: boolean;
   notFound: boolean;
   error: boolean;
+  /** Re-fetches without the loading skeleton — for after posting a review/reply/menu change. */
+  reload: () => void;
 }
 
 export function useBusiness(slug: string, lang: Lang): UseBusinessResult {
@@ -14,10 +16,14 @@ export function useBusiness(slug: string, lang: Lang): UseBusinessResult {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    // Only the initial load shows the full-page skeleton — a reload after a
+    // review/reply already has content on screen, so silently swapping it in
+    // reads better than flashing back to a skeleton.
+    if (reloadTick === 0) setLoading(true);
     setNotFound(false);
     setError(false);
 
@@ -40,7 +46,10 @@ export function useBusiness(slug: string, lang: Lang): UseBusinessResult {
     return () => {
       cancelled = true;
     };
-  }, [slug, lang]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, lang, reloadTick]);
 
-  return { business, loading, notFound, error };
+  const reload = useCallback(() => setReloadTick((t) => t + 1), []);
+
+  return { business, loading, notFound, error, reload };
 }

@@ -13,6 +13,7 @@ import DashboardHomeView from "./dashboard/views/DashboardHomeView";
 import EventsView from "./dashboard/views/EventsView";
 import InventoryView from "./dashboard/views/InventoryView";
 import MyBusinessesView from "./dashboard/views/MyBusinessesView";
+import PremiumView from "./dashboard/views/PremiumView";
 import ReviewsView from "./dashboard/views/ReviewsView";
 import SettingsView from "./dashboard/views/SettingsView";
 
@@ -24,8 +25,18 @@ export default function OwnerDashboard() {
   const { user, token } = useRequireAuth();
   // AddBusinessPage navigates back here with { state: { view } } so a sidebar
   // click from that page lands on the right tab instead of always "home".
-  const requestedView = (location.state as { view?: DashboardView } | null)?.view;
+  // DashboardHomeView's per-business "Tahrirlash" button adds editBusinessId
+  // so that tab opens straight into EditBusinessModal instead of just
+  // landing on the list.
+  const navState = location.state as { view?: DashboardView; editBusinessId?: number } | null;
+  const requestedView = navState?.view;
   const [activeView, setActiveView] = useState<DashboardView>(requestedView ?? "home");
+  const [editBusinessId, setEditBusinessId] = useState<number | undefined>(navState?.editBusinessId);
+
+  function goEditBusiness(id: number) {
+    setEditBusinessId(id);
+    setActiveView("businesses");
+  }
 
   // No token: useRequireAuth already opened the AuthModal. Render nothing
   // rather than the "not an owner" message, which would flash under it.
@@ -49,8 +60,9 @@ export default function OwnerDashboard() {
     <>
       <MetaTags title="Boshqaruv paneli — My Andijan" description="Biznes egalari uchun boshqaruv paneli." noIndex />
       <DashboardLayout activeView={activeView} onSelectView={setActiveView}>
-        {activeView === "home" && <DashboardHomeView onSelectView={setActiveView} />}
-        {activeView === "businesses" && <MyBusinessesView />}
+        {activeView === "home" && <DashboardHomeView onSelectView={setActiveView} onEditBusiness={goEditBusiness} />}
+        {activeView === "businesses" && <MyBusinessesView autoOpenBusinessId={editBusinessId} />}
+        {activeView === "premium" && <PremiumView />}
         {activeView === "inventory" && <InventoryView />}
         {activeView === "reviews" && <ReviewsView />}
         {activeView === "events" && <EventsView />}

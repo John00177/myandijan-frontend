@@ -83,16 +83,40 @@ export interface Branch {
   hours?: BusinessHours[];
 }
 
+export interface ReviewReply {
+  id: number;
+  body: string;
+  createdAt: string;
+  author?: { id: number; fullName: string } | null;
+}
+
+// Real GET /businesses/:id shape (see ReviewsService's REVIEW_INCLUDE on the
+// backend) — user.fullName/comment/photos, not authorName/text, and reply is
+// a nested ReviewReply, not a flat string.
 export interface Review {
   id: number;
-  authorName: string;
   rating: number;
-  text: string;
+  title?: string | null;
+  comment: string;
+  photos?: string[];
   createdAt: string;
+  user?: { id: number; fullName: string; avatarUrl?: string | null } | null;
+  reply?: ReviewReply | null;
+}
+
+export interface MenuItem {
+  id: number;
+  businessId: number;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  price?: number | string | null;
+  isAvailable?: boolean;
 }
 
 export interface Business {
   id: number;
+  ownerId?: number | null;
   slug: string;
   nameUz: string;
   nameRu: string;
@@ -102,10 +126,16 @@ export interface Business {
   descriptionEn?: string | null;
   coverImageUrl?: string | null;
   coverPhoto?: string | null;
+  hasDelivery?: boolean | null;
+  deliveryFee?: number | null;
+  deliveryTime?: string | null;
   rating?: number | null;
   reviewCount?: number | null;
   phone?: string | null;
   address?: string | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  website?: string | null;
   verified?: boolean;
   isPromoted?: boolean;
   isOpen?: boolean;
@@ -178,14 +208,28 @@ export interface CreateBusinessPayload {
   hours: BusinessHours[];
 }
 
-/** These match the live API's actual role strings — confirmed via POST /auth/register (2026-08-13), not guessed. */
-export type UserRole = "CUSTOMER" | "BUSINESS_OWNER" | "ADMIN";
+/**
+ * These match the live API's actual role strings. CUSTOMER/BUSINESS_OWNER/ADMIN
+ * confirmed via POST /auth/register (2026-08-13); MODERATOR/SUPPORT/SUPER_ADMIN
+ * added when the backend rolled out its role hierarchy (2026-08-15) — see
+ * UserRole enum in my-andijan-api/prisma/schema.prisma.
+ */
+export type UserRole = "CUSTOMER" | "BUSINESS_OWNER" | "MODERATOR" | "SUPPORT" | "ADMIN" | "SUPER_ADMIN";
 
 export interface AuthUser {
   id: number;
   fullName: string;
   phone: string;
   role: UserRole;
+  // Profile-completion fields. Not persisted server-side yet — the backend
+  // has no /users/me PATCH endpoint and no age/gender columns (confirmed
+  // against prisma/schema.prisma, 2026-08-15) — so these live in
+  // localStorage via AuthContext.updateUser until the backend catches up.
+  email?: string | null;
+  age?: number | null;
+  gender?: "MALE" | "FEMALE" | null;
+  districtId?: number | null;
+  avatarId?: string | null;
 }
 
 export interface AuthResponse {
@@ -203,6 +247,25 @@ export interface RegisterPayload {
   password: string;
   fullName: string;
   role: "user" | "owner";
+}
+
+/** Matches the real response shape of GET /admin/analytics/users (SUPER_ADMIN only) — see AnalyticsService.getUserAnalytics on the backend. */
+export interface UserAnalytics {
+  totalUsers: number;
+  ageGroups: { range: string; count: number }[];
+  genderSplit: { gender: string; count: number }[];
+  cityBreakdown: { city: string; count: number }[];
+}
+
+/** Matches GET /admin/analytics/dashboard (SUPER_ADMIN only) — see AnalyticsService.getDashboardAnalytics on the backend. */
+export interface DashboardAnalytics {
+  users: UserAnalytics & { newThisMonth: number };
+  businesses: {
+    totalBusinesses: number;
+    byStatus: { status: string; count: number }[];
+    byCategory: { category: string; count: number }[];
+    newThisMonth: number;
+  };
 }
 
 /**
@@ -233,12 +296,24 @@ export interface AdminBusiness {
   nameRu?: string | null;
   nameEn?: string | null;
   name?: string | null;
+  description?: string | null;
   status?: string | null;
   createdAt?: string | null;
+  coverPhoto?: string | null;
+  hasDelivery?: boolean | null;
+  deliveryFee?: number | null;
+  deliveryTime?: string | null;
   owner?: { id?: number; fullName?: string | null; phone?: string | null } | null;
   ownerId?: number | null;
   category?: { id?: number; nameUz?: string | null; slug?: string | null } | null;
+  // The real GET /admin/businesses response nests district under the
+  // primary branch (`branches[0].district`) — there is no top-level
+  // `district` field on the business itself, since district is a Branch
+  // concept (a business can have several). Kept `district` below as a
+  // permissive extra in case a future response shape does flatten it, but
+  // callers should read branches[0].district for the real data.
   district?: { id?: number; nameUz?: string | null } | null;
+  branches?: { id: number; address?: string | null; phone?: string | null; district?: { id?: number; nameUz?: string | null } | null }[] | null;
 }
 
 export interface AdminEvent {
@@ -310,6 +385,7 @@ export interface MyBranchHour {
   openTime: string | null;
   closeTime: string | null;
   isClosed: boolean;
+  is24Hours?: boolean;
 }
 
 export interface MyBranch {
@@ -329,10 +405,61 @@ export interface MyBusiness {
   slug: string;
   name: string;
   status: BusinessStatusValue;
+  coverPhoto?: string | null;
+  hasDelivery?: boolean | null;
+  deliveryFee?: number | null;
+  deliveryTime?: string | null;
+  // Real Business columns — OwnerService.findMyBusinesses uses Prisma
+  // `include` (not `select`), so every scalar column comes back on the wire
+  // whether or not it's typed here. viewCount has no writer anywhere in the
+  // app yet, so it reads 0 today — still real data, not mocked.
+  ratingAvg?: number | string | null;
+  reviewCount?: number | null;
+  viewCount?: number | null;
+  favoriteCount?: number | null;
   category?: { id: number; slug: string; nameUz: string } | null;
   businessType?: { id: number; slug: string; nameUz: string } | null;
   branches: MyBranch[];
   _count?: { branches: number };
+}
+
+/** GET /me/businesses/:id — same as MyBusiness plus the fields the list endpoint omits. */
+export interface MyBusinessDetail extends MyBusiness {
+  description?: string | null;
+}
+
+/**
+ * GET /businesses/:id (also accepts a slug) — the endpoint EditBusinessModal
+ * fetches from directly when opened with a businessId. Only returns
+ * APPROVED, non-deleted businesses (see BusinessesService.findOne on the
+ * backend), so the modal falls back to whatever `initial` data the caller
+ * already has (e.g. from /me/businesses or /admin/businesses) when this
+ * 404s for a DRAFT/PENDING listing.
+ */
+export interface BusinessEditBranch {
+  id: number;
+  address: string;
+  phone: string;
+  isPrimary: boolean;
+  district?: MyDistrictRef | null;
+  hours?: MyBranchHour[];
+}
+
+export interface BusinessEditDetail {
+  id: number;
+  slug: string;
+  name: string;
+  description?: string | null;
+  status?: string | null;
+  coverPhoto?: string | null;
+  hasDelivery?: boolean | null;
+  deliveryFee?: number | null;
+  deliveryTime?: string | null;
+  instagram?: string | null;
+  telegram?: string | null;
+  website?: string | null;
+  category?: { id: number; slug: string; nameUz: string } | null;
+  branches?: BusinessEditBranch[];
 }
 
 export interface MyStats {

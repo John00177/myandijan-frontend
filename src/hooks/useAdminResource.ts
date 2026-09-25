@@ -18,7 +18,13 @@ interface UseAdminResourceResult<T> {
   reload: () => void;
 }
 
-export function useAdminResource<T>(fetcher: () => Promise<T>): UseAdminResourceResult<T> {
+/**
+ * `enabled` mirrors react-query's option of the same name: when false, no
+ * request is ever issued (not "issued then discarded") — for guards where the
+ * caller must not fetch at all, e.g. a SUPER_ADMIN-only view rendered for a
+ * plain ADMIN. Defaults to true so every existing call site is unaffected.
+ */
+export function useAdminResource<T>(fetcher: () => Promise<T>, enabled = true): UseAdminResourceResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [state, setState] = useState<AdminFetchState>("loading");
   const [status, setStatus] = useState<number | null>(null);
@@ -27,6 +33,8 @@ export function useAdminResource<T>(fetcher: () => Promise<T>): UseAdminResource
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
+    if (!enabled) return;
+
     let cancelled = false;
     setState("loading");
 
@@ -47,7 +55,7 @@ export function useAdminResource<T>(fetcher: () => Promise<T>): UseAdminResource
     return () => {
       cancelled = true;
     };
-  }, [fetcher, attempt]);
+  }, [fetcher, attempt, enabled]);
 
   return { data, state, status, reload };
 }

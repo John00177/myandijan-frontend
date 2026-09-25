@@ -1,24 +1,33 @@
 import { SearchX } from "lucide-react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import JsonLd, { type LocalBusinessInput } from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
 import EmptyState from "../components/ui/EmptyState";
 import Skeleton from "../components/ui/Skeleton";
+import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useBusiness } from "../hooks/useBusiness";
 import { localizedDescription, localizedName } from "../lib/localize";
 import ActionButtons from "./business/ActionButtons";
 import BranchesSection from "./business/BranchesSection";
 import BusinessInfoHeader from "./business/BusinessInfoHeader";
+import ContactCTA from "./business/ContactCTA";
 import DescriptionSection from "./business/DescriptionSection";
 import HeroImage from "./business/HeroImage";
+import MenuSection from "./business/MenuSection";
 import ReviewsSection from "./business/ReviewsSection";
 import SimilarBusinesses from "./business/SimilarBusinesses";
+import SocialLinks from "../components/business/SocialLinks";
+
+type DetailTab = "about" | "menu" | "reviews";
 
 export default function BusinessDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, t } = useLanguage();
-  const { business, loading, notFound, error } = useBusiness(slug ?? "", lang);
+  const { user } = useAuth();
+  const { business, loading, notFound, error, reload } = useBusiness(slug ?? "", lang);
+  const [activeTab, setActiveTab] = useState<DetailTab>("about");
 
   if (loading) {
     return (
@@ -32,11 +41,7 @@ export default function BusinessDetailPage() {
   if (notFound || error || !business) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <EmptyState
-          icon={SearchX}
-          title="Biznes topilmadi"
-          body="Bu biznes mavjud emas yoki o'chirilgan bo'lishi mumkin."
-        />
+        <EmptyState icon={SearchX} title={t("businessNotFound")} body={t("businessNotFoundBody")} />
       </div>
     );
   }
@@ -50,6 +55,15 @@ export default function BusinessDetailPage() {
   // Coordinates and opening hours live on the primary branch, not the business.
   const branch = business.primaryBranch ?? business.branches?.[0] ?? null;
   const locality = business.city ? localizedName(business.city, lang) : business.district ? localizedName(business.district, lang) : null;
+
+  const canManage =
+    !!user && (user.id === business.ownerId || user.role === "ADMIN" || user.role === "SUPER_ADMIN" || user.role === "MODERATOR");
+
+  const tabs: { key: DetailTab; label: string }[] = [
+    { key: "about", label: t("description") },
+    { key: "menu", label: t("menu") },
+    { key: "reviews", label: `${t("reviews")}${business.reviewCount ? ` (${business.reviewCount})` : ""}` },
+  ];
 
   const schema: LocalBusinessInput = {
     name,
@@ -83,11 +97,48 @@ export default function BusinessDetailPage() {
 
       <div className="max-w-7xl mx-auto px-6 -mt-16 relative z-10">
         <div className="rounded-2xl bg-card border border-white/[0.08] shadow-card p-6 md:p-8">
-          <BusinessInfoHeader business={business} />
+          <BusinessInfoHeader business={business} onViewReviews={() => setActiveTab("reviews")} />
+          <ContactCTA business={business} />
           <ActionButtons business={business} />
-          <DescriptionSection business={business} />
-          <BranchesSection branches={business.branches} />
-          <ReviewsSection reviews={business.reviews} />
+          {(business.instagram || business.telegram || business.website) && (
+            <div className="mt-6">
+              <SocialLinks instagram={business.instagram} telegram={business.telegram} website={business.website} />
+            </div>
+          )}
+          <div className="flex items-center gap-1 mt-8 border-b border-white/[0.08]">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                  activeTab === tab.key
+                    ? "border-primary text-ink"
+                    : "border-transparent text-ink-muted hover:text-ink"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            {activeTab === "about" && (
+              <>
+                <DescriptionSection business={business} />
+                <BranchesSection branches={business.branches} />
+              </>
+            )}
+            {activeTab === "menu" && <MenuSection businessId={business.id} canManage={canManage} />}
+            {activeTab === "reviews" && (
+              <ReviewsSection
+                businessId={business.id}
+                ownerId={business.ownerId}
+                reviews={business.reviews}
+                onChanged={reload}
+              />
+            )}
+          </div>
+
           <SimilarBusinesses businesses={business.similar} />
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { Building2, Calendar, LayoutDashboard, Megaphone, MessageSquare, Package, Settings, type LucideIcon } from "lucide-react";
+import { Building2, Calendar, Crown, LayoutDashboard, Megaphone, MessageSquare, Package, Settings, type LucideIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -8,6 +8,7 @@ import type { DashboardView } from "./types";
 const MENU_ITEMS: { view: DashboardView; label: string; icon: LucideIcon }[] = [
   { view: "home", label: "Umumiy ko'rsatkichlar", icon: LayoutDashboard },
   { view: "businesses", label: "Mening bizneslarim", icon: Building2 },
+  { view: "premium", label: "Premium", icon: Crown },
   { view: "inventory", label: "Omborxona", icon: Package },
   { view: "reviews", label: "Sharhlar", icon: MessageSquare },
   { view: "events", label: "Tadbirlar", icon: Calendar },

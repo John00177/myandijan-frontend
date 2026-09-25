@@ -28,7 +28,10 @@ export function BusinessStatusBadge({ status }: { status: string | null | undefi
 const ROLE_LABELS: Record<UserRole, { label: string; tone: Tone }> = {
   CUSTOMER: { label: "Mijoz", tone: "blue" },
   BUSINESS_OWNER: { label: "Biznes egasi", tone: "amber" },
+  MODERATOR: { label: "Moderator", tone: "danger" },
+  SUPPORT: { label: "Qo'llab-quvvatlash", tone: "blue" },
   ADMIN: { label: "Admin", tone: "danger" },
+  SUPER_ADMIN: { label: "Super Admin", tone: "danger" },
 };
 
 export function RoleBadge({ role }: { role: string | null | undefined }) {

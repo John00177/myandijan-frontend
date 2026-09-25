@@ -7,6 +7,7 @@ import type { DashboardView } from "./types";
 const VIEW_TITLES: Record<DashboardView, string> = {
   home: "Umumiy ko'rsatkichlar",
   businesses: "Mening bizneslarim",
+  premium: "Premium",
   inventory: "Omborxona",
   reviews: "Sharhlar",
   events: "Tadbirlar",

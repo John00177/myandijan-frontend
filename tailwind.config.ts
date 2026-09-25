@@ -19,6 +19,15 @@ export default {
         warning: "#F59E0B",
         danger: "#EF4444",
         border: "rgba(255,255,255,0.08)",
+        // Monetization palette. The app's existing dark/blue theme stays the
+        // base; these are the accents that mark paid placements so "premium"
+        // reads instantly without re-theming every existing surface.
+        gold: "#FFD700",
+        "gold-deep": "#B8860B",
+        silver: "#C0C7D0",
+        bronze: "#CD7F32",
+        navy: "#1A3A5C",
+        "brand-green": "#2E7D32",
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],

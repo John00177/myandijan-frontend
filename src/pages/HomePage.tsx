@@ -1,3 +1,4 @@
+import EditorsPickCarousel from "../components/premium/EditorsPickCarousel";
 import JsonLd from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
 import SafeScrollReveal from "../components/SafeScrollReveal";
@@ -32,6 +33,9 @@ export default function HomePage() {
       </SafeScrollReveal>
       <SafeScrollReveal label="categories">
         <CategoriesSection />
+      </SafeScrollReveal>
+      <SafeScrollReveal label="editors-pick">
+        <EditorsPickCarousel />
       </SafeScrollReveal>
       <SafeScrollReveal label="featured">
         <FeaturedBusinesses />

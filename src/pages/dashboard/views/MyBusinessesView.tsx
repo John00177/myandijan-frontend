@@ -1,14 +1,25 @@
 import { Building2, Plus } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
 import Skeleton from "../../../components/ui/Skeleton";
+import EditBusinessModal, {
+  type EditableBusiness,
+  type EditBusinessFormState,
+} from "../../../components/business/EditBusinessModal";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAdminResource } from "../../../hooks/useAdminResource";
-import { getMyBusinesses } from "../../../lib/api";
-import type { BusinessStatusValue } from "../../../types";
+import {
+  ApiError,
+  getMyBusinessById,
+  getMyBusinesses,
+  updateBusiness,
+  updateBusinessHours,
+  updateMyBranch,
+} from "../../../lib/api";
+import type { BusinessStatusValue, MyBusiness } from "../../../types";
 
 const STATUS_LABEL: Record<BusinessStatusValue, string> = {
   DRAFT: "Qoralama",
@@ -26,14 +37,141 @@ const STATUS_TONE: Record<BusinessStatusValue, "success" | "amber" | "danger" | 
   SUSPENDED: "danger",
 };
 
-export default function MyBusinessesView() {
+function toEditableBusiness(b: MyBusiness): EditableBusiness {
+  const branch = b.branches[0];
+  return {
+    id: b.id,
+    name: b.name,
+    categoryId: b.category?.id ?? null,
+    status: b.status,
+    branchId: branch?.id ?? null,
+    phone: branch?.phone ?? null,
+    address: branch?.address ?? null,
+    districtId: branch?.district?.id ?? null,
+    coverPhoto: b.coverPhoto ?? null,
+    hasDelivery: b.hasDelivery ?? null,
+    deliveryFee: b.deliveryFee ?? null,
+    deliveryTime: b.deliveryTime ?? null,
+  };
+}
+
+interface MyBusinessesViewProps {
+  /** Set when this tab was reached via DashboardHomeView's "Tahrirlash" shortcut, to open the modal immediately. */
+  autoOpenBusinessId?: number;
+}
+
+export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesViewProps) {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const fetcher = useCallback(() => getMyBusinesses(), []);
   const { data: businesses, state, status, reload } = useAdminResource(fetcher);
 
+  const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [editingBusiness, setEditingBusiness] = useState<EditableBusiness | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [autoOpenedId, setAutoOpenedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!autoOpenBusinessId || autoOpenBusinessId === autoOpenedId || !businesses) return;
+    const match = businesses.find((b) => b.id === autoOpenBusinessId);
+    if (match) {
+      setAutoOpenedId(autoOpenBusinessId);
+      void openEditModal(match);
+    }
+  }, [autoOpenBusinessId, businesses, autoOpenedId]);
+
+  async function openEditModal(business: MyBusiness) {
+    // The list response is a lean summary (no description, no branch
+    // phone/address/district) — fetch the full detail so the form doesn't
+    // open silently missing fields the business actually has.
+    setEditingBusiness(toEditableBusiness(business));
+    setEditError(null);
+    setEditModalOpen(true);
+    setEditLoading(true);
+    try {
+      const full = await getMyBusinessById(business.id);
+      setEditingBusiness({ ...toEditableBusiness(full), description: full.description ?? null });
+    } catch {
+      // Keep the summary-derived data already shown rather than blocking
+      // the form on a failed detail fetch.
+    } finally {
+      setEditLoading(false);
+    }
+  }
+
+  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null }) {
+    if (!editingBusiness) return;
+    setEditSaving(true);
+    setEditError(null);
+
+    try {
+      await updateBusiness(editingBusiness.id, {
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        categoryId: form.categoryId ? Number(form.categoryId) : undefined,
+        coverPhoto: form.coverPhoto.trim() || undefined,
+        hasDelivery: form.hasDelivery,
+        deliveryFee: form.hasDelivery && form.deliveryFee ? Number(form.deliveryFee) : undefined,
+        deliveryTime: form.hasDelivery ? form.deliveryTime.trim() || undefined : undefined,
+        instagram: form.instagram.trim() || undefined,
+        telegram: form.telegram.trim() || undefined,
+        website: form.website.trim() || undefined,
+      });
+
+      await updateBusinessHours(
+        editingBusiness.id,
+        form.hours.map((row) => ({
+          dayOfWeek: row.dayOfWeek,
+          openTime: row.isClosed ? undefined : row.openTime,
+          closeTime: row.isClosed ? undefined : row.closeTime,
+          isClosed: row.isClosed,
+        })),
+      );
+
+      const branchId = meta.branchId ?? editingBusiness.branchId;
+      if (branchId && (form.phone.trim() || form.address.trim() || form.districtId)) {
+        await updateMyBranch(branchId, {
+          phone: form.phone.trim() || undefined,
+          address: form.address.trim() || undefined,
+          districtId: form.districtId ? Number(form.districtId) : undefined,
+        });
+      }
+
+      setToast({ tone: "success", text: "Biznes yangilandi" });
+      setEditModalOpen(false);
+      reload();
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Biznesni tahrirlashda xatolik";
+      setEditError(message);
+      setToast({ tone: "error", text: "Biznesni tahrirlashda xatolik" });
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
   return (
     <div>
+      {toast && (
+        <div
+          className={`mb-4 rounded-lg border px-4 py-2.5 text-sm ${
+            toast.tone === "success"
+              ? "bg-success/10 border-success/20 text-success"
+              : "bg-danger/10 border-danger/20 text-danger"
+          }`}
+        >
+          {toast.text}
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-ink-muted">{state === "ok" ? `${businesses?.length ?? 0} ta biznes` : "Bizneslar"}</p>
         <Button variant="primary" size="sm" onClick={() => navigate(`/${lang}/dashboard/business/new`)}>
@@ -86,12 +224,7 @@ export default function MyBusinessesView() {
                     {business.category?.nameUz ?? "—"}
                     {branch?.district ? ` · ${branch.district.nameUz}` : ""}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full mt-3"
-                    onClick={() => navigate(`/${lang}/dashboard/business/${business.id}/edit`)}
-                  >
+                  <Button variant="ghost" size="sm" className="w-full mt-3" onClick={() => openEditModal(business)}>
                     Tahrirlash
                   </Button>
                 </div>
@@ -100,6 +233,16 @@ export default function MyBusinessesView() {
           })}
         </div>
       )}
+
+      <EditBusinessModal
+        open={editModalOpen}
+        businessId={editingBusiness?.id ?? null}
+        initial={editingBusiness}
+        onClose={() => setEditModalOpen(false)}
+        onSave={handleSaveEdit}
+        submitting={editSaving || editLoading}
+        error={editError}
+      />
     </div>
   );
 }

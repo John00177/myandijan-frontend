@@ -7,6 +7,7 @@ import { MapPin, Star } from "lucide-react";
 import Badge from "../../components/ui/Badge";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { localizedName } from "../../lib/localize";
+import { getBusinessPremium } from "../../lib/premium";
 import type { Business, Lang } from "../../types";
 
 const ANDIJON_CENTER: [number, number] = [40.7823, 72.3442];
@@ -21,13 +22,54 @@ interface PinnedBusiness {
   lng: number;
 }
 
-function markerIcon(label: string): L.DivIcon {
-  return L.divIcon({
-    html: `<div class="size-8 rounded-full bg-primary border-2 border-white shadow-lg flex items-center justify-center text-white text-xs font-bold">${label}</div>`,
-    className: "",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+/**
+ * Business names are user-submitted, and this interpolates into raw HTML that
+ * Leaflet injects directly — React's escaping does not apply here. Only one
+ * character reaches it today, which is why nothing has broken, but escaping at
+ * the boundary is what keeps that true if the label ever grows.
+ */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
   });
+}
+
+/**
+ * Paid listings get a gold pin, free ones a muted grey — the same visual
+ * hierarchy the result cards use, so scanning the map matches scanning the
+ * list. Featured pins are drawn slightly larger to survive a dense cluster.
+ */
+function markerIcon(label: string, tier: "featured" | "premium" | "free"): L.DivIcon {
+  const size = tier === "featured" ? 36 : 32;
+  const style =
+    tier === "free"
+      ? "background:#64748B;border-color:#94A3B8;color:#FFFFFF"
+      : tier === "premium"
+        ? "background:linear-gradient(135deg,#FFD700,#B8860B);border-color:#FFF3B0;color:#3A2B00"
+        : "background:linear-gradient(135deg,#FFD700,#FFB300);border-color:#FFFFFF;color:#3A2B00;box-shadow:0 0 0 3px rgba(255,215,0,0.35)";
+
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;${style}" class="rounded-full border-2 shadow-lg flex items-center justify-center text-xs font-bold">${escapeHtml(label)}</div>`,
+    className: "",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
+function pinTier(business: Business): "featured" | "premium" | "free" {
+  const { plan } = getBusinessPremium(business);
+  return plan === "featured" ? "featured" : plan === "premium" ? "premium" : "free";
 }
 
 function pinBusinesses(businesses: Business[]): PinnedBusiness[] {
@@ -77,7 +119,11 @@ export default function SearchMap({ businesses }: SearchMapProps) {
       >
         <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
         {pins.map(({ business, lat, lng }) => (
-          <Marker key={business.id} position={[lat, lng]} icon={markerIcon(localizedName(business, lang)[0] ?? "?")}>
+          <Marker
+            key={business.id}
+            position={[lat, lng]}
+            icon={markerIcon(localizedName(business, lang)[0] ?? "?", pinTier(business))}
+          >
             <Popup>
               <BusinessPopup business={business} lang={lang} />
             </Popup>

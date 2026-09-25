@@ -1,4 +1,4 @@
-import { Building2, MessageSquare, Star, TrendingUp } from "lucide-react";
+import { Building2, Eye, Heart, MessageSquare, Star, TrendingUp } from "lucide-react";
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Badge from "../../../components/ui/Badge";
@@ -13,6 +13,7 @@ import type { DashboardView } from "../types";
 
 interface DashboardHomeViewProps {
   onSelectView: (view: DashboardView) => void;
+  onEditBusiness: (id: number) => void;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -31,7 +32,7 @@ const STATUS_TONE: Record<string, "success" | "amber" | "danger" | "neutral"> = 
   SUSPENDED: "danger",
 };
 
-export default function DashboardHomeView({ onSelectView }: DashboardHomeViewProps) {
+export default function DashboardHomeView({ onSelectView, onEditBusiness }: DashboardHomeViewProps) {
   const { lang } = useLanguage();
   const navigate = useNavigate();
 
@@ -105,11 +106,28 @@ export default function DashboardHomeView({ onSelectView }: DashboardHomeViewPro
                   <Badge tone={STATUS_TONE[business.status]} className="mt-1">
                     {STATUS_LABEL[business.status]}
                   </Badge>
+                  {/* Real Business columns (ratingAvg/viewCount/favoriteCount) —
+                      viewCount has no writer anywhere in the app yet, so it
+                      reads 0 today; not mocked, just not populated yet. */}
+                  <div className="flex items-center gap-3 mt-1.5 text-xs text-ink-muted">
+                    <span className="flex items-center gap-1">
+                      <Eye size={12} /> {business.viewCount ?? 0} ko'rish
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Heart size={12} /> {business.favoriteCount ?? 0} sevimlilar
+                    </span>
+                    {Number(business.ratingAvg ?? 0) > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Star size={12} className="fill-warning text-warning" />
+                        {Number(business.ratingAvg).toFixed(1)} reyting
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => navigate(`/${lang}/dashboard/business/${business.id}/edit`)}
+                  onClick={() => onEditBusiness(business.id)}
                 >
                   Tahrirlash
                 </Button>

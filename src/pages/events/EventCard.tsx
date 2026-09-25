@@ -18,14 +18,8 @@ export default function EventCard({ event }: EventCardProps) {
 
   return (
     <AnimatedCard className="overflow-hidden">
-      <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22] relative overflow-hidden">
-        {event.image && (
-          <img
-            src={event.image}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-          />
-        )}
+      <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22] relative">
+        {event.image && <img src={event.image} alt="" className="absolute inset-0 w-full h-full object-cover" />}
       </div>
 
       <div className="p-4">

@@ -38,10 +38,7 @@ export default function UsefulServices() {
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-16">
-      <div className="mb-6">
-        <div className="uppercase tracking-widest text-[10px] text-ink-muted mb-1">{t("services.eyebrow")}</div>
-        <h2 className="text-3xl font-extrabold tracking-tight text-ink">{t("services.title")}</h2>
-      </div>
+      <h2 className="text-2xl font-bold text-ink mb-6">{t("services.title")}</h2>
 
       <StaggerContainer className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {SERVICES.map(({ icon: Icon, titleKey, descriptionKey }) => (

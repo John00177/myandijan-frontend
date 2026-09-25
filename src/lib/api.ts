@@ -7,25 +7,40 @@ import type {
   AdminStats,
   AdminUser,
   AuthResponse,
+  AuthUser,
+  Branch,
   Business,
+  BusinessEditDetail,
   Category,
   CreateBusinessPayload,
   Event,
   Lang,
   LoginPayload,
+  MenuItem,
+  MyBranch,
+  MyBranchHour,
   MyBusiness,
+  MyBusinessDetail,
   MyEvent,
   MyReview,
   MyStats,
   PaginatedResponse,
   Region,
+  Review,
+  ReviewReply,
   RegisterPayload,
   SearchBusinessesParams,
+  DashboardAnalytics,
+  UserAnalytics,
 } from "../types";
 
 const BASE = import.meta.env.VITE_API_URL || "https://myandijan-api-production.up.railway.app";
 const TIMEOUT_MS = 10_000;
 const TOKEN_KEY = "myandijan_token";
+const USER_KEY = "myandijan_user";
+
+/** Fired when a request proves the stored token is no longer valid. */
+export const SESSION_EXPIRED_EVENT = "myandijan:session-expired";
 
 class ApiError extends Error {
   status: number;
@@ -34,6 +49,26 @@ class ApiError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+/**
+ * Central handling for "the token we sent was rejected".
+ *
+ * Previously only AuthContext's mount-time getMe() and useFavorites noticed a
+ * 401, so a token expiring mid-session left the rest of the app (owner
+ * dashboard, favourites toggles, review replies) failing with generic errors
+ * while the UI still showed the user as logged in, with no way back other
+ * than manually logging out. Clearing here means any 401 from any endpoint
+ * ends the session exactly once, and the event lets React state follow.
+ *
+ * Only fires when a token was actually sent: a 401 from /auth/login is a wrong
+ * password, not an expired session.
+ */
+function handleUnauthorized(hadToken: boolean, status: number): void {
+  if (!hadToken || status !== 401) return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
 }
 
 async function request<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
@@ -58,6 +93,7 @@ async function request<T>(path: string, params?: Record<string, string | number 
   try {
     const res = await fetch(url.toString(), { headers, signal: controller.signal });
     if (!res.ok) {
+      handleUnauthorized(!!token, res.status);
       throw new ApiError(`Request failed: ${res.status}`, res.status);
     }
     return (await res.json()) as T;
@@ -74,17 +110,222 @@ export function getCategories(lang?: Lang): Promise<Category[]> {
   return request<Category[]>("/categories", { lang });
 }
 
+/**
+ * The backend's Business/Branch models are NOT localized (a single `name`
+ * column, not nameUz/nameRu/nameEn — those only exist on Category/District/
+ * City) and keep phone/address/district/hours on Branch, not Business. The
+ * frontend `Business`/`Branch` types were built assuming a shape closer to
+ * the localized taxonomy entities, so every endpoint that returns a business
+ * needs its raw response adapted here — once, at the boundary — rather than
+ * every render site guessing at fallbacks. Fixes: blank business names
+ * (localizedName read nameUz, which the API never sends), missing phone/
+ * address on the detail page (lived on branches[0], never copied up), and
+ * NaN ratings (API sends ratingAvg as a string).
+ */
+function normalizeBranch(raw: any): Branch {
+  const rawName = raw?.name ?? raw?.nameUz ?? null;
+  return {
+    id: raw.id,
+    nameUz: raw.nameUz ?? rawName ?? "",
+    nameRu: raw.nameRu ?? rawName ?? "",
+    nameEn: raw.nameEn ?? rawName ?? "",
+    address: raw.address ?? null,
+    phone: raw.phone ?? null,
+    lat: raw.lat != null ? Number(raw.lat) : null,
+    lng: raw.lng != null ? Number(raw.lng) : null,
+    hours: Array.isArray(raw.hours)
+      ? raw.hours.map((h: any) => ({
+          day: h.day ?? h.dayOfWeek,
+          openTime: h.openTime ?? null,
+          closeTime: h.closeTime ?? null,
+          isClosed: !!h.isClosed,
+        }))
+      : undefined,
+  };
+}
+
+function normalizeBusiness(raw: any): Business {
+  if (!raw) return raw;
+
+  const branches = Array.isArray(raw.branches) ? raw.branches.map(normalizeBranch) : undefined;
+  const rawPrimary = raw.primaryBranch ?? raw.branches?.[0] ?? null;
+  const primary = rawPrimary ? normalizeBranch(rawPrimary) : branches?.[0];
+  const displayName = raw.name ?? raw.nameUz ?? raw.slug ?? "Noma'lum biznes";
+
+  return {
+    ...raw,
+    nameUz: raw.nameUz ?? displayName,
+    nameRu: raw.nameRu ?? displayName,
+    nameEn: raw.nameEn ?? displayName,
+    descriptionUz: raw.descriptionUz ?? raw.description ?? null,
+    descriptionRu: raw.descriptionRu ?? raw.description ?? null,
+    descriptionEn: raw.descriptionEn ?? raw.description ?? null,
+    coverImageUrl: raw.coverImageUrl ?? raw.coverUrl ?? null,
+    coverPhoto: raw.coverPhoto ?? null,
+    rating: raw.rating != null ? Number(raw.rating) : raw.ratingAvg != null ? Number(raw.ratingAvg) : null,
+    reviewCount: raw.reviewCount ?? 0,
+    phone: raw.phone ?? primary?.phone ?? null,
+    address: raw.address ?? primary?.address ?? null,
+    verified: raw.verified ?? raw.isVerified ?? false,
+    district: raw.district ?? rawPrimary?.district ?? null,
+    city: raw.city ?? rawPrimary?.city ?? null,
+    branches,
+    primaryBranch: primary ?? null,
+  };
+}
+
 export function getFeaturedBusinesses(lang?: Lang): Promise<Business[]> {
-  return request<Business[]>("/businesses/featured", { lang });
+  return request<any[]>("/businesses/featured", { lang }).then((rows) => rows.map(normalizeBusiness));
 }
 
 export function searchBusinesses(params: SearchBusinessesParams): Promise<PaginatedResponse<Business>> {
   const { lang: _lang, ...rest } = params;
-  return request<PaginatedResponse<Business>>("/businesses", rest);
+  return request<PaginatedResponse<any>>("/businesses", rest).then((res) => ({
+    ...res,
+    data: res.data.map(normalizeBusiness),
+  }));
 }
 
 export function getBusiness(slug: string, lang?: Lang): Promise<Business> {
-  return request<Business>(`/businesses/${slug}`, { lang });
+  return request<any>(`/businesses/${slug}`, { lang }).then(normalizeBusiness);
+}
+
+// GET /businesses/:id — same route as getBusiness above (it accepts either an
+// id or a slug server-side), used by EditBusinessModal to pre-fill its form
+// from a businessId. Only returns APPROVED businesses.
+export function getBusinessById(id: number): Promise<BusinessEditDetail> {
+  return request<BusinessEditDetail>(`/businesses/${id}`);
+}
+
+// PATCH /businesses/:id — owner or ADMIN/MODERATOR/SUPER_ADMIN (enforced
+// server-side). Distinct from updateMyBusiness/updateAdminBusiness: this is
+// the one general-purpose path EditBusinessModal saves through regardless of
+// which context (owner or admin) opened it.
+export function updateBusiness(
+  id: number,
+  payload: {
+    name?: string;
+    description?: string;
+    categoryId?: number;
+    coverPhoto?: string;
+    hasDelivery?: boolean;
+    deliveryFee?: number;
+    deliveryTime?: string;
+    instagram?: string;
+    telegram?: string;
+    website?: string;
+  },
+): Promise<BusinessEditDetail> {
+  return authedPatchJson<BusinessEditDetail>(`/businesses/${id}`, payload);
+}
+
+// PUT /businesses/:id/hours — replaces the business's primary-branch hours
+// wholesale from the 7-day grid in EditBusinessModal.
+export function updateBusinessHours(
+  id: number,
+  hours: Array<{ dayOfWeek: number; openTime?: string; closeTime?: string; isClosed?: boolean; is24Hours?: boolean }>,
+): Promise<MyBranchHour[]> {
+  return authedPutJson<MyBranchHour[]>(`/businesses/${id}/hours`, hours);
+}
+
+// MENU  (Product under the hood — see the backend's products module for why
+// there's no separate MenuItem model.)
+export function getBusinessMenu(businessId: number): Promise<MenuItem[]> {
+  return request<MenuItem[]>(`/businesses/${businessId}/menu`);
+}
+
+export function createMenuItem(
+  businessId: number,
+  payload: { name: string; price: number; description?: string; photo?: string },
+): Promise<MenuItem> {
+  return authedPostJson<MenuItem>(`/businesses/${businessId}/menu`, payload);
+}
+
+export function updateMenuItem(
+  id: number,
+  payload: { name?: string; price?: number; description?: string; photo?: string; isAvailable?: boolean },
+): Promise<MenuItem> {
+  return authedPatchJson<MenuItem>(`/menu/${id}`, payload);
+}
+
+export function deleteMenuItem(id: number): Promise<void> {
+  return authedDelete(`/menu/${id}`);
+}
+
+// REVIEWS  (business-scoped convenience — POST resolves to the business's
+// primary branch server-side, same as PUT /businesses/:id/hours does.)
+export function createBusinessReview(
+  businessId: number,
+  payload: { rating: number; title?: string; comment: string; photos?: string[] },
+): Promise<Review> {
+  return authedPostJson<Review>(`/businesses/${businessId}/reviews`, payload);
+}
+
+export function replyToReview(reviewId: number, body: string): Promise<ReviewReply> {
+  return authedPatchJson<ReviewReply>(`/reviews/${reviewId}/reply`, { body });
+}
+
+// IMAGE UPLOAD  (POST /upload/image — multipart, returns a real Supabase
+// Storage URL). A longer timeout than the JSON helpers below: a photo
+// upload over a slow connection legitimately takes more than 10s, and
+// aborting it early would look like a random failure.
+const UPLOAD_TIMEOUT_MS = 30_000;
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const ALLOWED_UPLOAD_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"];
+
+/**
+ * Client-side guard before the request goes out. `accept="image/*"` on the
+ * input is only a picker hint — drag-and-drop and "All files" both bypass it —
+ * so without this a 40MB video uploads for 30s and then fails as an opaque
+ * timeout. Rejecting up front costs nothing and gives a real message; the
+ * server still enforces its own limits.
+ */
+function assertUploadable(file: File): void {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    const mb = (file.size / (1024 * 1024)).toFixed(1);
+    throw new ApiError(`Rasm hajmi juda katta (${mb}MB). Maksimal 5MB.`, 413);
+  }
+  // Some browsers report an empty type for uncommon formats — only reject on
+  // a type that is present AND not an image, so a valid file is never blocked
+  // by a missing MIME type alone.
+  if (file.type && !ALLOWED_UPLOAD_TYPES.includes(file.type) && !file.type.startsWith("image/")) {
+    throw new ApiError("Faqat rasm fayllari qabul qilinadi (JPG, PNG, WEBP).", 415);
+  }
+}
+
+export async function uploadImage(file: File): Promise<{ url: string }> {
+  assertUploadable(file);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    // No Content-Type header here — the browser sets
+    // multipart/form-data with the correct boundary itself; setting it
+    // manually would drop the boundary and break the upload.
+    const res = await fetch(new URL("/upload/image", BASE).toString(), {
+      method: "POST",
+      headers,
+      body: formData,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      handleUnauthorized(!!token, res.status);
+      const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
+      const message = Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message;
+      throw new ApiError(message ?? `Request failed: ${res.status}`, res.status);
+    }
+    return (await res.json()) as { url: string };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export function getEvents(): Promise<PaginatedResponse<Event>> {
@@ -169,6 +410,7 @@ async function authedDelete(path: string): Promise<void> {
       signal: controller.signal,
     });
     if (!res.ok) {
+      handleUnauthorized(!!token, res.status);
       throw new ApiError(`Request failed: ${res.status}`, res.status);
     }
   } finally {
@@ -185,7 +427,7 @@ async function authedDelete(path: string): Promise<void> {
  * likely real shape so it activates the moment the backend ships it; callers
  * should treat a 404 ApiError as "not launched yet".
  */
-async function authedJson<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
+async function authedJson<T>(method: "POST" | "PATCH" | "PUT", path: string, body: unknown): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -201,6 +443,7 @@ async function authedJson<T>(method: "POST" | "PATCH", path: string, body: unkno
       signal: controller.signal,
     });
     if (!res.ok) {
+      handleUnauthorized(!!token, res.status);
       const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
       const message = Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message;
       throw new ApiError(message ?? `Request failed: ${res.status}`, res.status);
@@ -219,12 +462,34 @@ function authedPatchJson<T>(path: string, body: unknown): Promise<T> {
   return authedJson<T>("PATCH", path, body);
 }
 
+function authedPutJson<T>(path: string, body: unknown): Promise<T> {
+  return authedJson<T>("PUT", path, body);
+}
+
+// GET/PATCH /users/me are both real and live (confirmed 2026-08-17).
+export function getMe(): Promise<AuthUser> {
+  return request<AuthUser>("/users/me");
+}
+
+export function updateProfile(payload: Partial<AuthUser>): Promise<AuthUser> {
+  return authedPatchJson<AuthUser>("/users/me", payload);
+}
+
 export function createBusiness(payload: CreateBusinessPayload): Promise<Business> {
   return authedPostJson<Business>("/businesses", payload);
 }
 
+// GET /favorites requires auth and returns `{favoritedAt, business}[]`, not
+// a flat Business[] — unwrapped here so every caller keeps working with
+// plain Business objects.
 export function getFavorites(lang?: Lang): Promise<Business[]> {
-  return request<Business[]>("/favorites", { lang });
+  return request<Array<{ favoritedAt: string; business: unknown }>>("/favorites", { lang }).then((rows) =>
+    rows.map((row) => normalizeBusiness(row.business)),
+  );
+}
+
+export function addFavorite(businessId: number): Promise<unknown> {
+  return authedPostJson("/favorites", { businessId });
 }
 
 export function removeFavorite(businessId: number): Promise<void> {
@@ -261,12 +526,48 @@ export function getAdminStats(): Promise<AdminStats> {
   return request<AdminStats>("/admin/stats");
 }
 
+export function getUserAnalytics(): Promise<UserAnalytics> {
+  return request<UserAnalytics>("/admin/analytics/users");
+}
+
+export function getDashboardAnalytics(): Promise<DashboardAnalytics> {
+  return request<DashboardAnalytics>("/admin/analytics/dashboard");
+}
+
 export async function getAdminBusinesses(params?: {
   page?: number;
   limit?: number;
 }): Promise<AdminListResult<AdminBusiness>> {
   const raw = await request<unknown>("/admin/businesses", params);
   return normalizeAdminList<AdminBusiness>(raw);
+}
+
+export function approveAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/approve`, {});
+}
+
+// Backend's RejectBusinessDto requires a non-empty `reason` (@IsNotEmpty()) —
+// unlike approve, this can't be a bodyless POST.
+export function rejectAdminBusiness(id: number, reason: string): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/reject`, { reason });
+}
+
+export function updateAdminBusiness(
+  id: number,
+  payload: { name?: string; description?: string; categoryId?: number },
+): Promise<AdminBusiness> {
+  return authedPatchJson<AdminBusiness>(`/admin/businesses/${id}`, payload);
+}
+
+// Targets the business's primary branch server-side — there's no branch id
+// to pass because an admin editing "the business's contact info" isn't
+// meant to pick among branches the way an owner managing their own listing
+// might (see UpdateBusinessBranchDto on the backend).
+export function updateAdminBusinessBranch(
+  id: number,
+  payload: { phone?: string; address?: string; districtId?: number },
+): Promise<{ id: number; phone: string; address: string; districtId: number }> {
+  return authedPatchJson(`/admin/businesses/${id}/branch`, payload);
 }
 
 export async function getAdminUsers(params?: { page?: number; limit?: number }): Promise<AdminListResult<AdminUser>> {
@@ -305,6 +606,27 @@ export function getMyStats(): Promise<MyStats> {
 
 export function getMyBusinesses(): Promise<MyBusiness[]> {
   return request<MyBusiness[]>("/me/businesses");
+}
+
+// The list endpoint above returns a lean summary shape — no description,
+// no branch phone/address/district. This full-detail fetch is what backs
+// the edit modal opening with real data instead of a partially-blank form.
+export function getMyBusinessById(id: number): Promise<MyBusinessDetail> {
+  return request<MyBusinessDetail>(`/me/businesses/${id}`);
+}
+
+export function updateMyBusiness(
+  id: number,
+  payload: { name?: string; description?: string; categoryId?: number },
+): Promise<MyBusinessDetail> {
+  return authedPatchJson<MyBusinessDetail>(`/me/businesses/${id}`, payload);
+}
+
+export function updateMyBranch(
+  branchId: number,
+  payload: { phone?: string; address?: string; districtId?: number },
+): Promise<MyBranch> {
+  return authedPatchJson<MyBranch>(`/me/branches/${branchId}`, payload);
 }
 
 export function getMyReviews(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<MyReview>> {

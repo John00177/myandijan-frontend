@@ -10,8 +10,10 @@ import { useCategories } from "../hooks/useCategories";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { useRegions } from "../hooks/useRegions";
 import { useSearchBusinesses } from "../hooks/useSearchBusinesses";
+import { FOOD_CATEGORY_SLUG } from "../lib/foodCategory";
 import { localizedName } from "../lib/localize";
 import BusinessListCard from "./search/BusinessListCard";
+import CategorySearchPage from "./search/CategorySearchPage";
 import Pagination from "./search/Pagination";
 import SearchMap from "./search/SearchMap";
 import SearchHeader, { type SortOption } from "./search/SearchHeader";
@@ -30,7 +32,25 @@ function sortBusinesses(businesses: Business[], sort: SortOption, lang: "uz" | "
   return businesses;
 }
 
+/*
+ * /search?category=oziq-ovqat gets the restaurant-specific search UI
+ * (CategorySearchPage); every other category (or none) keeps the generic
+ * search below. This dispatch only calls useSearchParams so it stays valid
+ * regardless of which branch renders — the data-fetching hooks live inside
+ * each branch's own component instead.
+ */
 export default function SearchPage() {
+  const [searchParams] = useSearchParams();
+  const category = searchParams.get("category") ?? "";
+
+  if (category === FOOD_CATEGORY_SLUG) {
+    return <CategorySearchPage />;
+  }
+
+  return <GenericSearchPage />;
+}
+
+function GenericSearchPage() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

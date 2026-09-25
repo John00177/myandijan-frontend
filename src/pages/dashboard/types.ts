@@ -1,1 +1,9 @@
-export type DashboardView = "home" | "businesses" | "inventory" | "reviews" | "events" | "ads" | "settings";
+export type DashboardView =
+  | "home"
+  | "businesses"
+  | "premium"
+  | "inventory"
+  | "reviews"
+  | "events"
+  | "ads"
+  | "settings";

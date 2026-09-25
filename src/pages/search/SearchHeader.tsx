@@ -57,7 +57,10 @@ export default function SearchHeader({
     // need ~92px+, so the filter chips overflowed past the border-b and visually
     // collided with it. Sizing to content via padding instead of a fixed height
     // fixes that at any content size, rather than just raising the number.
-    <div className="sticky top-16 z-40 bg-surface/95 backdrop-blur-xl border-b border-white/[0.06] pt-4 pb-4">
+    // top must match the fixed header's height exactly (MobileHeader is h-14,
+    // desktop Header h-16) — a flat top-16 left an 8px slit on mobile that
+    // page content scrolled through.
+    <div className="sticky top-14 md:top-16 z-40 bg-surface/95 backdrop-blur-xl border-b border-white/[0.06] pt-4 pb-4">
       <div className="relative z-10 max-w-7xl mx-auto px-6 w-full">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto h-12 bg-elevated border border-white/[0.10] rounded-xl flex items-center px-4 gap-3">
           <Search size={18} className="text-ink-muted shrink-0" />

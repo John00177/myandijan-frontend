@@ -10,13 +10,13 @@ interface SimilarBusinessesProps {
 }
 
 export default function SimilarBusinesses({ businesses }: SimilarBusinessesProps) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
 
   if (!businesses || businesses.length === 0) return null;
 
   return (
     <section className="mt-10">
-      <h2 className="text-xl font-bold text-ink mb-4">O'xshash bizneslar</h2>
+      <h2 className="text-xl font-bold text-ink mb-4">{t("similarBusinesses")}</h2>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {businesses.map((business) => (
           <Link key={business.id} to={`/${lang}/business/${business.slug}`} className="shrink-0 w-64">
