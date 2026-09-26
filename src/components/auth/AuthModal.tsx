@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/motion-config";
 import ForgotPasswordFlow from "./ForgotPasswordFlow";
 import LoginForm from "./LoginForm";
-import RegisterForm from "./RegisterForm";
 
 type Tab = "login" | "register";
 type View = Tab | "forgot";
@@ -22,7 +22,8 @@ type View = Tab | "forgot";
  */
 export default function AuthModal() {
   const { isAuthModalOpen, closeAuthModal } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const navigate = useNavigate();
   const [view, setView] = useState<View>("login");
   const shouldAnimate = useShouldAnimate();
   const modalTransition = useMotionTransition(TRANSITIONS.modalSpring);
@@ -107,11 +108,18 @@ export default function AuthModal() {
                   >
                     {t("auth.login")}
                   </button>
+                  {/*
+                    Registration moved out of the modal to the phone-first
+                    /signup flow, which needs a full screen per step. The tab
+                    stays as the familiar entry point but now navigates there
+                    instead of rendering a second form in the modal.
+                  */}
                   <button
-                    onClick={() => setTab("register")}
-                    className={`h-9 rounded-lg text-sm font-medium transition-colors ${
-                      view === "register" ? "bg-primary text-white" : "text-ink-muted hover:text-ink"
-                    }`}
+                    onClick={() => {
+                      closeAuthModal();
+                      navigate(`/${lang}/signup`);
+                    }}
+                    className="h-9 rounded-lg text-sm font-medium text-ink-muted transition-colors hover:text-ink"
                   >
                     {t("auth.register")}
                   </button>
@@ -122,7 +130,6 @@ export default function AuthModal() {
                 {view === "login" && (
                   <LoginForm onSuccess={closeAuthModal} onForgotPassword={() => setView("forgot")} />
                 )}
-                {view === "register" && <RegisterForm onSuccess={closeAuthModal} />}
                 {view === "forgot" && <ForgotPasswordFlow onBackToLogin={() => setView("login")} />}
               </div>
             </motion.div>

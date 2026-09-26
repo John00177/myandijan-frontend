@@ -383,6 +383,44 @@ export function register(payload: RegisterPayload): Promise<AuthResponse> {
  * real failure.
  */
 
+/*
+ * Phone-first OTP signup. Backed by AuthService.requestOtp/verifyOtp on the
+ * API: codes are 6 digits, live 5 minutes, are single-use, and are capped at
+ * 3 SMS per phone per 10 minutes (the cap answers 429).
+ *
+ * verify returns the same {user, accessToken, refreshToken} envelope as
+ * /auth/login, so a verified phone lands in exactly the session the rest of
+ * the app already understands.
+ */
+export function requestOtp(phone: string): Promise<{ success: boolean; message: string }> {
+  return postJson<{ success: boolean; message: string }>("/auth/otp/request", { phone });
+}
+
+export function verifyOtp(phone: string, otp: string): Promise<AuthResponse> {
+  return postJson<AuthResponse>("/auth/otp/verify", { phone, otp });
+}
+
+/**
+ * Profile save for signup step 3 — PUT /auth/profile, multipart because the
+ * avatar rides along with the name in one request. The server composes
+ * firstName + lastName into the single `fullName` column it stores and
+ * uploads the photo to Supabase itself, so there is no separate upload call
+ * to sequence here.
+ */
+export async function saveSignupProfile(input: {
+  firstName: string;
+  lastName: string;
+  avatar?: File | null;
+}): Promise<AuthUser> {
+  const form = new FormData();
+  form.append("firstName", input.firstName);
+  form.append("lastName", input.lastName);
+  if (input.avatar) form.append("photo", input.avatar);
+
+  const res = await authedFormData<{ success: boolean; user: AuthUser }>("PUT", "/auth/profile", form);
+  return res.user;
+}
+
 export function forgotPassword(phone: string): Promise<void> {
   return postJson<void>("/auth/forgot-password", { phone });
 }
@@ -440,6 +478,38 @@ async function authedJson<T>(method: "POST" | "PATCH" | "PUT", path: string, bod
       method,
       headers,
       body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      handleUnauthorized(!!token, res.status);
+      const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
+      const message = Array.isArray(payload?.message) ? payload.message.join(", ") : payload?.message;
+      throw new ApiError(message ?? `Request failed: ${res.status}`, res.status);
+    }
+    return (await res.json().catch(() => undefined)) as T;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Authed multipart request. Separate from authedJson because the browser must
+ * set Content-Type itself here — writing multipart/form-data by hand drops the
+ * boundary and the server cannot parse the body.
+ */
+async function authedFormData<T>(method: "POST" | "PUT" | "PATCH", path: string, body: FormData): Promise<T> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+
+  const token = localStorage.getItem(TOKEN_KEY);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(new URL(path, BASE).toString(), {
+      method,
+      headers,
+      body,
       signal: controller.signal,
     });
     if (!res.ok) {
