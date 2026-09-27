@@ -12,7 +12,9 @@ export default function CtaBanner() {
         <h2 className="text-2xl md:text-3xl font-bold text-ink">{t("cta.title")}</h2>
         <p className="text-ink-body mt-3 max-w-lg mx-auto">{t("cta.subtitle")}</p>
         <button
-          onClick={() => navigate(`/${lang}/search`)}
+          // The button reads "add your business" — it went to /search, which
+          // is where a customer looks for one, not where an owner lists one.
+          onClick={() => navigate(`/${lang}/claim`)}
           className="mt-6 h-12 px-8 bg-primary hover:bg-blue-400 text-white font-semibold rounded-xl inline-flex items-center gap-2 active:scale-[0.97]"
         >
           <Plus size={18} />

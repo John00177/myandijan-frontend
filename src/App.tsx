@@ -21,6 +21,12 @@ function RedirectToSignup() {
   return <Navigate to={`/${lang}/signup`} replace />;
 }
 
+/** The claim flow lives at /claim; /business/claim is the path people reach for. */
+function RedirectToClaim() {
+  const { lang } = useParams();
+  return <Navigate to={`/${lang}/claim`} replace />;
+}
+
 /** Suspense boundary for the lazy routes that render outside Layout. */
 function LazyRouteShell() {
   return (
@@ -43,6 +49,7 @@ const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const SignupPage = lazy(() => import("./pages/SignupPage"));
+const ClaimPage = lazy(() => import("./pages/ClaimPage"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard"));
 const AddBusinessPage = lazy(() => import("./pages/dashboard/AddBusinessPage"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
@@ -75,6 +82,8 @@ export default function App() {
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="pricing" element={<PricingPage />} />
                     <Route path="signup" element={<SignupPage />} />
+                    <Route path="claim" element={<ClaimPage />} />
+                    <Route path="business/claim" element={<RedirectToClaim />} />
                     {/* /register never shipped as a route, but the old auth
                         modal's register tab and any external links point at it,
                         so it resolves here rather than 404ing. */}
