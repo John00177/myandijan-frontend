@@ -1,0 +1,413 @@
+# API — My Andijan
+
+> **118 routes** across 16 controllers in 17 feature modules. Extracted from the route decorators in `my-andijan-api/src/**/*.controller.ts` on 2026-09-28 and cross-referenced against the frontend's `src/lib/api.ts`.
+
+---
+
+## 0. Conventions
+
+| | |
+| --- | --- |
+| Base URL (production) | `https://myandijan-api-production.up.railway.app` |
+| Base URL (local) | `http://localhost:3000` (port 3001 was also used during development) |
+| **Global prefix** | **None.** Routes are `/auth/login`, *not* `/api/auth/login`. Session prompts referring to `/api/auth/otp/*` were wrong; the real paths have no `/api`. |
+| Auth | `Authorization: Bearer <accessToken>` |
+| Validation | Global `ValidationPipe` with `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` → **unknown body properties produce `400`** |
+| Paginated response | `{ "data": T[], "meta": { "page", "limit", "total", "totalPages" } }` |
+| Error response | Nest default: `{ "statusCode", "message": string \| string[], "error" }` |
+| Interactive docs | `GET /docs` — Swagger UI, **publicly reachable in production** |
+| `Decimal` over JSON | Serialised as **strings** (e.g. `ratingAvg: "5"`). Clients must coerce. |
+
+### Auth legend
+
+| Symbol | Meaning |
+| --- | --- |
+| — | Public, no token |
+| 🔒 | `JwtAuthGuard` — any authenticated active user |
+| 🔒 `ROLE` | `JwtAuthGuard` + `RolesGuard`, where `ROLE` is the **minimum** level (hierarchy floor: `CUSTOMER` 1 < `BUSINESS_OWNER` 2 < `SUPPORT` 3 < `MODERATOR` 4 < `ADMIN` 5 < `SUPER_ADMIN` 6) |
+
+### Frontend-usage legend
+
+| Symbol | Meaning |
+| --- | --- |
+| ✅ | Called by the frontend |
+| ⭕ | **Exists on the API but no frontend code calls it** |
+
+---
+
+## 1. Auth — `/auth` (10 routes)
+
+`src/auth/auth.controller.ts`
+
+| Method | Path | Auth | Purpose | Request | FE |
+| --- | --- | --- | --- | --- | --- |
+| POST | `/auth/register` | — | Create an account with a password | `RegisterDto`: `phone` `/^\+998\d{9}$/` **req**, `password` min 8 **req**, `fullName` min 2 **req**, `email?`, `role?` restricted to `CUSTOMER\|BUSINESS_OWNER`, `marketingConsent?` (default false), `districtId?` | ✅ |
+| POST | `/auth/login` | — | Password login | `LoginDto`: `phone`, `password` | ✅ |
+| POST | `/auth/refresh` | — | Exchange a refresh token for a new pair (rotating) | `RefreshDto` | **⭕** |
+| POST | `/auth/logout` | 🔒 | Revoke the current refresh token | — | **⭕** |
+| POST | `/auth/otp/request` | — | Send a 6-digit OTP | `RequestOtpDto`: `phone` `/^\+998\d{9}$/` | ✅ |
+| POST | `/auth/otp/verify` | — | Verify OTP; creates the user if new | `VerifyOtpDto`: `phone`, `otp` `/^\d{6}$/` | ✅ |
+| PUT | `/auth/profile` | 🔒 | Set name + avatar after OTP signup | **multipart**: `firstName`, `lastName`, `photo?` (image, ≤5 MB) | ✅ |
+| POST | `/auth/forgot-password` | — | Start password reset | `ForgotPasswordDto`: `phone` | ✅ |
+| POST | `/auth/verify-reset-code` | — | Verify the reset code | `VerifyResetCodeDto`: `phone`, `code` | ✅ |
+| POST | `/auth/reset-password` | — | Set a new password | `ResetPasswordDto`: `phone`, `code`, `newPassword` | ✅ |
+
+**Responses.** `/auth/login`, `/auth/register` and `/auth/otp/verify` all return the same envelope: `{ user, accessToken, refreshToken }`. `/auth/otp/request` returns `{ success: true, message: "Kod yuborildi" }`. `/auth/profile` returns `{ success: true, user }`.
+
+**Errors.** `400` bad phone format; `400 "Kod noto'g'ri yoki muddati tugagan"` wrong/expired OTP; `401` bad credentials or inactive user; **`429`** OTP rate limit (3 per phone per 10 min).
+
+**Behaviour to know.**
+- `RegisterDto.role` uses `@IsIn([CUSTOMER, BUSINESS_OWNER])`, which **is** the enforcement of the schema's *"the public /auth/register endpoint MUST reject role=ADMIN"* requirement.
+- OTP: 6 digits via `crypto.randomInt`, hashed, 5-minute TTL, single-use, max 5 attempts.
+- OTP-created users get an unusable random password hash and `fullName: ''`.
+- **`/auth/profile` is `PUT` and multipart**, not JSON — the avatar rides along with the name in one request, so the client needs no separate upload call.
+- `PUT /auth/profile` is the OTP-signup profile setter; `PATCH /users/me` is the general profile editor. **Two different endpoints for overlapping concerns.**
+
+**Models touched:** `User`, `RefreshToken`, `OtpCode`.
+
+---
+
+## 2. Users — `/users` (2 routes)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/users/me` | 🔒 | Current user profile | ✅ |
+| PATCH | `/users/me` | 🔒 | Update profile (`UpdateProfileDto`) | ✅ |
+
+Used by `AuthContext`'s mount-time refresh and `ProfilePage`. Supports `age`, `gender`, `avatarId` (migration `add_profile_fields`).
+
+> **Stale comment alert:** `src/contexts/AuthContext.tsx` claims *"the backend has no profile-update endpoint or age/gender columns yet."* It does. Both.
+
+---
+
+## 3. Geography — `/geography` (5 routes)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/geography/regions` | — | Regions (with districts) | ✅ |
+| GET | `/geography/districts` | — | All districts | **⭕** |
+| GET | `/geography/districts/:id/cities` | — | Cities in a district | **⭕** |
+| GET | `/geography/cities` | — | All cities | **⭕** |
+| GET | `/geography/cities/:id` | — | One city | **⭕** |
+
+The frontend derives districts from `regions[0].districts` (see `AdminRegionsView`, `useRegions`) rather than calling the dedicated endpoints.
+
+---
+
+## 4. Categories — `/categories` (3 routes)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/categories/homepage` | — | Categories with `showOnHomepage = true` | **⭕** |
+| GET | `/categories` | — | Full category list/tree | ✅ |
+| GET | `/categories/:slug` | — | One category by slug | **⭕** |
+
+The frontend fetches the whole list and filters client-side, so the purpose-built `homepage` endpoint is unused.
+
+---
+
+## 5. Businesses — `/businesses` (10 routes)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| POST | `/businesses` | 🔒 `CUSTOMER` | Create a business (any authenticated user) | ✅ |
+| DELETE | `/businesses/:id` | 🔒 **`SUPER_ADMIN`** | Delete a business | **⭕** |
+| PATCH | `/businesses/:id` | 🔒 `BUSINESS_OWNER` | Update — the one general-purpose path `EditBusinessModal` saves through, from either owner or admin context | ✅ |
+| PUT | `/businesses/:id/hours` | 🔒 `BUSINESS_OWNER` | Replace the **primary branch's** 7-day hours wholesale | ✅ |
+| GET | `/businesses/featured` | — | `isFeatured` businesses | ✅ |
+| GET | `/businesses/promoted` | — | `isPromoted` businesses | **⭕** |
+| GET | `/businesses` | — | **List + search + filter + paginate** | ✅ |
+| GET | `/businesses/:id` | — | Detail by **id or slug**; only `APPROVED` | ✅ |
+| GET | `/businesses/:id/reviews` | — | Reviews for a business | ✅ |
+| POST | `/businesses/:id/reviews` | 🔒 `CUSTOMER` | Create a review; resolves to the primary branch server-side | ✅ |
+
+**`GET /businesses` query (`ListBusinessesQueryDto`)** — this is the app's real search endpoint:
+
+| Param | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `category` | string | — | category slug |
+| `district` | int | — | district id |
+| `city` | int | — | city id |
+| `search` | string | — | free text |
+| `page` | int ≥1 | `1` | |
+| `limit` | int 1–100 | `20` | **max 100** |
+
+**`POST /businesses` (`CreateBusinessDto`)** — required: `name` (2–200), `categoryId`, `phone` `/^\+998\d{9}$/`, `districtId`, `address` (5–500). Optional: `businessTypeId`, `description`, `secondaryPhone`, `cityId`, `landmark`, `hours[]` (`{day: 0–6, openTime?, closeTime?, isClosed?}`), and more.
+
+> **Known spec divergence:** the claim flow specced address as optional. `CreateBusinessDto` hard-requires `address` (min 5) **and** `districtId`, so the claim flow had to make both required. `useClaimFlow.ts` defaults `DEFAULT_DISTRICT_ID = "1"` (Andijon).
+> **Historical trap:** commit `762ac15` fixed a frontend/backend mismatch — the field is **`hours`**, not `workingHours`.
+> **Stale comment alert:** `src/lib/api.ts` says `POST /businesses` was *"Confirmed absent on the live API (2026-08-13) … 404"*. It exists.
+
+**Models:** `Business`, `Branch`, `BranchHour`, `Category`, `BusinessType`, `Review`.
+
+---
+
+## 6. Search — `/search` (1 route)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/search` | — | Unified full-text search over businesses **and** products | **⭕** |
+
+**Query (`SearchQueryDto`):** `q` **required**, non-empty, ≤200 chars; `category?`, `district?`, `city?`, `page` (default 1), `limit` (1–100, default 20).
+
+**Response:** `{ data, meta: { page, limit, total, totalPages, query, normalizedQuery } }` where `normalizedQuery` exposes what the query folded down to after Uzbek transliteration normalisation.
+
+> **This is the most capable endpoint in the API and nothing calls it.** It uses `pg_trgm` + tsvector with four custom Postgres functions, ranks businesses and products in one CTE, and matches a product's category through its own or its business's. The frontend searches via `GET /businesses` instead.
+
+---
+
+## 7. Reviews — `/reviews` (6 routes)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| POST | `/reviews` | 🔒 | Create a review (branch-scoped) | **⭕** |
+| GET | `/reviews/:id` | — | One review | **⭕** |
+| PATCH | `/reviews/:id` | 🔒 | Edit own review | **⭕** |
+| DELETE | `/reviews/:id` | 🔒 | Delete own review | **⭕** |
+| POST | `/reviews/:id/reply` | 🔒 `BUSINESS_OWNER` | Create an owner reply | **⭕** |
+| PATCH | `/reviews/:id/reply` | 🔒 `BUSINESS_OWNER` | Edit an owner reply | ✅ |
+
+The frontend writes reviews through `POST /businesses/:id/reviews` and replies through `POST /me/reviews/:id/reply`, so most of this controller is unused. **`api.ts`'s `replyToReview()` uses `PATCH /reviews/:id/reply`** — edit, not create — which will fail if no reply exists yet. Worth verifying.
+
+**Constraints:** one review per user per branch; one reply per review; `rating` has no DB-level range check.
+
+---
+
+## 8. Favorites — `/favorites` (3 routes)
+
+Class-level 🔒 `JwtAuthGuard`.
+
+| Method | Path | Purpose | FE |
+| --- | --- | --- | --- |
+| POST | `/favorites` | Add — body `{ businessId }` | ✅ |
+| DELETE | `/favorites/:businessId` | Remove | ✅ |
+| GET | `/favorites` | List | ✅ |
+
+**`GET /favorites` returns `{ favoritedAt, business }[]`, not a flat `Business[]`** — `api.ts` unwraps it so callers keep working with plain business objects.
+
+---
+
+## 9. Products / "menu" — `/businesses/:id/menu` + `/menu` (4 routes)
+
+`ProductsController` is declared on **two** base paths.
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/businesses/:id/menu` | — | List a business's products | ✅ |
+| POST | `/businesses/:id/menu` | 🔒 `BUSINESS_OWNER` | Create an item | ✅ |
+| PATCH | `/menu/:id` | 🔒 `BUSINESS_OWNER` | Update an item | ✅ |
+| DELETE | `/menu/:id` | 🔒 `BUSINESS_OWNER` | Delete an item | ✅ |
+
+> **Stale comment alert:** `src/pages/dashboard/mockData.ts` says *"Products/inventory have no backend at all (no /me/products, no catalog endpoint) — this stays mock."* This API exists and `api.ts` already wraps it. `InventoryView` should be switched off mock data.
+> Backed by the `Product` model — there is deliberately no separate `MenuItem`.
+
+---
+
+## 10. Events — `/events` (4 routes)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/events` | — | Paginated list | ✅ |
+| POST | `/events` | 🔒 `BUSINESS_OWNER` | Create an event | **⭕** |
+| GET | `/events/:slug` | — | Detail by slug | **⭕** |
+| POST | `/events/:slug/attend` | 🔒 | RSVP (`EventAttendee`) | **⭕** |
+
+The frontend has an events **list** only — no detail page and no RSVP UI, despite both endpoints existing.
+
+---
+
+## 11. Upload — `/upload` (1 route)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| POST | `/upload/image` | 🔒 | Upload an image to Supabase Storage | ✅ |
+
+`multipart/form-data`, field **`file`**. Max **5 MB**; MIME allow-list `image/jpeg`, `image/png`, `image/webp`, `image/gif`. Returns `{ url }` — a public unsigned Supabase URL.
+
+Errors: `400 "No file uploaded (expected multipart field \"file\")"`, `400 "Unsupported file type: <mime>"`, `500` when `SUPABASE_URL`/`SUPABASE_SERVICE_KEY` are missing.
+
+> Authorization note from the controller: any authenticated user may upload, because the endpoint only returns a URL. Permission to *attach* that URL is enforced by whichever write endpoint the client calls next.
+> The client also pre-validates (`assertUploadable`) and allows `image/heic`/`image/heif`, **which the server rejects** — an iPhone HEIC upload passes the client check and then fails server-side with a 400.
+
+---
+
+## 12. Owner — `/me` (14 routes)
+
+Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
+
+| Method | Path | Purpose | FE |
+| --- | --- | --- | --- |
+| GET | `/me/stats` | Owner KPI summary | ✅ |
+| GET | `/me/businesses` | My businesses (lean summary shape) | ✅ |
+| POST | `/me/businesses` | Create a business as owner | **⭕** |
+| GET | `/me/businesses/:id` | **Full** detail — backs the edit modal | ✅ |
+| PATCH | `/me/businesses/:id` | Update my business | ✅ |
+| POST | `/me/businesses/:id/branches` | Add a branch | **⭕** |
+| PATCH | `/me/branches/:id` | Update a branch (`phone`, `address`, `districtId`) | ✅ |
+| GET | `/me/reviews` | Reviews on my businesses (paginated) | ✅ |
+| POST | `/me/reviews/:id/reply` | Reply to a review | ✅ |
+| GET | `/me/events` | My events (paginated) | ✅ |
+| POST | `/me/events` | Create an event | **⭕** |
+| PATCH | `/me/events/:id` | Update an event | **⭕** |
+| DELETE | `/me/events/:id` | Delete an event | **⭕** |
+| GET | `/me/claims` | My submitted claims | **⭕** |
+
+> `GET /me/businesses` returns a lean shape without description or branch phone/address/district — which is why `GET /me/businesses/:id` exists and why the edit modal opens with real data rather than a partially blank form.
+> **`GET /me/claims` being unused matters:** an owner who submits a claim through `/uz/claim` has no way to see its status.
+
+---
+
+## 13. Analytics — 11 routes
+
+`AnalyticsController` is declared on `@Controller()` (root) and spans three path families.
+
+### 13.1 Ingestion (public)
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`) | **⭕** |
+| POST | `/analytics/click` | — | Record a click (`RecordClickDto`) | **⭕** |
+| POST | `/analytics/search` | — | Record a search (`RecordSearchDto`) | **⭕** |
+
+> **⚠ The single most consequential gap in the API surface.** These three are the only writers for `BusinessAnalytics`, `SearchAnalytics` and `ActivityLog`, and **the frontend calls none of them.** Every owner and admin analytics screen therefore reads from tables nothing populates. Wiring these is a small change with large downstream effect.
+> They are also **unauthenticated and unthrottled** — see `SECURITY.md`.
+
+### 13.2 Owner-facing reports (🔒)
+
+| Method | Path | Purpose | FE |
+| --- | --- | --- | --- |
+| GET | `/me/analytics/overview` | Summary | **⭕** |
+| GET | `/me/analytics/traffic` | Time series (`TrafficQueryDto`) | **⭕** |
+| GET | `/me/analytics/demographics` | Visitor cities | **⭕** |
+| GET | `/me/analytics/search-terms` | Terms that led to the business | **⭕** |
+| GET | `/me/analytics/peak-hours` | Busiest hours | **⭕** |
+| GET | `/me/analytics/competitors` | Category comparison | **⭕** |
+
+### 13.3 Admin (🔒 `SUPER_ADMIN`)
+
+| Method | Path | Purpose | FE |
+| --- | --- | --- | --- |
+| GET | `/admin/analytics/users` | User analytics | ✅ |
+| GET | `/admin/analytics/dashboard` | Dashboard analytics | ✅ |
+
+---
+
+## 14. Health score — 3 routes
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/me/health-score` | 🔒 | Scores + recommendations for my business | **⭕** |
+| POST | `/me/health-score/recommendations/:id/complete` | 🔒 | Mark a recommendation done | **⭕** |
+| POST | `/admin/health-scores/recalculate` | 🔒 `ADMIN` | Recalculate platform-wide | **⭕** |
+
+Four sub-scores (profile, engagement, visibility, response) plus a weighted `overallScore`; weights live in `HealthScoreService`, not the schema. Recommendations are keyed by a stable `code` so recalculation is an idempotent upsert that preserves `isCompleted`. **No frontend surface exists for any of it.**
+
+---
+
+## 15. Admin — `/admin` (31 routes)
+
+Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route overrides in **both** directions.
+
+| Method | Path | Auth | Purpose | FE |
+| --- | --- | --- | --- | --- |
+| GET | `/admin/stats` | `ADMIN` | Platform stats | ✅ |
+| GET | `/admin/businesses` | `ADMIN` | List businesses | ✅ |
+| POST | `/admin/businesses/:id/approve` | **`MODERATOR`** ↓ | Approve | ✅ |
+| POST | `/admin/businesses/:id/reject` | **`MODERATOR`** ↓ | Reject — body `{ reason }` **required** (`@IsNotEmpty`) | ✅ |
+| PATCH | `/admin/businesses/:id/hide` | **`SUPER_ADMIN`** ↑ | Hide | **⭕** |
+| PATCH | `/admin/businesses/:id` | `ADMIN` | Edit `name`/`description`/`categoryId` | ✅ |
+| PATCH | `/admin/businesses/:id/branch` | `ADMIN` | Edit the **primary** branch's `phone`/`address`/`districtId` | ✅ |
+| POST | `/admin/businesses/:id/verify` | `ADMIN` | Set verified | **⭕** |
+| POST | `/admin/businesses/:id/suspend` | `ADMIN` | Suspend | **⭕** |
+| POST | `/admin/businesses/:id/promote` | `ADMIN` | Set promoted/featured — **the only way promotion is granted today** | **⭕** |
+| GET | `/admin/claims` | `ADMIN` | List claims | **⭕** |
+| POST | `/admin/claims/:id/approve` | `ADMIN` | Approve → sets `Business.ownerId` | **⭕** |
+| POST | `/admin/claims/:id/reject` | `ADMIN` | Reject | **⭕** |
+| GET | `/admin/reports` | `ADMIN` | List review reports | **⭕** |
+| POST | `/admin/reports/:id/resolve` | `ADMIN` | Resolve/dismiss | **⭕** |
+| POST | `/admin/reviews/:id/hide` | `ADMIN` | Hide a review | **⭕** |
+| POST | `/admin/reviews/:id/restore` | `ADMIN` | Restore a review | **⭕** |
+| GET | `/admin/events` | `ADMIN` | List events | ✅ |
+| POST | `/admin/events/:id/approve` | `ADMIN` | Approve | **⭕** |
+| POST | `/admin/events/:id/reject` | `ADMIN` | Reject | **⭕** |
+| GET | `/admin/categories` | `ADMIN` | List | ✅ |
+| POST | `/admin/categories` | `ADMIN` | Create | ✅ |
+| PATCH | `/admin/categories/reorder` | `ADMIN` | Bulk `sortOrder` | **⭕** |
+| PATCH | `/admin/categories/:id` | `ADMIN` | Update | ✅ |
+| DELETE | `/admin/categories/:id` | `ADMIN` | Soft delete | **⭕** |
+| PATCH | `/admin/districts/:id` | `ADMIN` | Edit a district | **⭕** |
+| PATCH | `/admin/cities/:id` | `ADMIN` | Edit a city | **⭕** |
+| GET | `/admin/users` | `ADMIN` | List users | ✅ |
+| POST | `/admin/users/:id/suspend` | `ADMIN` | Suspend | **⭕** |
+| POST | `/admin/users/:id/activate` | `ADMIN` | Reactivate | **⭕** |
+| GET | `/admin/audit` | `ADMIN` | Audit log (paginated) | ✅ |
+
+> **⚠ Route-ordering hazard:** `PATCH /admin/categories/reorder` is declared **before** `PATCH /admin/categories/:id`, which is what makes `reorder` reachable rather than being swallowed as `:id = "reorder"`. **Do not reorder these declarations.**
+> **There is no `GET /admin/reviews`** — only hide/restore. This is exactly why `AdminReviewsView` is still mock data.
+> **11 of 31 admin routes are wired; 20 are not.** The backend moderation capability substantially exceeds the admin UI.
+
+> **Stale comment alert:** `src/lib/api.ts` says *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)"*. `/admin/audit` exists (the probed path was wrong, and this was later corrected in the same file); review hide/restore exist. Only `/admin/settings` is genuinely absent.
+
+---
+
+## 16. Command centre — `/admin` (10 routes)
+
+Separate controller, same `/admin` base, 🔒 `ADMIN`. **Founder-level analytics. Nothing in the frontend calls any of it.**
+
+| Method | Path | Purpose | FE |
+| --- | --- | --- | --- |
+| POST | `/admin/analytics/aggregate` | Build daily `PlatformMetric` rollups | **⭕** |
+| GET | `/admin/command-center/overview` | Top-line metrics | **⭕** |
+| GET | `/admin/command-center/growth` | Growth over time | **⭕** |
+| GET | `/admin/command-center/geography` | Per-district breakdown | **⭕** |
+| GET | `/admin/command-center/categories` | Per-category breakdown | **⭕** |
+| GET | `/admin/command-center/search-intelligence` | Query analytics | **⭕** |
+| GET | `/admin/command-center/users` | User cohorts | **⭕** |
+| GET | `/admin/command-center/moderation` | Moderation queue health | **⭕** |
+| GET | `/admin/command-center/business-health` | Health distribution | **⭕** |
+| GET | `/admin/command-center/health-overview` | "Who needs help" list | **⭕** |
+
+> `POST /admin/analytics/aggregate` is the only writer for `PlatformMetric`, and **nothing schedules it** (there is no cron in the API). Unless an external scheduler exists (**UNKNOWN**), the table is only populated when someone calls this route by hand.
+
+---
+
+## 17. Endpoints the frontend references that do NOT exist
+
+Verified by comparing every path in `src/` against the route list.
+
+| Referenced | Reality |
+| --- | --- |
+| `/admin/settings` | **Does not exist.** `AdminSettingsView` therefore keeps its state in `useState` and persists nothing. The `PlatformSetting` table exists and is unused — this is the missing module. |
+| `GET /admin/reviews` (list) | **Does not exist.** Only hide/restore. `AdminReviewsView` uses `adminMockData.ts`. |
+| `/health` | **Does not exist and never did.** Deploy checklists expecting it will 404. Use `GET /categories` as a liveness probe. |
+| `/api/auth/otp/*` | **Wrong prefix.** There is no global `/api` prefix; the real paths are `/auth/otp/*`. Several session specs used the wrong form. |
+
+## 18. Endpoints referenced in specs/plans that were never built
+
+| Referenced | Status |
+| --- | --- |
+| Notifications (any path) | **Not built.** `Notification` table + enum exist; no module, no endpoints, no writer. |
+| Advertisements (any path) | **Not built.** Deferred to Phase 2 with Click payments. |
+| Payments / subscriptions | **Not built.** No provider, no billing model. |
+| Telegram / Google OAuth | **Not built.** Signup shows the buttons. |
+| `/me/products` | Never existed — the real path is `/businesses/:id/menu`. |
+
+---
+
+## 19. Coverage summary
+
+| | Count |
+| --- | --- |
+| Total routes | **118** |
+| Called by the frontend | **~38** |
+| **Built but unused (⭕)** | **~80** |
+
+The imbalance is concentrated in five areas, and it is the clearest single fact about this codebase's state:
+
+1. **Search** (1 route) — the most sophisticated endpoint in the API, unused.
+2. **Analytics ingestion** (3 routes) — unused, which starves every analytics feature downstream.
+3. **Command centre** (10 routes) — unused; no founder dashboard exists.
+4. **Health score** (3 routes) — unused; no owner-facing surface.
+5. **Admin actions** (20 of 31) — unused; claims, reports, review moderation, verification, promotion, suspension and geography editing all lack UI.
+
+Consequence for planning: **the backend is not the bottleneck.** Most near-term product value is unlocked by frontend wiring against endpoints that already exist and already work.
