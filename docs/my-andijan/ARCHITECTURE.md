@@ -443,7 +443,7 @@ AI's actual role in this project is **as the development tool** (Claude Code acr
 | Service | Purpose | Status |
 | --- | --- | --- |
 | **Railway** | API + PostgreSQL hosting | **Active.** `railway.json`: NIXPACKS, `npm run build`, start `npx prisma migrate deploy && npm run start:prod`, restart `ON_FAILURE` max 3 |
-| **Vercel** | Frontend hosting | **Active but behind HEAD.** Project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3`. Not Git-connected. |
+| **Vercel** | Frontend hosting | **Active and current** (2026-09-28). Project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3`. Not Git-connected. |
 | **Supabase Storage** | Image storage | **Active.** Bucket `myandijan-images`, service_role key |
 | **Eskiz.uz** | SMS / OTP delivery | **Built, NOT configured.** `ESKIZ_*` unset on Railway → degrades to logging |
 | **Leaflet / OSM tiles** | Maps | Active (provider config not verified) |
@@ -527,6 +527,58 @@ Deployed with `npx vercel --prod` from this machine (no Git integration). Projec
 ### Local development
 - API: `docker-compose.yml` → `postgres:16`, user/db `andijan`/`my_andijan`, port 5432, healthcheck via `pg_isready`. Then `npm run start:dev` (Nest watch) on port 3000 (3001 was also used in session).
 - Frontend: `npm run dev` → Vite. **Port 5173 is occupied on this machine by an unrelated `crm-os` server, so this project uses 5180** via `.claude/launch.json`.
+
+### Production deployment baseline — verified 2026-09-28
+
+| | API | Frontend |
+| --- | --- | --- |
+| Platform | **Railway** (`myandijan-api`, env `production`, project `3910b9c5-e86d-4c06-8058-def605847424`) | **Vercel** (project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3`) |
+| Mechanism | `railway up` from a developer machine | Vercel CLI (`vercel --prod`) from a developer machine |
+| Git-connected? | **No** | **No** |
+| Version running | Built from `main` `4c5bcd0`; Railway deployment `08b23ee0`, status SUCCESS | Bundle byte-identical to a local build of `main` `0f4ecc8` |
+| Identified by | Railway deployment id + container content fingerprint | Vite content-hashed asset names (`index-NERlrCqp.js`) |
+
+**Neither platform auto-deploys from GitHub.** Pushing to `main` does **not** ship. Every deploy is a manual action from a developer machine, so `main` and production can silently diverge — re-verify after any commit.
+
+#### Why version is identified by content, not commit SHA
+
+Neither platform records a commit, because neither is Git-connected. Both were therefore verified by content:
+
+- **API** — `railway ssh` into the running container and check markers that differ between revisions (for example whether `scripts/seed-role-accounts.js` reads `process.env.SEED_ROLE_PASSWORD`), plus the `dist/main.js` mtime.
+- **Frontend** — download the served entry chunk and `cmp` it against a local `npm run build` of `main`. Vite hashes asset names from content, so identical names *and* a byte-identical file prove identical source. Confirmed for `index-NERlrCqp.js` (451,121 bytes) and `createLucideIcon-C9cll_Zg.js` (17,960 bytes, which is where `src/lib/api.ts` lands).
+
+#### Required production variables — names only
+
+**Railway (API), all present:** `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `SEED_ADMIN_PHONE`, `SEED_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL`, `SEED_ROLE_PASSWORD`, `FRONTEND_URL`, `NODE_ENV`, plus Railway-injected `PORT` / `RAILWAY_*`.
+
+**Absent by design or still outstanding:** `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM` — **still unset, so no SMS is sent**; `JWT_REFRESH_SECRET` is set but read by no code.
+
+**Vercel (frontend):** `VITE_API_URL` — confirmed *effective* (the production bundle embeds `https://myandijan-api-production.up.railway.app`, matching the deployed Railway service, and contains no `localhost`). The Vercel variable list itself could not be enumerated: the CLI is logged out and the Vercel API returned 403/404 for this project under the available token.
+
+#### Production verification procedure
+
+```bash
+curl -s -o /dev/null -w '%{http_code}
+' https://myandijan-api-production.up.railway.app/categories
+```
+
+1. **API health** — expect `200` on `/categories`, `/geography/regions`, `/businesses`, `/businesses/featured`, `/businesses/promoted`, `/events`, `/search?q=osh`, `/docs`; expect `401` on `/users/me`, `/favorites`, `/me/stats`, `/me/businesses`, `/admin/stats`.
+2. **Frontend version** — fetch the entry chunk named in `/uz`'s HTML and `cmp` it against `dist/assets/` after `npm run build`.
+3. **Rendering** — `/uz` (hero, districts, categories, Editor's Pick), `/ru/search` (Russian category names prove the localized taxonomy), `/uz/business/<slug>` (open-now badge, branch phone, dynamic `<title>`).
+4. **Auth gate** — `/uz/profile` must present the login dialog while unauthenticated. **Do not test credentials against production.**
+
+> **Verification trap:** `vercel.json` rewrites `/(.*)` → `/index.html`, so **every** URL on `myandijan.uz` returns `200` with `text/html`, including assets that do not exist. Always check `content-type` and size; use a deliberately fake asset path as a control.
+
+#### Known deployment limitations
+
+1. **No CI/CD and no Git-connected deploys** — deployment depends on one developer's machine and local CLI auth.
+2. **Vercel CLI auth expires**, and on this machine PowerShell's execution policy blocks the `npx.ps1` shim; use `npx.cmd`.
+3. **No `/health` endpoint** — use `GET /categories` as the liveness probe.
+4. **No staging environment**; `railway up` deploys straight to production.
+5. **Migrations run on boot**, `&&`-chained — the app will not start if they fail.
+6. **No error tracking or uptime monitoring.**
+7. **CORS is open** — verified `access-control-allow-origin: *` for an arbitrary origin.
+8. **`/docs` is publicly reachable in production.**
 
 ### Not present
 No CI/CD pipeline, no GitHub Actions, no staging environment, no preview-deploy workflow, no Dockerfile for the API, no infrastructure-as-code, no automated database backups configured in-repo.

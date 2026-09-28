@@ -12,9 +12,11 @@
 | **BROKEN** | Built but does not work as intended |
 | **UNKNOWN** | Cannot be determined from the repositories |
 
-### A distinction this matrix makes throughout
+### A distinction this matrix previously made
 
-Several features are **IMPLEMENTED in code but not in production**, because the deployed frontend bundle predates them. Those are marked **IMPLEMENTED (not deployed)** — they are done, not missing.
+> **Superseded 2026-09-28.** Several rows used to read *IMPLEMENTED (not deployed)* because the live bundle predated them. **Production now runs current `main`** (verified byte-identical), so those qualifiers are removed.
+
+This no longer applies. Frontend production was confirmed on 2026-09-28 to be serving the current `main` build.
 
 ---
 
@@ -30,7 +32,7 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 | Featured businesses | **PARTIALLY IMPLEMENTED** | Endpoint + UI exist; **`GET /businesses/featured` returns `[]`** — no business is flagged |
 | Promoted businesses | **PARTIALLY IMPLEMENTED** | `GET /businesses/promoted` exists; **no frontend calls it** |
 | Similar businesses | **IMPLEMENTED** | `SimilarBusinesses` on the detail page |
-| "Editor's Pick" carousel | **IMPLEMENTED (not deployed)** | `EditorsPickCarousel` |
+| "Editor's Pick" carousel | **IMPLEMENTED** | `EditorsPickCarousel` |
 | Useful services section | **IMPLEMENTED** | `UsefulServices` |
 | Platform stats strip | **IMPLEMENTED** | `StatsStrip` with count-up animation |
 | Events listing | **IMPLEMENTED** | `/:lang/events`; **live API returns 0 events** |
@@ -54,7 +56,7 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 | "Open now" filter | **IMPLEMENTED** | Real `BranchHour` data via `OpenNowBadge` |
 | Sort (rating / reviews / name) | **IMPLEMENTED** | `SortDropdown`, client-side |
 | Product/menu search | **PARTIALLY IMPLEMENTED** | Server ranks products; no UI surfaces product hits |
-| Business-name typeahead | **IMPLEMENTED (not deployed)** | Claim step 1 |
+| Business-name typeahead | **IMPLEMENTED** | Claim step 1 |
 | Geo/radius/"near me" search | **PLANNED** | Blocked by the no-PostGIS constraint |
 | Search suggestions / autocomplete | **PLANNED** | — |
 
@@ -81,7 +83,7 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 | Star ratings | **IMPLEMENTED** | Denormalized `ratingAvg` on business + branch |
 | Review photos | **PARTIALLY IMPLEMENTED** | `Review.photos String[]` and the upload endpoint exist; UI wiring **UNKNOWN** |
 | One review per user per branch | **IMPLEMENTED** | DB-enforced `@@unique([branchId, userId])` |
-| Owner replies | **IMPLEMENTED (not deployed)** | `ReviewsView` → `POST /me/reviews/:id/reply` |
+| Owner replies | **IMPLEMENTED** | `ReviewsView` → `POST /me/reviews/:id/reply` |
 | Edit / delete own review | **PARTIALLY IMPLEMENTED** | Endpoints exist; **no UI** |
 | Report a review | **PARTIALLY IMPLEMENTED** | `ReviewReport` model + admin resolve endpoint; **no report UI** |
 | "Helpful" voting | **PLANNED** | `helpfulCount` column exists; nothing increments it |
@@ -96,7 +98,7 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 | Client-side pre-validation | **IMPLEMENTED** | `assertUploadable()` |
 | Business logo / cover | **IMPLEMENTED** | Three overlapping fields: `logoUrl`, `coverUrl`, `coverPhoto` |
 | Branch photo gallery | **PARTIALLY IMPLEMENTED** | `BranchPhoto` model + `PhotoGalleryManager` component; end-to-end wiring **UNKNOWN** |
-| Avatar upload | **IMPLEMENTED (not deployed)** | `PUT /auth/profile` multipart |
+| Avatar upload | **IMPLEMENTED** | `PUT /auth/profile` multipart |
 | Preset avatar picker | **IMPLEMENTED** | `AvatarPicker` + `User.avatarId` |
 | OG image generation | **IMPLEMENTED** | `scripts/generate-og-image.ts` via `sharp`; static `og-default.jpg` |
 | **HEIC upload** | **BROKEN** | Client allows `image/heic`/`heif`; **server rejects them** → iPhone photos 400 |
@@ -109,7 +111,7 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 | --- | --- | --- |
 | Password registration | **IMPLEMENTED** | `POST /auth/register`; role restricted to `CUSTOMER`/`BUSINESS_OWNER` |
 | Password login | **IMPLEMENTED** | |
-| **Phone-first OTP signup** | **PARTIALLY IMPLEMENTED** | Frontend + backend complete; **not deployed AND no SMS is sent** |
+| **Phone-first OTP signup** | **PARTIALLY IMPLEMENTED** | Frontend + backend complete and **deployed**; still **no SMS is sent** |
 | OTP rate limiting | **IMPLEMENTED** | 3 per phone per 10 min → `429`, verified in production |
 | Password reset | **PARTIALLY IMPLEMENTED** | All three endpoints + UI exist; **code is logged, not sent** (`auth.service.ts:347`) |
 | JWT access tokens | **IMPLEMENTED** | 15 min default |
@@ -139,15 +141,15 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Owner dashboard shell | **IMPLEMENTED (not deployed)** | 8 views |
-| My businesses | **IMPLEMENTED (not deployed)** | Lean list + full-detail fetch |
-| Edit business | **IMPLEMENTED (not deployed)** | `EditBusinessModal`; details + 7-day hours |
-| Owner KPIs | **IMPLEMENTED (not deployed)** | `GET /me/stats` |
-| Reviews + reply | **IMPLEMENTED (not deployed)** | |
-| My events (list) | **IMPLEMENTED (not deployed)** | Create/edit/delete endpoints exist; **no UI** |
-| **Business claim flow** | **IMPLEMENTED (not deployed)** | 8 screens, live preview; submits to `POST /businesses` |
+| Owner dashboard shell | **IMPLEMENTED** | 8 views |
+| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch |
+| Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours |
+| Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
+| Reviews + reply | **IMPLEMENTED** | |
+| My events (list) | **IMPLEMENTED** | Create/edit/delete endpoints exist; **no UI** |
+| **Business claim flow** | **IMPLEMENTED** | 8 screens, live preview; submits to `POST /businesses` |
 | Claim status visibility | **PLANNED** | `GET /me/claims` exists; nothing calls it — an owner cannot see what happened to their claim |
-| Add business (3-step) | **IMPLEMENTED (not deployed)** | `AddBusinessPage` |
+| Add business (3-step) | **IMPLEMENTED** | `AddBusinessPage` |
 | Multi-branch management | **PARTIALLY IMPLEMENTED** | `POST /me/businesses/:id/branches` + `PATCH /me/branches/:id` exist; branch **creation** has no UI |
 | Menu / product management | **PARTIALLY IMPLEMENTED** | API + `api.ts` wrappers + `ProductModal` exist; **`InventoryView` still renders mock data** |
 | Owner analytics | **PARTIALLY IMPLEMENTED** | 6 endpoints exist; no UI, and the source tables are empty |
@@ -159,14 +161,14 @@ Several features are **IMPLEMENTED in code but not in production**, because the 
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Admin shell | **IMPLEMENTED (not deployed)** | 10 views, sidebar/drawer |
-| Platform stats | **IMPLEMENTED (not deployed)** | |
-| Business list + approve/reject | **IMPLEMENTED (not deployed)** | Reject requires a non-empty `reason` |
-| Business edit + branch edit | **IMPLEMENTED (not deployed)** | |
-| User list | **IMPLEMENTED (not deployed)** | |
+| Admin shell | **IMPLEMENTED** | 10 views, sidebar/drawer |
+| Platform stats | **IMPLEMENTED** | |
+| Business list + approve/reject | **IMPLEMENTED** | Reject requires a non-empty `reason` |
+| Business edit + branch edit | **IMPLEMENTED** | |
+| User list | **IMPLEMENTED** | |
 | Category CRUD | **PARTIALLY IMPLEMENTED** | List/create/update wired; delete + reorder endpoints unused |
-| Event list | **IMPLEMENTED (not deployed)** | Approve/reject endpoints unused |
-| Audit log | **IMPLEMENTED (not deployed)** | `GET /admin/audit` |
+| Event list | **IMPLEMENTED** | Approve/reject endpoints unused |
+| Audit log | **IMPLEMENTED** | `GET /admin/audit` |
 | Analytics view | **PARTIALLY IMPLEMENTED** | Real endpoints, but the underlying tables are unfed |
 | Regions view | **PARTIALLY IMPLEMENTED** | Reads the **public** geography endpoint; district/city edit endpoints unused |
 | **Review moderation** | **BROKEN** | Mock — no list endpoint |
@@ -240,11 +242,11 @@ See `AI.md`.
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Pricing page | **IMPLEMENTED (not deployed)** | 3 tiers, monthly/yearly toggle, 20% yearly discount |
-| Premium badges / tiers | **IMPLEMENTED (not deployed)** | Gold/silver/bronze, `PremiumBadge` |
-| Featured listing card | **IMPLEMENTED (not deployed)** | Gold gradient, ribbon, priority indicator, mini-chart |
-| Upgrade modal | **IMPLEMENTED (not deployed)** | With confirmation |
-| Premium view in owner dashboard | **IMPLEMENTED (not deployed)** | |
+| Pricing page | **IMPLEMENTED** | 3 tiers, monthly/yearly toggle, 20% yearly discount |
+| Premium badges / tiers | **IMPLEMENTED** | Gold/silver/bronze, `PremiumBadge` |
+| Featured listing card | **IMPLEMENTED** | Gold gradient, ribbon, priority indicator, mini-chart |
+| Upgrade modal | **IMPLEMENTED** | With confirmation |
+| Premium view in owner dashboard | **IMPLEMENTED** | |
 | Promotion flags | **IMPLEMENTED** | `isPromoted`/`isFeatured` + `*Until` |
 | Promotion granting | **PARTIALLY IMPLEMENTED** | Only `POST /admin/businesses/:id/promote` — admin-granted, never purchased |
 | **Payments (Click/Payme/Uzum/cash)** | **PLANNED** | **UI labels only. No provider, no integration, no billing/subscription table.** |
@@ -280,7 +282,7 @@ See `AI.md`.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | API deployment (Railway) | **IMPLEMENTED** | Auto-migrate on boot, `&&`-chained |
-| Frontend deployment (Vercel) | **PARTIALLY IMPLEMENTED** | Live but behind HEAD; **blocked** on local PowerShell execution policy |
+| Frontend deployment (Vercel) | **IMPLEMENTED** | Live and current as of 2026-09-28. Deployed from a developer machine via the Vercel CLI; the project is **not** Git-connected, so pushes to GitHub do not auto-deploy. |
 | SPA deep-link rewrite | **IMPLEMENTED** | `vercel.json` catch-all |
 | Local Postgres via Docker | **IMPLEMENTED** | `docker-compose.yml` |
 | Swagger API docs | **IMPLEMENTED** | `/docs` — **publicly exposed in production** |

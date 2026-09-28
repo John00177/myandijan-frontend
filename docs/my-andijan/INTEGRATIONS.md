@@ -9,7 +9,7 @@
 | Service | Category | Status |
 | --- | --- | --- |
 | Railway | API + database hosting | 🟢 **Active, current** |
-| Vercel | Frontend hosting | 🟡 **Active but behind HEAD; deploy blocked** |
+| Vercel | Frontend hosting | 🟢 **Active and current** (2026-09-28) |
 | Supabase Storage | Object storage | 🟢 **Active** |
 | PostgreSQL (Railway) | Database | 🟢 **Active** |
 | Leaflet / OSM tiles | Maps | 🟢 **Active** (provider unverified) |

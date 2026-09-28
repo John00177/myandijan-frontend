@@ -16,7 +16,7 @@
 
 Everything in this section is either a blocker or a case where work that is already *done* is invisible to users.
 
-### 1. Complete the frontend deploy · **[EXPLICIT]** · blocker
+### 1. ~~Complete the frontend deploy~~ — ✅ DONE 2026-09-28
 The pending task from the final session. All local work is deploy-ready: clean tree at `dd08485`, build passing, SPA rewrite and the `/uz/business/claim` redirect both in place.
 
 ```bash
@@ -31,7 +31,7 @@ npx.cmd vercel --prod
 - PowerShell 5.1 has no `&&` — run the two commands separately.
 - Until this lands, **signup, claim, pricing and the entire premium UI do not exist for users**, despite being finished.
 
-### 2. Run the queued post-deploy verification · **[EXPLICIT]**
+### 2. ~~Run the queued post-deploy verification~~ — ✅ DONE 2026-09-28
 Specified in the deploy brief and never executed:
 
 - **Signup:** phone → "Kod yuborildi" → OTP → optional profile

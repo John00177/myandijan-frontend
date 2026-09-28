@@ -30,7 +30,7 @@ Think Yelp/2GIS, scoped to one Uzbek region, mobile-first and trilingual from th
 | **API** | 🟢 **Deployed, verified, current.** All probed endpoints 200; auth guard working. |
 | **Database** | 🟢 Live on Railway, 11 migrations applied, geography + taxonomy seeded. **4 businesses, 0 featured, 0 events** — pre-launch content volume. |
 | **Frontend code** | 🟢 `HEAD = dd08485`, working tree clean, `npm run build` passes in 2.5 s, zero errors. |
-| **Frontend production** | 🔴 **Behind HEAD.** The live bundle has restaurant search but **no signup, claim, pricing or premium.** |
+| **Frontend production** | 🟢 **Current** (2026-09-28). Serves the `main` build — entry chunk byte-identical to a local build; signup, claim, pricing and premium all live. |
 | **Blocker** | 🔴 One local shell problem. See §5. |
 | **SMS / OTP** | 🔴 Built, **unconfigured** — reports success, sends nothing. |
 | **Payments** | ⚪ UI only. No provider. |
@@ -83,7 +83,7 @@ Full record — 52 decisions with lock status — in [`DECISIONS.md`](DECISIONS.
 
 ## 5. Current blockers
 
-### 🔴 Blocker 1 — The frontend cannot be deployed
+### 🟢 Blocker 1 — RESOLVED: the frontend is deployed and current
 
 **Root cause is local, not Vercel.** PowerShell's execution policy blocks `D:\Node.js\npx.ps1`, so **every** `npx`/`npm` command the developer ran — `vercel login`, `vercel link`, and four `npm i -g vercel` attempts — failed before Vercel was ever invoked.
 
@@ -122,8 +122,8 @@ The shortest path to a launchable product. Details in [`ROADMAP.md`](ROADMAP.md)
 
 | # | Action | Effort |
 | --- | --- | --- |
-| 1 | **Deploy the frontend** — `npx.cmd vercel login` then `npx.cmd vercel --prod` | Minutes (human) |
-| 2 | **Run the queued post-deploy verification** — signup, claim, premium, regressions, 375px | ~1 h |
+| 1 | ~~Deploy the frontend~~ — ✅ **DONE**: production serves current `main` (verified 2026-09-28) | — |
+| 2 | ~~Post-deploy verification~~ — ✅ **DONE 2026-09-28**: homepage, `/uz` `/ru` `/en`, search, business detail, signup, claim, pricing all render with live API data; auth modal gates correctly | — |
 | 3 | **Configure Eskiz + register the template** | ~1 h |
 | 4 | ~~Rotate the seed-script password~~ — **✅ DONE 2026-09-28** — rotated to a 192-bit random secret held in Railway's `SEED_ROLE_PASSWORD`; script parameterized; literal purged from history before the first push. | — |
 | 5 | **Fix password-reset SMS** (`auth.service.ts:347`) | Small |
@@ -184,7 +184,7 @@ Plus [`my-andijan-api/CLAUDE.md`](../../../my-andijan-api/CLAUDE.md) in the API 
 
 | Don't assume | Reality |
 | --- | --- |
-| **The live site reflects the code** | Production is behind `HEAD`. Signup, claim, pricing and premium are **not** deployed. |
+| ~~The live site reflects the code~~ | **It does, as of 2026-09-28.** Both platforms run current `main`. But neither auto-deploys from GitHub, so re-verify after any new commit. |
 | **A 200 means a page or asset exists** | `vercel.json` rewrites `/(.*)` → `/index.html`, so **every** URL on the domain returns 200 with HTML. **Check `content-type` and bundle contents.** |
 | **Comments in `src/lib/api.ts` are current** | Several assert endpoints 404 that now exist. Same for `AuthContext` ("no profile-update endpoint or age/gender columns") and `docs/SSG.md` ("the API returns zero businesses"). |
 | **The backend is the bottleneck** | ~80 of 118 routes have no frontend caller. |

@@ -94,7 +94,7 @@ Established in the prior session's production verification (recovered, not re-ru
 
 ## 3. What does not work
 
-1. **The frontend cannot be deployed.** Root cause is local, not Vercel: PowerShell's execution policy blocks `D:\Node.js\npx.ps1`, so every `npx`/`npm` command the developer ran — `vercel login`, `vercel link`, and four `npm i -g vercel` attempts — failed before Vercel was invoked. Fix: use `npx.cmd`.
+1. ~~The frontend cannot be deployed.~~ **RESOLVED 2026-09-28** — production serves current `main`. (Historical cause: PowerShell's execution policy blocked the `npx.ps1` shim, so `vercel login` never ran; the fix is `npx.cmd`.)
 2. **SMS delivery.** Unconfigured. OTP and password reset are both non-functional for real users.
 3. **Payments.** No provider integrated. Every price, tier and payment-method chip in the UI is presentational.
 4. **`AdminSettingsView` and dashboard `SettingsView`** accept input and show a saved state but write nothing anywhere.
@@ -178,7 +178,7 @@ These are documentation bugs, and they matter because the codebase's comments ar
 | Working tree | **clean** | **clean** |
 | Commits total | 6 | 4 |
 | Build | `npm run build` passes (`tsc -b && vite build`) | `nest build` (last built `dist/` present) |
-| Deployed | **Behind HEAD** — Vercel, project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3` | **Current** — Railway, verified live |
+| Deployed | **Current** — Vercel, project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3` | **Current** — Railway, verified live |
 
 ---
 

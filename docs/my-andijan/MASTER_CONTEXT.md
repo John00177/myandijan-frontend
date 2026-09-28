@@ -81,13 +81,13 @@ The platform's specific answers to that:
 
 A **category-aware variant exists for food**: when `?category=oziq-ovqat`, `SearchPage` dispatches to a restaurant-specific UI with cuisine chips, price buckets, delivery badges and "open now" — this is live in production.
 
-### 5.2 Consumer account (IMPLEMENTED locally, NOT deployed)
+### 5.2 Consumer account (IMPLEMENTED, deployed)
 `/uz/signup` → **phone-first, one field per screen**: Phone (`+998XXXXXXXXX`) → 6-digit OTP → optional profile (name + avatar, skippable). **The account is created at the OTP step**, so the profile step is genuinely optional (progressive profiling). Login is via an auth modal available anywhere under `/:lang`.
 
-### 5.3 Business claim / registration (IMPLEMENTED locally, NOT deployed)
+### 5.3 Business claim / registration (IMPLEMENTED, deployed)
 `/uz/claim` → **eight single-field screens with no progress bar**, 40/60 split-screen on desktop with a live preview of the resulting business page: Name (typeahead against existing businesses) → Email → Location → Phone → Category → Website → Verification method → Summary. Submits via `POST /businesses`.
 
-### 5.4 Owner management (IMPLEMENTED locally, NOT deployed)
+### 5.4 Owner management (IMPLEMENTED, deployed)
 `/uz/dashboard` → views for My Businesses, Reviews (with reply), Events, Inventory, Ads, Premium, Settings. Editing happens in an in-place modal (`EditBusinessModal`), not a separate route.
 
 ### 5.5 Staff moderation (PARTIAL)
@@ -149,7 +149,7 @@ The schema encodes the MVP boundary explicitly with comments. **In scope now:**
 | --- | --- |
 | **API (Railway)** | **Deployed and verified live.** 118 routes across 17 feature modules. All probed public endpoints return 200. |
 | **Database** | Live PostgreSQL on Railway, 11 migrations applied, seeded with Andijan geography + categories. Contains **4 businesses, 0 featured, 0 events** — effectively pre-launch content volume. |
-| **Frontend (Vercel)** | **Deployed but ~significantly behind HEAD.** The live bundle contains the restaurant search but **not** signup, claim, pricing, or premium UI. |
+| **Frontend (Vercel)** | **Deployed and current** as of 2026-09-28 (verified byte-identical to a `main` build). |
 | **Local frontend HEAD** | `dd08485`, working tree clean, `npm run build` passes. |
 | **Blocker** | Frontend deploy blocked — see §9. |
 | **Tests** | **Zero.** No test files, no test runner installed in either repo. |
@@ -165,7 +165,7 @@ The deployed entry chunk (`assets/index-DKCNN09S.js`) lists its lazy chunks in a
 
 ## 9. Current blockers
 
-**1. The frontend cannot be deployed — root cause is the local PowerShell execution policy, not Vercel.**
+**1. ~~The frontend cannot be deployed~~ — RESOLVED 2026-09-28.** Production serves current `main`. Historical cause: PowerShell's execution policy blocked the `npx.ps1` shim, so `vercel login` never ran; `npx.cmd` is the workaround.
 
 The chain, established in the final session turns:
 

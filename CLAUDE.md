@@ -211,7 +211,7 @@ Work through this:
 
 - **`npm run build` before declaring anything done.** `tsc -b` catches i18n gaps, type drift and broken imports.
 - **Trace consumers before changing a shared module.** `src/lib/api.ts`, `AuthContext`, `LanguageContext`, `MetaTags`, `JsonLd`, `OtpInput` (used by **both** signup and forgot-password), `EditBusinessModal` (owner **and** admin), `StepShell`/`FIELD_CLASSES`, `useAdminResource`.
-- **Remember production is behind HEAD.** The deployed bundle lacks signup, claim, pricing and premium. Verifying "in production" will mislead you until the pending deploy lands.
+- **Production matches `main`** as of 2026-09-28, so verifying against the live site is valid — but re-check after any new commit, since neither platform auto-deploys from GitHub.
 - **`vercel.json` rewrites `/(.*)` → `/index.html`, so every URL on `myandijan.uz` returns 200 with HTML** — including asset paths that do not exist. **Status codes prove nothing.** Check `content-type` and bundle contents.
 - **Test all three languages.** A key added only to `uz` fails the build; a key added everywhere but rendered wrong does not.
 - **Test at 375px.** Mobile-first, and the mobile verification pass has never been run.
@@ -248,8 +248,8 @@ The handoff package in `docs/my-andijan/` is meant to stay accurate.
 ## 14. Current state — as of 2026-09-28
 
 - **API:** deployed, verified, current. 118 routes live.
-- **Frontend:** `HEAD = dd08485`, clean, build passing — **production is behind HEAD** and lacks signup, claim, pricing and premium.
-- **The one blocker:** run `npx.cmd vercel login` then `npx.cmd vercel --prod`. Interactive — **the user must do the login.**
+- **Frontend:** clean, build passing, and **production serves current `main`** (verified 2026-09-28).
+- **Deployment:** both platforms run current `main`. Frontend deploys via the Vercel CLI from a developer machine (project is **not** Git-connected); API deploys via `railway up`.
 - **Then:** configure `ESKIZ_*` on Railway and register the SMS template (OTP currently reports success and sends nothing). The seed-script credential rotation is **done** (2026-09-28).
 
 Read [`HANDOFF_INDEX.md`](docs/my-andijan/HANDOFF_INDEX.md) before starting anything substantial.

@@ -182,7 +182,7 @@ No `@nestjs/config` (env read straight from `process.env`). No `@nestjs/throttle
 
 | Service | Use | Config location | Status |
 | --- | --- | --- | --- |
-| **Vercel** | Frontend | `vercel.json`, `.vercel/` | Active; **deployed build is behind HEAD**. Project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3`. Not Git-connected. |
+| **Vercel** | Frontend | `vercel.json`, `.vercel/` | Active and **current** (2026-09-28). Project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH`, team `john-s3`. Not Git-connected. |
 | **Railway** | API + PostgreSQL | `railway.json` | Active and current |
 | **Supabase** | Storage, bucket `myandijan-images` | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | Active |
 | **Eskiz.uz** | SMS / OTP | `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`, `ESKIZ_BASE_URL` | **Built, not configured** — degrades to logging |

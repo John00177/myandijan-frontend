@@ -231,7 +231,7 @@ npx.cmd vercel --prod
 
 ### Current deployment status
 
-The **API is deployed and current**. The **frontend in production is behind `HEAD`** and does not yet include the signup, claim, pricing or premium features. See [`docs/my-andijan/CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md) for the blocker and the fix.
+Both are deployed and **current** as of 2026-09-28 — the API from `main` via `railway up`, and the frontend serving a bundle byte-identical to a local build of `main`. Neither platform auto-deploys from GitHub, so re-verify after any new commit. See [`CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md).
 
 ## Documentation
 

@@ -65,7 +65,7 @@ Read this section before trusting anything you see.
 
 | Trap | Reality |
 | --- | --- |
-| **The live site does not reflect the code.** | Production lacks signup, claim, pricing and the entire premium UI. Judging the product from `myandijan.uz` will understate it by about a month of work. |
+| ~~The live site does not reflect the code~~ | **No longer true (2026-09-28).** Production serves current `main` on both platforms, verified by byte-identical bundles and a live smoke test. Judge the product from the site *and* the code. |
 | **Every URL on the domain returns HTTP 200.** | `vercel.json` rewrites `/(.*)` → `/index.html`, so even non-existent asset paths return 200 with HTML. **Status codes prove nothing here** — content type and bundle contents do. |
 | **Code comments about missing endpoints are stale.** | `src/lib/api.ts` asserts that password reset, `POST /businesses`, `/admin/audit-logs` and `/admin/reviews` are 404. Each was true when probed and is now wrong. `AuthContext` claims there is no profile-update endpoint or age/gender columns; both exist. `docs/SSG.md` says the API returns zero businesses; it returns four. **Read controllers, not comments.** |
 | **Analytics dashboards look functional.** | The frontend never calls the ingestion endpoints, so every analytics surface reads from empty tables. |
@@ -160,11 +160,11 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 | --- | --- |
 | **API** | Deployed, verified, current |
 | **Frontend code** | Clean tree, build passing |
-| **Frontend production** | Behind HEAD — missing signup, claim, pricing, premium |
-| **Blocker** | The developer's PowerShell execution policy blocks `npx.ps1`, so `vercel login` never ran. Fix: `npx.cmd vercel login`, then `npx.cmd vercel --prod`. **Do not suggest `vercel link`** — that diagnosis was made, verified wrong, and retracted. |
+| **Frontend production** | Current — serves the `main` build (verified 2026-09-28) |
+| **Blocker** | None for deployment — both platforms run current `main` as of 2026-09-28. |
 | **Then** | Configure `ESKIZ_*` on Railway and register the SMS template. (The seed-script credential rotation is done — completed 2026-09-28.) |
 
-**Until the frontend deploy lands, treat production as historical.** Review the code, not the site.
+**Production and `main` now agree**, so the live site is a valid reference as of 2026-09-28.
 
 ---
 
