@@ -43,7 +43,11 @@ const PLAIN_PASSWORD = '<REDACTED>';
 
 > This was found during a pre-commit secret scan in the 2026-09-27 session, flagged to the user for rotation, and committed as instructed because there was no remote. **It has not been rotated.**
 
-### 1.2 🔴 Supabase `service_role` key in a local `.env`
+### 1.2 🟢 RESOLVED — published default admin password in `prisma/seed.ts`
+
+`prisma/seed.ts:279` read `process.env.SEED_ADMIN_PASSWORD ?? '<a literal published in this repo>'`. Because the fallback was a working password committed to the repository, **any `npm run db:seed` run without that variable set silently created an `ADMIN` account with a publicly-known password** — fail-open. Found and fixed 2026-09-28: the fallback is removed and the function now throws when the variable is unset. `.env.example`'s value was replaced with a non-usable placeholder. `phone` and `email` still default, which is safe; a credential does not.
+
+### 1.3 🔴 Supabase `service_role` key in a local `.env`
 
 **Files:** `my-andijan-api/.env` (gitignored — verified with `git check-ignore`), Railway env.
 

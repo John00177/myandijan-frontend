@@ -65,7 +65,7 @@ Local form (from `.env.example`): a `postgresql://` URL against the `docker-comp
 | Variable | Required | Read by | Purpose |
 | --- | --- | --- | --- |
 | `SEED_ADMIN_PHONE` | Dev / first deploy | `prisma/seed.ts` | Phone for the seeded admin account (`+998XXXXXXXXX`) |
-| `SEED_ADMIN_PASSWORD` | Dev / first deploy | `prisma/seed.ts` | Password for that account. `.env.example` ships an obvious placeholder — **change it.** |
+| `SEED_ADMIN_PASSWORD` | **Required to seed** | `prisma/seed.ts` | Password for that account. **Hardened 2026-09-28: the `?? 'ChangeMe123!'` fallback was removed**, so `npm run db:seed` now throws when this is unset rather than silently creating an ADMIN with a password published in the repo. `.env.example` carries a non-usable placeholder. |
 | `SEED_ADMIN_EMAIL` | Dev / first deploy | `prisma/seed.ts` | Email for that account |
 
 | `SEED_ROLE_PASSWORD` | `scripts/seed-role-accounts.js` only | `scripts/seed-role-accounts.js` | Password applied to the six per-role demo accounts. **Added 2026-09-28**, replacing a hardcoded literal. Deliberately has **no default** — the script exits 1 when it is unset. Supply it per-run (`SEED_ROLE_PASSWORD='...' node scripts/seed-role-accounts.js`); **do not** persist it in `.env`. |
@@ -137,14 +137,14 @@ Used by `scripts/generate-sitemap.ts` (`npm run sitemap`), which runs in Node an
 
 | File | Repo | Gitignored | Holds |
 | --- | --- | --- | --- |
-| `.env` | api | ✅ (`.gitignore:3`, verified via `git check-ignore`) | **Live production secrets** — `DATABASE_URL`, both JWT secrets, `SUPABASE_*` (incl. the service-role key), seed admin credentials |
+| `.env` | api | ✅ (verified via `git check-ignore`) | Local dev + real secrets. **Correction 2026-09-28:** its `DATABASE_URL` points at **`localhost`**, not production — an earlier draft of this document said production, which was wrong. It does hold a real Supabase **service-role** key, both JWT secrets, and seed admin credentials. |
 | `.env.example` | api | ❌ committed | Placeholders only. **Incomplete — missing all `SUPABASE_*` and `ESKIZ_*`.** |
 | `.env` | frontend | ✅ (`.env`, `.env*`) | `VITE_API_URL` |
 | `.env.local` | frontend | ✅ | `VERCEL_OIDC_TOKEN` |
 
 Both `.gitignore` files correctly exclude env files. The frontend's lists `.env`, `.env.local`, `.env.*.local` and a broad `.env*`.
 
-> **The API's local `.env` contains a live Supabase `service_role` key and the production database URL.** It is correctly gitignored, but it is a high-value file on a developer laptop. Treat it accordingly, and never paste it into a chat, issue, or AI prompt.
+> **The API's local `.env` contains a live Supabase `service_role` key.** Its `DATABASE_URL` targets `localhost`, not production (verified 2026-09-28). It is correctly gitignored, but it remains a high-value file on a developer laptop. Treat it accordingly, and never paste it into a chat, issue, or AI prompt.
 
 ---
 
