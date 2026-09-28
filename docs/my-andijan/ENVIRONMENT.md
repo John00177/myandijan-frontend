@@ -65,7 +65,7 @@ Local form (from `.env.example`): a `postgresql://` URL against the `docker-comp
 | Variable | Required | Read by | Purpose |
 | --- | --- | --- | --- |
 | `SEED_ADMIN_PHONE` | Dev / first deploy | `prisma/seed.ts` | Phone for the seeded admin account (`+998XXXXXXXXX`) |
-| `SEED_ADMIN_PASSWORD` | **Required to seed** | `prisma/seed.ts` | Password for that account. **Hardened 2026-09-28: the `?? 'ChangeMe123!'` fallback was removed**, so `npm run db:seed` now throws when this is unset rather than silently creating an ADMIN with a password published in the repo. `.env.example` carries a non-usable placeholder. |
+| `SEED_ADMIN_PASSWORD` | **Required to seed** | `prisma/seed.ts` | Password for that account. **Hardened 2026-09-28: the `?? '<a literal published in this repo>'` fallback was removed**, so `npm run db:seed` now throws when this is unset rather than silently creating an ADMIN with a password published in the repo. `.env.example` carries a non-usable placeholder. |
 | `SEED_ADMIN_EMAIL` | Dev / first deploy | `prisma/seed.ts` | Email for that account |
 
 | `SEED_ROLE_PASSWORD` | `scripts/seed-role-accounts.js` only | `scripts/seed-role-accounts.js` | Password applied to the six per-role demo accounts. **Added 2026-09-28**, replacing a hardcoded literal. Deliberately has **no default** — the script exits 1 when it is unset. Supply it per-run (`SEED_ROLE_PASSWORD='...' node scripts/seed-role-accounts.js`); **do not** persist it in `.env`. |
