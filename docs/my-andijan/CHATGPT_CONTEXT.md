@@ -143,7 +143,7 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 **Genuinely clean:** no SQL injection (every raw query uses `Prisma.sql` tagged templates; no `*Unsafe` variants; the single `Prisma.raw()` takes hardcoded literals). XSS defended where it mattered — `escapeHtml()` before Leaflet `divIcon`, `<` escaping in JSON-LD. Privilege escalation via registration blocked by `@IsIn([CUSTOMER, BUSINESS_OWNER])`. bcrypt cost 12 everywhere. OTP codes, reset codes and refresh tokens all hashed at rest. `ActivityLog` stores an `ipHash`, never a raw IP.
 
 **Open, and ranked:**
-1. **A hardcoded plaintext password sits in `my-andijan-api/scripts/seed-role-accounts.js:14`**, applied to `SUPER_ADMIN` and five other roles and printed to stdout. It is in committed git history. **Rotating it is the highest-priority action in the project.** The literal is redacted from all documentation.
+1. ✅ **RESOLVED 2026-09-28 — hardcoded admin credential.** `scripts/seed-role-accounts.js` had a plaintext password applied to six accounts. It is now read from `process.env.SEED_ROLE_PASSWORD` (no default), the literal was purged from history before the first push, and **the production credential was rotated** to a 192-bit random secret and verified. It had been confirmed live, so this was necessary.
 2. `app.enableCors()` with no origin allow-list.
 3. Swagger at `/docs` publicly reachable in production, publishing all 118 routes.
 4. No rate limiting except a hand-rolled OTP cap — so login is brute-forceable, and bcrypt cost 12 makes each attempt a server CPU cost.
@@ -162,7 +162,7 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 | **Frontend code** | Clean tree, build passing |
 | **Frontend production** | Behind HEAD — missing signup, claim, pricing, premium |
 | **Blocker** | The developer's PowerShell execution policy blocks `npx.ps1`, so `vercel login` never ran. Fix: `npx.cmd vercel login`, then `npx.cmd vercel --prod`. **Do not suggest `vercel link`** — that diagnosis was made, verified wrong, and retracted. |
-| **Then** | Configure `ESKIZ_*` on Railway and register the SMS template; rotate the seed-script password |
+| **Then** | Configure `ESKIZ_*` on Railway and register the SMS template. (The seed-script credential rotation is done — completed 2026-09-28.) |
 
 **Until the frontend deploy lands, treat production as historical.** Review the code, not the site.
 

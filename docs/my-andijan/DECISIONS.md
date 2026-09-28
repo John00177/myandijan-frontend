@@ -280,7 +280,7 @@
 **Verified against the Vercel API and retracted.** `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH` and `team_ErWmdvPfiaDk9mHs6Tv1GFuu` (team `john-s3`) are both **correct** and serve `myandijan.uz`. The expired CLI token was the entire problem.
 **Why this is recorded.** Anyone re-reading the earlier session notes will find the wrong diagnosis. **Do not run `vercel link`.**
 
-### D-52 · Commit the hardcoded credential, flag it for rotation 🔓 REVISITABLE — **action still pending**
+### D-52 · Commit the hardcoded credential, flag it for rotation 🔒 CLOSED — **remediated 2026-09-28**
 **What happened.** A pre-commit secret scan found `PLAIN_PASSWORD = '<REDACTED>'` in `scripts/seed-role-accounts.js`, applied to `SUPER_ADMIN`/`ADMIN`/`MODERATOR`/`SUPPORT`. It was committed as instructed **because the repository has no remote**, and flagged for rotation and `process.env` parameterization *before any remote is added*.
 **Status: not done.** See `SECURITY.md` §1.1. This is the highest-severity open item in the project.
 

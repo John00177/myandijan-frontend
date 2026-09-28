@@ -294,7 +294,7 @@ Recovered verbatim or near-verbatim. These describe how this user works.
 | **Frontend deploy of Sessions 2/5/6** | Blocked on the PowerShell issue — **the single outstanding task** |
 | **Post-deploy verification** (signup, claim, premium, regressions, 375px mobile) | Specified, never run |
 | **Eskiz configuration + template registration** | Flagged as user-side, not done |
-| **Credential rotation** | Flagged at commit time, not done |
+| **Credential rotation** | Flagged at commit time; **completed 2026-09-28** — rotated and verified |
 | **Social login (Telegram/Google)** | Buttons shipped per Yelp research; **no backend was ever specced** |
 | **Payments** | UI built in Session 2; no provider ever discussed beyond the schema's *"ships with Click payments"* |
 | **Analytics ingestion wiring** | **Never discussed in any recovered session.** The endpoints predate the transcript; nothing explains why the frontend does not call them. |

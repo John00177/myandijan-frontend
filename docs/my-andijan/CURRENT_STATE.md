@@ -153,7 +153,7 @@ These are documentation bugs, and they matter because the codebase's comments ar
 | Area | Debt |
 | --- | --- |
 | **Testing** | Total absence. 118 API routes and 132 components with no automated verification of any kind. This is the single largest risk to future change. |
-| **Hardcoded credential** | `scripts/seed-role-accounts.js` contains `PLAIN_PASSWORD = '<REDACTED>'`, applied to `SUPER_ADMIN`, `ADMIN`, `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER` and `CUSTOMER` accounts, and the script header documents running it against production via `railway ssh`. It also prints the password to stdout. Flagged for rotation at commit time; **not yet rotated**. |
+| **Hardcoded credential** | ✅ **RESOLVED 2026-09-28.** `scripts/seed-role-accounts.js` now reads `process.env.SEED_ROLE_PASSWORD` with no default; the literal was purged from history before the first push; the production credential was rotated to a 192-bit random value and verified on all six accounts. |
 | **CORS wide open** | `app.enableCors()` with no origin allow-list. |
 | **No rate limiting** | Only OTP requests are throttled, and that is hand-rolled in the service. No `@nestjs/throttler`; login, register and password-reset are unthrottled. |
 | **Swagger public in production** | `/docs` returns 200 on the live API, publishing the full 118-route surface. |
@@ -202,7 +202,7 @@ Ordered. Rationale given because the order is not arbitrary.
 1. **Unblock and complete the frontend deploy** — `npx.cmd vercel login` then `npx.cmd vercel --prod`. Everything else is invisible to users until this lands. Do **not** run `vercel link`; the link is correct.
 2. **Run the post-deploy verification** that was queued and never executed: signup (phone → "Kod yuborildi"), claim (typeahead → 8 steps → submit), premium UI (Editor's Pick carousel, "Faqat Premium" filter, gold borders), regressions (search, business detail, login, favourites), and mobile at 375px (no horizontal overflow, bottom nav visible, no iOS zoom).
 3. **Configure Eskiz on Railway** (`ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`) and register the SMS template in the Eskiz dashboard. Until this is done the signup flow that was just shipped cannot actually be used by anyone.
-4. **Rotate the seed-script password** and parameterize `scripts/seed-role-accounts.js` to read from `process.env`. It is a known production credential in plaintext in git.
+4. ~~Rotate the seed-script password~~ — **✅ DONE 2026-09-28** — rotated to a 192-bit random secret held in Railway's `SEED_ROLE_PASSWORD`; script parameterized; literal purged from history before the first push.
 5. **Fix the refresh-token gap.** Store `refreshToken` at login/OTP-verify and call `POST /auth/refresh` on 401 before giving up. This converts a 15-minute session into a 30-day one and is a small, high-value change.
 6. **Wire analytics ingestion.** Call `POST /analytics/view` on business detail and `POST /analytics/click` on call/direction/website/share/favourite. Without it, the entire analytics and health-score investment stays dark.
 7. **Lock down the API surface**: restrict CORS to the known origins, gate or disable `/docs` in production, add `@nestjs/throttler` on auth routes.

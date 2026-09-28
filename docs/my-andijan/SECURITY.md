@@ -8,16 +8,28 @@
 
 ## 1. Critical findings
 
-### 1.1 🟠 Hardcoded production password — code fixed, **rotation still pending**
+### 1.1 🟢 RESOLVED — hardcoded production password: code fixed, history purged, credential rotated
 
-> **STATUS UPDATE 2026-09-28**, while establishing the GitHub baseline:
+> **RESOLVED 2026-09-28.** Full remediation completed:
+> - ✅ The script reads `process.env.SEED_ROLE_PASSWORD` (no default; exits 1 when unset).
+> - ✅ The password echo to stdout was removed.
+> - ✅ The literal was **purged from git history before the first push** (`4e3c6bc` rebuilt as `002fca9`), so it never reached GitHub, and it is redacted from every document here.
+> - ✅ **The production credential was ROTATED.** A 192-bit random value was generated, stored as the Railway production variable `SEED_ROLE_PASSWORD` (retrievable by the owner from the Railway dashboard), and applied as a bcrypt-cost-12 hash to all six role accounts. Verified: 6 of 6 hashes match the new secret. Because only one password can match a given bcrypt hash, the previously exposed credential is no longer valid.
+> - ✅ Only `password_hash` was written. `role`, `fullName` and `status` were left untouched — re-verified after rotation: 6 accounts, roles unchanged, all ACTIVE, 1 SUPER_ADMIN, 13 users total.
+> - ✅ Production health re-verified after rotation: all public endpoints 200, `/users/me` 401, data intact.
+>
+> Confirmed during this work: the exposed value **was** live — `SEED_ROLE_PASSWORD` was absent in production, so the six accounts had been created with the hardcoded literal, and SUPER_ADMIN had logged in that same day. Rotation was therefore necessary, not precautionary.
+
+> <details><summary>Original finding, retained as the record of why</summary>
+>
+> **Earlier status**, while establishing the GitHub baseline:
 > - ✅ The script now reads `process.env.SEED_ROLE_PASSWORD` with **no default** and exits 1 when unset.
 > - ✅ The `console.log` of the password was removed.
 > - ✅ The literal was **purged from git history before the first push** — the one commit containing it (`4e3c6bc`) was rebuilt as `002fca9` with a credential-free tree, so **the password never reached GitHub.** The other three commits are unchanged.
 > - ✅ The literal was redacted from every document in this package.
-> - 🔴 **NOT DONE — the password itself has not been rotated.** The old value is still live on all six accounts. **Until it is rotated this remains a critical exposure:** it sat in plaintext on disk and in local history, so anyone who saw it still holds working `SUPER_ADMIN` access.
+> - (At the time of that earlier note the credential was still un-rotated. It has since been rotated — see the RESOLVED banner above.)
 >
-> **The one remaining action is a production change: rotate the six accounts.** The record below describes the original finding and stays valid as the reason why.
+> </details>
 
 **File:** `my-andijan-api/scripts/seed-role-accounts.js:14` (as originally committed)
 
@@ -309,7 +321,7 @@ Note that preview deploys get generated Vercel URLs, so either add a pattern for
 
 | # | Severity | Action | Effort |
 | --- | --- | --- | --- |
-| 1 | 🔴 **Critical** | **Rotate the seed-script password on all six role accounts**; parameterize `seed-role-accounts.js` to `process.env` with no default; remove the `console.log`; purge from history **before** adding any git remote | Low |
+| 1 | ✅ **DONE 2026-09-28** | Rotated all six role accounts to a 192-bit random secret held in Railway's `SEED_ROLE_PASSWORD`; script parameterized to `process.env` with no default; `console.log` removed; literal purged from history before the first push | — |
 | 2 | 🔴 High | **Install `@nestjs/throttler`** — global default, tight buckets on `/auth/*`, `/analytics/*`, `/search`, `/upload/*` | Low |
 | 3 | 🔴 High | **Restrict CORS** to known origins | Trivial |
 | 4 | 🔴 High | **Gate or disable `/docs` in production** | Trivial |

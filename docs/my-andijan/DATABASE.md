@@ -563,7 +563,7 @@ Demo/sample content. Not wired into the `prisma.seed` key — run manually.
 | `cleanup-db.ts` | Database cleanup | **Destructive — read it before running** |
 | `promote-super-admin.ts` | Promote a user to `SUPER_ADMIN` | Privileged |
 | `rename-andijon-district.js` | One-off data fix for the Andijon district/city naming trap | Safe |
-| `seed-role-accounts.js` | Creates/updates one demo account per role tier | **⚠ Contains `PLAIN_PASSWORD = '<REDACTED>'` in plaintext, applied to `SUPER_ADMIN` (+998994796431), `ADMIN`, `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER`, `CUSTOMER`, and prints it to stdout. Header documents running it against production via `railway ssh`. MUST be rotated and parameterized.** |
+| `seed-role-accounts.js` | Creates/updates one demo account per role tier | Requires `SEED_ROLE_PASSWORD` (no default; exits 1 when unset) and does not echo it. The former hardcoded literal was purged from history before the first push and the production credential was rotated 2026-09-28. |
 
 ---
 

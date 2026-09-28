@@ -49,8 +49,8 @@ Flagged as a user-side follow-up and still outstanding.
 
 > **Without this, the signup flow shipped in step 1 cannot be completed by any real user.** `SmsService` returns success while sending nothing.
 
-### 4. Rotate the hardcoded production credential · **[EXPLICIT]** · security
-Flagged at commit time, not done. `scripts/seed-role-accounts.js:14` holds `PLAIN_PASSWORD = '<REDACTED>'`, applied to `SUPER_ADMIN` and five other roles, printed to stdout, documented as run against production via `railway ssh`.
+### 4. ~~Rotate the hardcoded production credential~~ — ✅ DONE 2026-09-28
+Completed 2026-09-28: the script reads `process.env.SEED_ROLE_PASSWORD` with no default, the stdout echo is gone, the literal was purged from history before the first push, and the production credential was rotated to a 192-bit random secret stored in Railway's `SEED_ROLE_PASSWORD` and verified on all six accounts.
 
 Rotate all six accounts; parameterize to `process.env` with no default; remove the `console.log`; purge from history **before** adding any git remote.
 
@@ -205,7 +205,7 @@ Deploy frontend ──► Post-deploy verification
       │
       └──► Configure Eskiz ──► Signup actually usable by real users
                                       │
-Rotate credential (independent, do now)│
+Rotate credential — DONE 2026-09-28            │
 Wire analytics ingestion ──► Owner analytics + command centre + health score become meaningful
 Fix refresh tokens ──► Sessions survive the claim flow
 Run sitemap ──► Business pages become crawlable

@@ -250,6 +250,6 @@ The handoff package in `docs/my-andijan/` is meant to stay accurate.
 - **API:** deployed, verified, current. 118 routes live.
 - **Frontend:** `HEAD = dd08485`, clean, build passing — **production is behind HEAD** and lacks signup, claim, pricing and premium.
 - **The one blocker:** run `npx.cmd vercel login` then `npx.cmd vercel --prod`. Interactive — **the user must do the login.**
-- **Then:** configure `ESKIZ_*` on Railway (OTP currently reports success and sends nothing) and **rotate the seed-script password** in `api/scripts/seed-role-accounts.js`.
+- **Then:** configure `ESKIZ_*` on Railway and register the SMS template (OTP currently reports success and sends nothing). The seed-script credential rotation is **done** (2026-09-28).
 
 Read [`HANDOFF_INDEX.md`](docs/my-andijan/HANDOFF_INDEX.md) before starting anything substantial.

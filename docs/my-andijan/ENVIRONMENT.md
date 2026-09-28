@@ -68,11 +68,11 @@ Local form (from `.env.example`): a `postgresql://` URL against the `docker-comp
 | `SEED_ADMIN_PASSWORD` | **Required to seed** | `prisma/seed.ts` | Password for that account. **Hardened 2026-09-28: the `?? '<a literal published in this repo>'` fallback was removed**, so `npm run db:seed` now throws when this is unset rather than silently creating an ADMIN with a password published in the repo. `.env.example` carries a non-usable placeholder. |
 | `SEED_ADMIN_EMAIL` | Dev / first deploy | `prisma/seed.ts` | Email for that account |
 
-| `SEED_ROLE_PASSWORD` | `scripts/seed-role-accounts.js` only | `scripts/seed-role-accounts.js` | Password applied to the six per-role demo accounts. **Added 2026-09-28**, replacing a hardcoded literal. Deliberately has **no default** — the script exits 1 when it is unset. Supply it per-run (`SEED_ROLE_PASSWORD='...' node scripts/seed-role-accounts.js`); **do not** persist it in `.env`. |
+| `SEED_ROLE_PASSWORD` | **Set in Railway production 2026-09-28** (192-bit random; retrieve from the Railway dashboard, never from here). Used by `scripts/seed-role-accounts.js` only | `scripts/seed-role-accounts.js` | Password applied to the six per-role demo accounts. **Added 2026-09-28**, replacing a hardcoded literal. Deliberately has **no default** — the script exits 1 when it is unset. Supply it per-run (`SEED_ROLE_PASSWORD='...' node scripts/seed-role-accounts.js`); **do not** persist it in `.env`. |
 
 > These are how an `ADMIN` first comes into existence, since `POST /auth/register` restricts `role` to `CUSTOMER`/`BUSINESS_OWNER`. They are only needed when seeding.
 >
-> **Separately:** `scripts/seed-role-accounts.js` creates one account per role tier using a **hardcoded plaintext password in the source file**, not an environment variable, and prints it to stdout. See `SECURITY.md` — this must be parameterized to `process.env` and the password rotated.
+> **Separately:** `scripts/seed-role-accounts.js` creates one account per role tier. It now requires `SEED_ROLE_PASSWORD` from the environment, with no default, and does not print it. See `SECURITY.md` §1.1 — fully remediated 2026-09-28.
 
 ### 1.7 Backend summary
 

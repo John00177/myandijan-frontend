@@ -106,13 +106,13 @@ npx.cmd vercel --prod
 
 Set the three `ESKIZ_*` variables **and register the SMS template in the Eskiz dashboard** (`"My Andijan tasdiqlash kodi: {code}. @myandijan.uz #{code}"` — the trailing line enables Android WebOTP). **Password reset needs a separate code fix** (`auth.service.ts:347` still logs instead of sending).
 
-### 🟠 Blocker 3 — Production credential: code fixed, rotation pending
+### 🟢 Blocker 3 — RESOLVED: production credential rotated
 
-> **STATUS 2026-09-28:** partly resolved. The script now reads `process.env.SEED_ROLE_PASSWORD` (no default, exits 1 when unset), the password echo was removed, and the literal was **purged from git history before the first push** (`4e3c6bc` rebuilt as `002fca9`), so it never reached GitHub. 🔴 **The password itself is still un-rotated and still live on all six accounts — rotating it is the one remaining action.**
+> **RESOLVED 2026-09-28.** Script parameterized to `process.env.SEED_ROLE_PASSWORD` (no default), password echo removed, literal purged from history before the first push (`4e3c6bc` → `002fca9`), and **the production credential rotated** to a 192-bit random value stored in Railway's `SEED_ROLE_PASSWORD` variable. All six role accounts re-hashed at bcrypt cost 12 and verified; roles/status unchanged; production health confirmed. The exposed value was confirmed live before rotation, so this was necessary rather than precautionary.
 
 `my-andijan-api/scripts/seed-role-accounts.js:14` — `PLAIN_PASSWORD = '<REDACTED>'`, applied to **`SUPER_ADMIN` (`+998994796431`)** and five other roles, printed to stdout, documented as run against production via `railway ssh`, and re-applied on every run (`upsert`).
 
-It is not yet a breach only because **the repository has no git remote.** Rotate, parameterize to `process.env`, remove the `console.log`, and **purge from history before adding any remote.** Flagged at commit time; never done.
+✅ **Fully remediated 2026-09-28.** The literal never reached GitHub (history rebuilt before the first push), the script is parameterized, and the production credential was rotated and verified. The exposed value was confirmed live beforehand, so rotation was necessary.
 
 ---
 
@@ -125,7 +125,7 @@ The shortest path to a launchable product. Details in [`ROADMAP.md`](ROADMAP.md)
 | 1 | **Deploy the frontend** — `npx.cmd vercel login` then `npx.cmd vercel --prod` | Minutes (human) |
 | 2 | **Run the queued post-deploy verification** — signup, claim, premium, regressions, 375px | ~1 h |
 | 3 | **Configure Eskiz + register the template** | ~1 h |
-| 4 | **Rotate the seed-script password** and parameterize the script | ~1 h |
+| 4 | ~~Rotate the seed-script password~~ — **✅ DONE 2026-09-28** — rotated to a 192-bit random secret held in Railway's `SEED_ROLE_PASSWORD`; script parameterized; literal purged from history before the first push. | — |
 | 5 | **Fix password-reset SMS** (`auth.service.ts:347`) | Small |
 | 6 | **Wire analytics ingestion** — 3 endpoints exist, nothing calls them, so every analytics feature reads empty tables | Small |
 | 7 | **Fix the refresh-token gap** — sessions currently die after ~15 min mid-flow | Small |

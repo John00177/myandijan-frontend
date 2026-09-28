@@ -10,7 +10,7 @@
 
 ## 🔴 Critical bugs
 
-- [ ] **Rotate the seed-script password in production** (the one remaining step — code and history are fixed) — `api/scripts/seed-role-accounts.js:14`. Hardcoded plaintext password applied to `SUPER_ADMIN` (`+998994796431`), `ADMIN`, `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER`, `CUSTOMER`; printed to stdout; documented as run against production via `railway ssh`; `upsert` re-applies it on every run. **[SESSION]** — flagged at commit time, never done
+- [x] **Rotate the seed-script password in production** — DONE 2026-09-28: 192-bit random secret stored in Railway `SEED_ROLE_PASSWORD`, applied to all six accounts, verified — `api/scripts/seed-role-accounts.js:14`. Hardcoded plaintext password applied to `SUPER_ADMIN` (`+998994796431`), `ADMIN`, `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER`, `CUSTOMER`; printed to stdout; documented as run against production via `railway ssh`; `upsert` re-applies it on every run. **[SESSION]** — flagged at commit time, never done
 - [x] **Parameterize** that script to `process.env.SEED_ROLE_PASSWORD` with **no default**, and remove the `console.log` of the password — done 2026-09-28 **[SESSION]**
 - [x] **Purge the credential from git history before adding any git remote** — done 2026-09-28: `4e3c6bc` rebuilt as `002fca9`; verified absent from all reachable commits before the first push. **Rotation in production is still outstanding.** **[REVIEW]**
 - [ ] **Sessions die after ~15 minutes.** Frontend never stores `refreshToken` and never calls `POST /auth/refresh`. A user can be signed out mid-claim-flow and lose the submission. Fix on the client — do **not** just raise `JWT_ACCESS_EXPIRES_IN` **[REVIEW]**
