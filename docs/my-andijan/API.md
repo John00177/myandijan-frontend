@@ -325,8 +325,9 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | POST | `/admin/claims/:id/reject` | `ADMIN` | Reject | **⭕** |
 | GET | `/admin/reports` | `ADMIN` | List review reports | **⭕** |
 | POST | `/admin/reports/:id/resolve` | `ADMIN` | Resolve/dismiss | **⭕** |
-| POST | `/admin/reviews/:id/hide` | `ADMIN` | Hide a review | **⭕** |
-| POST | `/admin/reviews/:id/restore` | `ADMIN` | Restore a review | **⭕** |
+| GET | `/admin/reviews` | `ADMIN` | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |
+| POST | `/admin/reviews/:id/hide` | `ADMIN` | Hide a review | ✅ |
+| POST | `/admin/reviews/:id/restore` | `ADMIN` | Restore a review | ✅ |
 | GET | `/admin/events` | `ADMIN` | List events | ✅ |
 | POST | `/admin/events/:id/approve` | `ADMIN` | Approve | **⭕** |
 | POST | `/admin/events/:id/reject` | `ADMIN` | Reject | **⭕** |
@@ -343,10 +344,10 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | GET | `/admin/audit` | `ADMIN` | Audit log (paginated) | ✅ |
 
 > **⚠ Route-ordering hazard:** `PATCH /admin/categories/reorder` is declared **before** `PATCH /admin/categories/:id`, which is what makes `reorder` reachable rather than being swallowed as `:id = "reorder"`. **Do not reorder these declarations.**
-> **There is no `GET /admin/reviews`** — only hide/restore. This is exactly why `AdminReviewsView` is still mock data.
-> **11 of 31 admin routes are wired; 20 are not.** The backend moderation capability substantially exceeds the admin UI.
+> **Superseded 2026-09-29 (Phase 6):** `GET /admin/reviews` now exists (`AdminService.findReviews`, paginated, optional `?status=` filter) and `AdminReviewsView` is wired to it, with hide/restore as real moderation actions. This was the last "genuinely missing" piece of the review workflow.
+> **12 of 31 admin routes are now wired; 19 are not.**
 
-> **Stale comment alert:** `src/lib/api.ts` says *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)"*. `/admin/audit` exists (the probed path was wrong, and this was later corrected in the same file); review hide/restore exist. Only `/admin/settings` is genuinely absent.
+> **Stale comment alert:** `src/lib/api.ts` says *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)"*. `/admin/audit` exists (the probed path was wrong, and this was later corrected in the same file); review hide/restore exist; `/admin/reviews` (list) exists as of Phase 6. Only `/admin/settings` is genuinely absent.
 
 ---
 
@@ -378,7 +379,6 @@ Verified by comparing every path in `src/` against the route list.
 | Referenced | Reality |
 | --- | --- |
 | `/admin/settings` | **Does not exist.** `AdminSettingsView` therefore keeps its state in `useState` and persists nothing. The `PlatformSetting` table exists and is unused — this is the missing module. |
-| `GET /admin/reviews` (list) | **Does not exist.** Only hide/restore. `AdminReviewsView` uses `adminMockData.ts`. |
 | `/health` | **Does not exist and never did.** Deploy checklists expecting it will 404. Use `GET /categories` as a liveness probe. |
 | `/api/auth/otp/*` | **Wrong prefix.** There is no global `/api` prefix; the real paths are `/auth/otp/*`. Several session specs used the wrong form. |
 

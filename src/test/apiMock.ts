@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Business, Category, EventDetail, PaginatedResponse, Region } from "../types";
+import type { AdminReview, Business, Category, EventDetail, PaginatedResponse, Region } from "../types";
 
 // Central set of sensible empty defaults for every lib/api export a page
 // component's hooks might call. Individual tests override just the calls
@@ -97,6 +97,23 @@ export const mockEvent: EventDetail = {
 
 export const getEventBySlug = vi.fn().mockResolvedValue(mockEvent);
 export const attendEvent = vi.fn().mockResolvedValue({});
+
+export const mockAdminReview: AdminReview = {
+  id: 1,
+  rating: 5,
+  title: null,
+  comment: "Juda yaxshi xizmat!",
+  status: "PUBLISHED",
+  reportCount: 0,
+  createdAt: "2026-09-20T10:00:00.000Z",
+  user: { id: 2, fullName: "Sardor Aliyev", avatarUrl: null },
+  branch: { id: 1, name: "Soy milliy taomlar", business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar" } },
+  reply: null,
+};
+
+export const getAdminReviews = vi.fn().mockResolvedValue({ items: [mockAdminReview], total: 1 });
+export const hideAdminReview = vi.fn().mockResolvedValue({ ...mockAdminReview, status: "HIDDEN" });
+export const restoreAdminReview = vi.fn().mockResolvedValue({ ...mockAdminReview, status: "PUBLISHED" });
 export const recordBusinessView = vi.fn();
 export const recordBusinessClick = vi.fn();
 export const recordSearch = vi.fn();

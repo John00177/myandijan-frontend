@@ -22,6 +22,14 @@ This no longer applies. Frontend production was confirmed on 2026-09-28 to be se
 
 A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTURE.md` §21) selected and wired four previously-unconnected backend capabilities end-to-end. Rows below are updated accordingly; everything else in this matrix reflects the 2026-09-28 audit unchanged.
 
+### Phase 5 update — 2026-09-29
+
+Selected 3 capabilities from a 20-item MVP gap matrix (`ARCHITECTURE.md` §22): event detail page + RSVP, owner event creation, and populating `sitemap-businesses.xml`. Also fixed a live bug found along the way — the events list was rendering blank titles/dates/images in production.
+
+### Phase 6 update — 2026-09-29
+
+Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the missing `GET /admin/reviews` endpoint and wired `AdminReviewsView` to it, replacing its mock data with real hide/restore moderation.
+
 ---
 
 ## 1. Discovery & browse
@@ -92,7 +100,7 @@ A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTUR
 | Edit / delete own review | **PARTIALLY IMPLEMENTED** | Endpoints exist; **no UI** |
 | Report a review | **PARTIALLY IMPLEMENTED** | `ReviewReport` model + admin resolve endpoint; **no report UI** |
 | "Helpful" voting | **PLANNED** | `helpfulCount` column exists; nothing increments it |
-| Review moderation queue | **BROKEN** | Hide/restore endpoints exist but **no `GET /admin/reviews`**, so `AdminReviewsView` is mock |
+| Review moderation queue | **IMPLEMENTED** | **Phase 6 (2026-09-29):** `GET /admin/reviews` added (paginated, `?status=` filter); `AdminReviewsView` now shows the real list with reviewer/business/rating/text/date/status, and hide/restore act on real reviews |
 | Rating range validation | **PARTIALLY IMPLEMENTED** | DTO-level only; no DB constraint |
 
 ## 5. Photos & media
@@ -176,7 +184,7 @@ A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTUR
 | Audit log | **IMPLEMENTED** | `GET /admin/audit` |
 | Analytics view | **PARTIALLY IMPLEMENTED** | Real endpoints, but the underlying tables are unfed |
 | Regions view | **PARTIALLY IMPLEMENTED** | Reads the **public** geography endpoint; district/city edit endpoints unused |
-| **Review moderation** | **BROKEN** | Mock — no list endpoint |
+| **Review moderation** | **IMPLEMENTED** | **Phase 6:** real list + hide/restore, replacing the mock |
 | **Admin settings** | **BROKEN** | Local state only; `/admin/settings` does not exist; `PlatformSetting` table unused |
 | Claims moderation | **PLANNED** | 3 endpoints exist; no UI |
 | Reports moderation | **PLANNED** | 2 endpoints exist; no UI |
@@ -311,14 +319,14 @@ See `AI.md`.
 | | Count |
 | --- | --- |
 | API routes built | **118** |
-| API routes the frontend calls | **~42** (Phase 4 connected `/auth/refresh`, `/auth/logout`, `/analytics/view`, `/analytics/click`, `/analytics/search`, `/categories/homepage`) |
-| API routes with no frontend usage | **~76** |
+| API routes the frontend calls | **~46** (Phase 4: refresh/logout/analytics/homepage-categories; Phase 5: events detail/RSVP/owner-create; Phase 6: `GET /admin/reviews`) |
+| API routes with no frontend usage | **~72** |
 | Database models | **31** |
 | Models entirely unused by code | **3** (`Notification`, `PlatformSetting`, `Advertisement`) |
 | Frontend route pages | **12** + 3 redirects |
 | Owner dashboard views | 8 (1 mock, 1 non-persisting, 1 placeholder) |
-| Admin dashboard views | 10 (1 mock, 1 non-persisting) |
+| Admin dashboard views | 10 (0 mock as of Phase 6 — Reviews now real; 1 non-persisting — Settings) |
 | i18n keys | **385 × 3 languages, full parity** |
-| Tests | **47** (37 backend + 10 frontend) |
+| Tests | **65** (48 backend + 17 frontend) |
 | AI features | **0** |
 | 3D / immersive features | **0** |

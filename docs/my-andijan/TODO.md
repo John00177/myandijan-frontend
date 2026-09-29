@@ -45,7 +45,7 @@
 - [ ] **10 command-centre endpoints** — no UI at all **[REVIEW]**
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
-- [ ] **20 of 31 admin endpoints** — no UI (claims ×3, reports ×2, review hide/restore, verify, suspend, promote, events approve/reject, category delete + reorder, district/city edit, user suspend/activate) **[REVIEW]**
+- [ ] **19 of 31 admin endpoints** — no UI (claims ×3, reports ×2, verify, suspend, promote, events approve/reject, category delete + reorder, district/city edit, user suspend/activate) **[REVIEW]**. Review hide/restore: **done — Phase 6 (2026-09-29)**, now reachable via `AdminReviewsView`
 - [ ] `GET /me/claims` — owners cannot see their claim's status **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**
 - [ ] `GET /events/:slug`, `POST /events/:slug/attend` — no detail page, no RSVP **[REVIEW]**
@@ -53,7 +53,7 @@
 - [ ] `POST /auth/logout` — frontend only clears `localStorage` **[REVIEW]**
 
 ### Missing modules
-- [ ] **`GET /admin/reviews`** (list) does not exist — only hide/restore. This is why `AdminReviewsView` is mock. **Add the list endpoint first** **[REVIEW]**
+- [x] **`GET /admin/reviews`** (list) — **done, Phase 6 (2026-09-29)**. Paginated, `?status=` filter, mirrors `findEvents`/`findReports` **[REVIEW]**
 - [ ] **`/admin/settings`** does not exist. The **`PlatformSetting` table exists and is entirely unused** — build the module that `AdminSettingsView` should save to **[REVIEW]**
 - [ ] **Notifications module** — table + 10-value enum exist; no module, no endpoints, **nothing writes to the table** **[CODE — Phase 2]**
 - [ ] **Advertising module** — table + enums exist, *"DEFERRED TO PHASE 2 (ships with Click payments)"* **[CODE]**
@@ -76,7 +76,7 @@
 - [ ] **`AdminSettingsView`** — platform name, contact email, Telegram, default language, maintenance toggle all in `useState`; **saves nothing**, shows success **[REVIEW]**
 - [ ] **dashboard `SettingsView`** — 7-day hours form persists nothing, while `PUT /businesses/:id/hours` exists and works **[REVIEW]**
 - [ ] **`InventoryView`** — mock rows labelled "Demo" while `/businesses/:id/menu` + `/menu/:id` exist and `api.ts` already wraps them **[REVIEW]**
-- [ ] **`AdminReviewsView`** — mock; blocked on a list endpoint **[REVIEW]**
+- [x] **`AdminReviewsView`** — **done, Phase 6.** Real list + hide/restore, mock data (`adminMockData.ts`) deleted **[REVIEW]**
 - [ ] **`restaurantMock.ts`** — production restaurant cards show cuisine, price bucket, tags and delivery time derived from `Math.sin(id * k)`. Deterministic, honestly labelled in code, **invented** **[REVIEW]**
 - [ ] **Home hero weather is a placeholder** — `src/pages/home/HeroSection.tsx:30` `// TODO: Replace with real weather API` **[CODE]**
 - [ ] **Telegram + Google login buttons do nothing** — and sit *above* the phone field, so they are the first thing a new user sees **[REVIEW]**
@@ -93,7 +93,7 @@
 ### Stale comments that will mislead — worth treating as bugs
 - [ ] `src/lib/api.ts` — *"Password reset … Confirmed absent on the live API (2026-08-13): all three paths 404."* **All three now exist** **[REVIEW]**
 - [ ] `src/lib/api.ts` — *"Business creation. Confirmed absent … POST /businesses … 404."* **It exists** **[REVIEW]**
-- [ ] `src/lib/api.ts` — *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)."* `/admin/audit` exists; review hide/restore exist; only `/admin/settings` is genuinely absent **[REVIEW]**
+- [x] `src/lib/api.ts` — *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)."* Corrected: `/admin/audit` exists; review hide/restore/list all exist (Phase 6); only `/admin/settings` is genuinely absent **[REVIEW]**
 - [ ] `src/contexts/AuthContext.tsx` — *"the backend has no profile-update endpoint or age/gender columns yet."* **`PATCH /users/me` exists; the columns were added in `20260815150053_add_profile_fields`** **[REVIEW]**
 - [ ] `src/pages/dashboard/mockData.ts` — *"Products/inventory have no backend at all."* **It has one** **[REVIEW]**
 - [ ] `docs/SSG.md` — *"the API returns zero businesses."* **It returns 4** **[REVIEW]**

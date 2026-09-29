@@ -355,6 +355,24 @@ export interface AdminEvent {
   location?: string | null;
 }
 
+/** Matches GET /admin/reviews (see AdminService.findReviews). */
+export interface AdminReview {
+  id: number;
+  rating: number;
+  title?: string | null;
+  comment: string;
+  status: string;
+  reportCount: number;
+  createdAt: string;
+  user: { id: number; fullName: string; avatarUrl?: string | null } | null;
+  branch: {
+    id: number;
+    name: string;
+    business: { id: number; slug: string; name: string } | null;
+  } | null;
+  reply: { id: number; body: string; createdAt: string } | null;
+}
+
 /**
  * Matches the live GET /admin/stats response exactly (confirmed 2026-08-15,
  * not guessed) — it does NOT have flat `businesses`/`users`/`reviews`/`events`

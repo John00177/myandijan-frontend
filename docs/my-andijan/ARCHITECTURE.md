@@ -616,5 +616,34 @@ A 20-capability MVP gap matrix (geography through audit logging) was built again
 ### Evaluated and explicitly NOT implemented (require a product decision)
 
 - **Owner "Inventory" management (`InventoryView`).** The mock `Product` type carries `sku` and `quantity` (stock-keeping fields); the real backend's menu/catalog model (`GET/POST /businesses/:id/menu`) has neither — it's a simple name/description/price/photo/availability catalog, with no stock concept at all. Wiring `InventoryView` to the real API as-is would silently drop SKU/quantity from the UI, reframing "inventory management" as "menu management." Building stock tracking for real would need new schema fields. **This needs a decision: is "Inventory" meant to be warehouse/stock tracking (new schema work) or the existing menu/catalog concept (drop SKU/quantity from the UI)?** Not implemented either way.
-- **Admin review moderation (`GET /admin/reviews` doesn't exist).** Building it would be a genuine new backend route, not just a frontend connection — reasonable in scope, but deprioritized this phase in favor of the three items above to keep the batch small and verifiable in one pass. Flagged as the top candidate for the next batch, not blocked by ambiguity.
+- **Admin review moderation (`GET /admin/reviews` doesn't exist).** Deprioritized in Phase 5 to keep that batch small; **implemented in Phase 6, see §23.**
 - **Admin claims moderation UI.** Skipped for the same reason as Phase 4: no endpoint anywhere creates a `BusinessClaim` row, so a moderation queue would always be empty.
+
+## 23. Review moderation & trust layer — 2026-09-29 (Phase 6)
+
+Completed the review moderation workflow: customer submits a review → it exists in the backend → the business can reply where already supported → admin can now see and moderate it through a real UI.
+
+### What was already connected (unchanged this phase)
+
+- Review creation (`POST /businesses/:id/reviews`), display, and owner replies (`POST /me/reviews/:id/reply`) were already fully wired — see `FEATURES.md` §4.
+- `POST /admin/reviews/:id/hide` and `POST /admin/reviews/:id/restore` already existed in `AdminService`/`AdminController`; they were simply unreachable from the UI because nothing could list reviews to act on.
+
+### What was newly connected
+
+1. **`GET /admin/reviews`** — new route, `@Roles(ADMIN)` (inherited from `AdminController`'s class-level guard, same as every other admin route). `AdminService.findReviews(query)` mirrors the existing `findEvents`/`findReports` shape exactly: `{status?, page, limit}` → `{data, meta}` via the same `paginate()` helper, `$transaction([findMany, count])`, and `deletedAt: null` convention. Includes `user` (id/fullName/avatarUrl), `branch.business` (id/slug/name), and `reply` (id/body/createdAt) — the same join shape `AdminService.findReports` already used for its embedded review preview, so no new query pattern was invented.
+2. **`AdminReviewsView`** — the mock `adminMockData.ts` (`ADMIN_MOCK_REVIEWS`) is gone; the view now uses `useAdminResource` + `getAdminReviews()`, with the existing `renderAdminState`/`AdminForbidden`/`AdminError` components for loading/forbidden/error, and a status filter (`PENDING`/`PUBLISHED`/`REJECTED`/`HIDDEN`) that maps directly to the new endpoint's `?status=` param. `adminMockData.ts` was deleted outright — after this change nothing else imported it.
+3. **Moderation actions** — "Yashirish" (hide) shown unless already `HIDDEN`; "Tiklash" (restore) shown unless already `PUBLISHED` — matching `hideReview`/`restoreReview`'s own guard conditions in `AdminService` exactly, so the UI never offers an action the backend would reject as a conflict. Same toast/pending-button pattern as `AdminBusinessesView`'s approve/reject.
+
+### Authorization
+
+No new guard logic was needed: `GET /admin/reviews` sits under `AdminController`'s existing class-level `@UseGuards(JwtAuthGuard, RolesGuard) @Roles(UserRole.ADMIN)`, identical to every other admin route. Added `roles.guard.spec.ts` — the first unit test on `RolesGuard` itself — covering no-user, non-admin (CUSTOMER/BUSINESS_OWNER), admin, and SUPER_ADMIN-via-hierarchy cases, since this one guard protects the entire admin surface.
+
+### Tests
+
+Backend: `roles.guard.spec.ts` (6 tests), `admin.service.spec.ts` (4 tests — pagination, status filter, skip/take, include shape), `admin.controller.spec.ts` (1 test — delegation). Frontend: `AdminReviewsView.test.tsx` (5 tests — list rendering, empty state, 403-forbidden state, hide-action success, hide-action failure).
+
+### Deliberately not implemented
+
+- **Reports queue UI, claims moderation UI, verify/suspend/promote UI** — out of scope per this phase's guardrails; unrelated admin modules.
+- **Edit/delete a review's own content from the admin panel** — not requested; `ReviewsService.update`/`remove` are user-scoped (owner-of-review only) by design, and giving admin a bypass would be a new business rule, not a connection of an existing one.
+- **`ReviewReport` (user-submitted reports) surfacing on this view** — `GET /admin/reports` already exists as its own endpoint/view; folding report counts into the reviews list was considered scope creep for this task and left as `reportCount` on the type (unused in the UI) for a future pass.

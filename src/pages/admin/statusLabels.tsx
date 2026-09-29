@@ -25,6 +25,20 @@ export function BusinessStatusBadge({ status }: { status: string | null | undefi
   return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
 }
 
+/** ReviewStatus is a real 4-value enum (PENDING/PUBLISHED/REJECTED/HIDDEN) — no guessing needed here. */
+const REVIEW_STATUS: Record<string, { label: string; tone: Tone }> = {
+  published: { label: "Chop etilgan", tone: "success" },
+  pending: { label: "Kutilmoqda", tone: "amber" },
+  rejected: { label: "Rad etilgan", tone: "danger" },
+  hidden: { label: "Yashirilgan", tone: "neutral" },
+};
+
+export function ReviewStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <Badge tone="neutral">—</Badge>;
+  const entry = REVIEW_STATUS[status.toLowerCase()];
+  return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
+}
+
 const ROLE_LABELS: Record<UserRole, { label: string; tone: Tone }> = {
   CUSTOMER: { label: "Mijoz", tone: "blue" },
   BUSINESS_OWNER: { label: "Biznes egasi", tone: "amber" },

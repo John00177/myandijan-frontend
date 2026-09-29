@@ -3,6 +3,7 @@ import type {
   AdminBusiness,
   AdminCategoryPayload,
   AdminEvent,
+  AdminReview,
   AdminListResult,
   AdminStats,
   AdminUser,
@@ -811,6 +812,23 @@ export async function getAdminUsers(params?: { page?: number; limit?: number }):
 export async function getAdminEvents(): Promise<AdminListResult<AdminEvent>> {
   const raw = await request<unknown>("/admin/events");
   return normalizeAdminList<AdminEvent>(raw);
+}
+
+export async function getAdminReviews(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdminListResult<AdminReview>> {
+  const raw = await request<unknown>("/admin/reviews", params);
+  return normalizeAdminList<AdminReview>(raw);
+}
+
+export function hideAdminReview(id: number): Promise<AdminReview> {
+  return authedPostJson<AdminReview>(`/admin/reviews/${id}/hide`, {});
+}
+
+export function restoreAdminReview(id: number): Promise<AdminReview> {
+  return authedPostJson<AdminReview>(`/admin/reviews/${id}/restore`, {});
 }
 
 export async function getAdminCategories(): Promise<AdminListResult<Category>> {
