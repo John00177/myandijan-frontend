@@ -18,6 +18,10 @@
 
 This no longer applies. Frontend production was confirmed on 2026-09-28 to be serving the current `main` build.
 
+### Phase 4 update — 2026-09-29
+
+A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTURE.md` §21) selected and wired four previously-unconnected backend capabilities end-to-end. Rows below are updated accordingly; everything else in this matrix reflects the 2026-09-28 audit unchanged.
+
 ---
 
 ## 1. Discovery & browse
@@ -44,7 +48,7 @@ This no longer applies. Frontend production was confirmed on 2026-09-28 to be se
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Text search | **IMPLEMENTED** | Via `GET /businesses?search=`; debounced input |
-| **Advanced FTS search** (`GET /search`) | **PARTIALLY IMPLEMENTED** | `pg_trgm` + tsvector, 4 custom PG functions, **Uzbek transliteration normalisation**, unified business+product ranking. **Nothing calls it.** The most capable unused asset in the project. |
+| **Advanced FTS search** (`GET /search`) | **PARTIALLY IMPLEMENTED** | `pg_trgm` + tsvector, 4 custom PG functions, **Uzbek transliteration normalisation**, unified business+product ranking. **Nothing calls it.** The most capable unused asset in the project. **Evaluated for Phase 4, not wired:** its `hydrate()` response is a heterogeneous `{type: 'business'|'product', ...}` shape with a *different, smaller* field set than the `Business` type the existing search UI (`BusinessListCard`, open-now/promoted badges) renders — missing `nameUz/nameRu/nameEn`, `rating`, `hasDelivery`, `isPromoted`, hours, etc. Wiring it as a drop-in replacement for `GET /businesses?search=` would either silently degrade result cards or require deciding how to present product hits, both product/design decisions, not a mechanical connection. Reported, not implemented. |
 | Category filter | **IMPLEMENTED** | |
 | District / city filter | **IMPLEMENTED** | |
 | Pagination | **IMPLEMENTED** | Server-side generic, client-side for restaurants |
@@ -115,8 +119,8 @@ This no longer applies. Frontend production was confirmed on 2026-09-28 to be se
 | OTP rate limiting | **IMPLEMENTED** | 3 per phone per 10 min → `429`, verified in production |
 | Password reset | **PARTIALLY IMPLEMENTED** | All three endpoints + UI exist; **code is logged, not sent** (`auth.service.ts:347`) |
 | JWT access tokens | **IMPLEMENTED** | 15 min default |
-| **Refresh tokens** | **BROKEN** | Fully built server-side (hashed, rotating, revocable); **frontend never stores or uses them** → sessions die after ~15 min |
-| Logout | **PARTIALLY IMPLEMENTED** | `POST /auth/logout` exists; frontend only clears `localStorage` |
+| **Refresh tokens** | **IMPLEMENTED** | **Phase 4 (2026-09-29):** frontend now persists the refresh token from login/register/OTP-verify and silently redeems it via `POST /auth/refresh` on any 401 (single-flight, retries the original request once) before falling back to logout — see `src/lib/api.ts` `refreshAccessToken()` |
+| Logout | **IMPLEMENTED** | **Phase 4:** `logout()` now calls `POST /auth/logout` to revoke the stored refresh token server-side (best-effort, not awaited) in addition to clearing `localStorage` |
 | Session-expiry handling | **IMPLEMENTED** | Centralised 401 → clear + `SESSION_EXPIRED_EVENT` |
 | Immediate suspension enforcement | **IMPLEMENTED** | `JwtStrategy` re-checks `status` on **every** request |
 | Profile management | **IMPLEMENTED** | `GET`/`PATCH /users/me`; age, gender, avatar |
@@ -148,7 +152,7 @@ This no longer applies. Frontend production was confirmed on 2026-09-28 to be se
 | Reviews + reply | **IMPLEMENTED** | |
 | My events (list) | **IMPLEMENTED** | Create/edit/delete endpoints exist; **no UI** |
 | **Business claim flow** | **IMPLEMENTED** | 8 screens, live preview; submits to `POST /businesses` |
-| Claim status visibility | **PLANNED** | `GET /me/claims` exists; nothing calls it — an owner cannot see what happened to their claim |
+| Claim status visibility | **PLANNED** | `GET /me/claims` exists; nothing calls it — an owner cannot see what happened to their claim. **Evaluated for Phase 4, not wired:** no endpoint anywhere in the backend ever creates a `BusinessClaim` row — the existing "claim flow" (`ClaimPage`/`useClaimFlow`) submits a new `Business` via `POST /businesses`, not a claim against an existing one. Wiring this UI today would always show an empty list; fixing it needs a product decision on whether/how the claim flow should create `BusinessClaim` records. Reported, not implemented. |
 | Add business (3-step) | **IMPLEMENTED** | `AddBusinessPage` |
 | Multi-branch management | **PARTIALLY IMPLEMENTED** | `POST /me/businesses/:id/branches` + `PATCH /me/branches/:id` exist; branch **creation** has no UI |
 | Menu / product management | **PARTIALLY IMPLEMENTED** | API + `api.ts` wrappers + `ProductModal` exist; **`InventoryView` still renders mock data** |
@@ -227,9 +231,9 @@ See `AI.md`.
 | --- | --- | --- |
 | Analytics schema | **IMPLEMENTED** | `BusinessAnalytics` (daily grain), `SearchAnalytics`, `ActivityLog`, `PlatformMetric` |
 | Ingestion endpoints | **IMPLEMENTED** | `POST /analytics/view\|click\|search` |
-| **Ingestion wiring** | **BROKEN** | **The frontend calls none of them.** Every analytics feature downstream reads empty tables. |
+| **Ingestion wiring** | **PARTIALLY IMPLEMENTED** | **Phase 4 (2026-09-29):** wired from the frontend — `useBusiness` fires a view on initial business-detail load; `ActionButtons` fires a click for CALL/DIRECTION/SHARE/FAVORITE; `useSearchBusinesses` fires a search (query + district/city + result count) whenever a text query resolves. Not yet wired: WEBSITE clicks (no website link exists in the current UI) and category-id attribution on search (the UI only has the category *slug*, not its numeric id). |
 | Owner analytics API | **IMPLEMENTED** | 6 endpoints |
-| Owner analytics UI | **PLANNED** | `TrafficChart`, `Sparkline` components exist but are not fed |
+| Owner analytics UI | **PLANNED** | `TrafficChart`, `Sparkline` components exist but are not fed. Considered for Phase 4 and deferred: no owner-dashboard "Analytics" view exists to hold them — those components currently only render inside `PremiumView`'s upsell mock — so wiring this would mean adding a new dashboard view, not just connecting existing UI. Flagged for a product decision on where it belongs. |
 | Admin analytics | **PARTIALLY IMPLEMENTED** | 2 endpoints wired to `AnalyticsView` |
 | Command centre | **PLANNED** | 10 endpoints, no UI |
 | Daily metric aggregation | **PARTIALLY IMPLEMENTED** | `POST /admin/analytics/aggregate` exists; **nothing schedules it** |
@@ -286,8 +290,8 @@ See `AI.md`.
 | SPA deep-link rewrite | **IMPLEMENTED** | `vercel.json` catch-all |
 | Local Postgres via Docker | **IMPLEMENTED** | `docker-compose.yml` |
 | Swagger API docs | **IMPLEMENTED** | `/docs` — **publicly exposed in production** |
-| **Tests** | **NOT PRESENT** | **Zero test files, no runner, no `test` script in either repo** |
-| CI/CD | **NOT PRESENT** | No GitHub Actions, no pipeline |
+| **Tests** | **PARTIALLY IMPLEMENTED** | **Superseded by Phase 3 (2026-09-28)/Phase 4 (2026-09-29).** Jest (backend, 37 tests) + Vitest/RTL (frontend, 10 tests) now cover auth, business listing/search/detail, category/geography endpoints, the homepage/search/detail/protected-route smoke tests, and the Phase 4 refresh-token + search-analytics wiring. Not a full suite — most admin/owner flows and UI components remain untested. |
+| CI/CD | **PARTIALLY IMPLEMENTED** | **Superseded by Phase 3.** A minimal GitHub Actions workflow exists in both repos (install → test → build on push/PR to `main`); no deployment automation |
 | Staging environment | **NOT PRESENT** | |
 | Error tracking | **NOT PRESENT** | |
 | Rate limiting (general) | **NOT PRESENT** | Only the hand-rolled OTP cap |
@@ -306,14 +310,14 @@ See `AI.md`.
 | | Count |
 | --- | --- |
 | API routes built | **118** |
-| API routes the frontend calls | **~38** |
-| API routes with no frontend usage | **~80** |
+| API routes the frontend calls | **~42** (Phase 4 connected `/auth/refresh`, `/auth/logout`, `/analytics/view`, `/analytics/click`, `/analytics/search`, `/categories/homepage`) |
+| API routes with no frontend usage | **~76** |
 | Database models | **31** |
 | Models entirely unused by code | **3** (`Notification`, `PlatformSetting`, `Advertisement`) |
 | Frontend route pages | **12** + 3 redirects |
 | Owner dashboard views | 8 (1 mock, 1 non-persisting, 1 placeholder) |
 | Admin dashboard views | 10 (1 mock, 1 non-persisting) |
 | i18n keys | **385 × 3 languages, full parity** |
-| Tests | **0** |
+| Tests | **47** (37 backend + 10 frontend) |
 | AI features | **0** |
 | 3D / immersive features | **0** |

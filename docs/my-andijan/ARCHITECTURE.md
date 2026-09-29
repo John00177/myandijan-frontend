@@ -581,4 +581,26 @@ curl -s -o /dev/null -w '%{http_code}
 8. **`/docs` is publicly reachable in production.**
 
 ### Not present
-No CI/CD pipeline, no GitHub Actions, no staging environment, no preview-deploy workflow, no Dockerfile for the API, no infrastructure-as-code, no automated database backups configured in-repo.
+No staging environment, no preview-deploy workflow, no Dockerfile for the API, no infrastructure-as-code, no automated database backups configured in-repo. **Superseded 2026-09-28 (Phase 3):** a minimal GitHub Actions workflow now exists in both repos (install → test → build on push/PR to `main`).
+
+## 21. Frontend/backend integration audit — 2026-09-29 (Phase 4)
+
+A full route-by-route audit compared all 118 backend HTTP routes against `myandijan-frontend/src/lib/api.ts` (confirmed the only file performing network calls) and its callers. Full per-route detail lives in the audit itself, not reproduced here; headline results:
+
+- **~42 of 118 routes are called from the frontend** (up from ~38 — see Phase 4 connections below); ~76 have no frontend caller.
+- **Controllers with zero frontend usage:** `command-center` (9 routes), `health-score` (3 routes), `search` (`GET /search`), most of `geography` beyond `regions`, most of `categories` beyond the tree (until Phase 4 added `/categories/homepage`), and the standalone `reviews.controller.ts` routes (the app instead goes through `/businesses/:id/reviews` and `/me/reviews`).
+- **No route in the frontend calls a backend path that doesn't exist** — `lib/api.ts` is fully consistent with the live route table (two stale 2026-08-13 code comments claim otherwise; the routes they reference now exist).
+- **Dead code in `lib/api.ts`:** `register` (signup uses OTP instead), `getUserAnalytics`, `updateAdminBusiness`, `updateMenuItem`, `replyToReview`'s underlying `POST /reviews/:id/reply` (the PATCH alias is what's actually called) are exported but never imported anywhere.
+
+### Phase 4 connections (implemented this pass)
+
+1. **Refresh-token session persistence** — `AuthContext.login`/`register` now take and persist the `refreshToken` field the backend already returned (the `AuthResponse` type was missing it). `lib/api.ts`'s five internal fetch wrappers (`request`, `authedDelete`, `authedJson`, `authedFormData`, `uploadImage`) each attempt one silent `POST /auth/refresh` (single-flight, deduped across concurrent 401s) before falling back to the existing logout-on-401 path. Fixes the previously BROKEN behavior where sessions died after the 15-minute access-token lifetime.
+2. **Logout revocation** — `AuthContext.logout()` now calls `POST /auth/logout` (best-effort, not awaited) to revoke the stored refresh token server-side, in addition to clearing `localStorage`.
+3. **Analytics ingestion wiring** — `POST /analytics/view` fires from `useBusiness` on a business detail page's initial load; `POST /analytics/click` fires from `ActionButtons` for CALL/DIRECTION/SHARE/FAVORITE; `POST /analytics/search` fires from `useSearchBusinesses` whenever a text-query search resolves (query, district/city id, result count — category id is omitted since the UI only holds the category *slug*). All three are fire-and-forget and never surface a failure to the user. This is the first frontend traffic these previously-empty analytics tables will ever receive.
+4. **Homepage categories via the dedicated endpoint** — `CategoriesSection` now calls the purpose-built `GET /categories/homepage` (new `getCategoriesHomepage()` + `useCategoriesHomepage` hook) instead of fetching the full category tree via `GET /categories` and filtering client-side for `showOnHomepage`. Same rendered output, smaller payload, server is now the source of truth for the filter.
+
+### Evaluated and explicitly NOT implemented (require a product decision)
+
+- **Advanced FTS search (`GET /search`)** — its `hydrate()` response is a heterogeneous, smaller field set than the `Business` type the search UI renders (missing localized names, rating, delivery/promoted flags, hours). Wiring it as-is would either degrade result cards or require designing UI for mixed business/product hits. See `FEATURES.md` §2.
+- **Claim status visibility (`GET /me/claims`)** — no backend endpoint ever creates a `BusinessClaim` row (the existing claim flow creates a `Business` directly via `POST /businesses`), so this UI would always show an empty list until someone decides how/whether the claim flow should produce real claim records. See `FEATURES.md` §8.
+- **`GET /businesses/promoted`** — no business in the current dataset has `isPromoted` set, and its visual placement/relationship to the existing "Editor's Pick" carousel (which already derives from `isFeatured`) is a design decision, not a mechanical connection.

@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ApiError, getMe, SESSION_EXPIRED_EVENT } from "../lib/api";
+import { ApiError, getMe, revokeSession, SESSION_EXPIRED_EVENT } from "../lib/api";
 import type { AuthUser } from "../types";
 
 const TOKEN_KEY = "myandijan_token";
+const REFRESH_TOKEN_KEY = "myandijan_refresh_token";
 const USER_KEY = "myandijan_user";
 
 interface AuthContextValue {
@@ -11,8 +12,8 @@ interface AuthContextValue {
   isOwner: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
-  login: (token: string, user: AuthUser) => void;
-  register: (token: string, user: AuthUser) => void;
+  login: (token: string, user: AuthUser, refreshToken: string) => void;
+  register: (token: string, user: AuthUser, refreshToken: string) => void;
   logout: () => void;
   /**
    * Merges a partial user patch into state + localStorage without a server
@@ -56,21 +57,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // it must never itself trigger a render or re-run this effect.
   const writeSeqRef = useRef(0);
 
-  const applySession = useCallback((nextToken: string, nextUser: AuthUser) => {
+  const applySession = useCallback((nextToken: string, nextUser: AuthUser, nextRefreshToken: string) => {
     writeSeqRef.current += 1;
     localStorage.setItem(TOKEN_KEY, nextToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, nextRefreshToken);
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
     setToken(nextToken);
     setUser(nextUser);
   }, []);
 
   const login = useCallback(
-    (nextToken: string, nextUser: AuthUser) => applySession(nextToken, nextUser),
+    (nextToken: string, nextUser: AuthUser, nextRefreshToken: string) =>
+      applySession(nextToken, nextUser, nextRefreshToken),
     [applySession],
   );
 
   const register = useCallback(
-    (nextToken: string, nextUser: AuthUser) => applySession(nextToken, nextUser),
+    (nextToken: string, nextUser: AuthUser, nextRefreshToken: string) =>
+      applySession(nextToken, nextUser, nextRefreshToken),
     [applySession],
   );
 
@@ -120,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Matches how useFavorites already treats a 401.
         if (err instanceof ApiError && err.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(REFRESH_TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
           setToken(null);
           setUser(null);
@@ -138,7 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const logout = useCallback(() => {
+    // Best-effort: revoke the refresh token server-side so a copy of it
+    // (e.g. from a shared/compromised device) can't outlive this logout. Not
+    // awaited — local session state is cleared regardless of the outcome, so
+    // a network failure here never blocks logging out.
+    const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+    if (storedRefreshToken) {
+      revokeSession(storedRefreshToken).catch(() => {});
+    }
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     setToken(null);
     setUser(null);

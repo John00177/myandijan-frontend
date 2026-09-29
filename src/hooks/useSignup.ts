@@ -102,7 +102,7 @@ export function useSignup(): UseSignupResult {
         const res = await verifyOtp(toE164(phone), code);
         // The account exists from here on. Storing the token before step 3
         // is what makes the profile step genuinely optional.
-        register(res.accessToken, res.user);
+        register(res.accessToken, res.user, res.refreshToken);
         setStep("profile");
       } catch (err) {
         setError(messageFor(err, "signup.errorInvalidCode"));

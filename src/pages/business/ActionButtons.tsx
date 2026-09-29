@@ -2,7 +2,7 @@ import { Heart, Navigation, Phone, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { addFavorite, ApiError, getFavorites, removeFavorite } from "../../lib/api";
+import { addFavorite, ApiError, getFavorites, recordBusinessClick, removeFavorite } from "../../lib/api";
 import type { Business } from "../../types";
 
 interface ActionButtonsProps {
@@ -67,6 +67,7 @@ export default function ActionButtons({ business }: ActionButtonsProps) {
         await addFavorite(business.id);
         setIsFavorite(true);
         setToast(t("addedToFavorites"));
+        recordBusinessClick(business.id, "FAVORITE");
       }
     } catch (err) {
       setToast(err instanceof ApiError ? err.message : t("common.genericError"));
@@ -76,6 +77,7 @@ export default function ActionButtons({ business }: ActionButtonsProps) {
   }
 
   async function share() {
+    recordBusinessClick(business.id, "SHARE");
     const url = window.location.href;
     if (navigator.share) {
       try {
@@ -106,6 +108,7 @@ export default function ActionButtons({ business }: ActionButtonsProps) {
         <a
           href={business.phone ? `tel:${business.phone}` : undefined}
           aria-disabled={!business.phone}
+          onClick={() => business.phone && recordBusinessClick(business.id, "CALL")}
           className={`h-14 rounded-xl flex flex-col items-center justify-center gap-1 ${
             business.phone
               ? "bg-primary text-white"
@@ -121,6 +124,7 @@ export default function ActionButtons({ business }: ActionButtonsProps) {
             href={mapsUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => recordBusinessClick(business.id, "DIRECTION")}
             className="bg-white/[0.05] border border-white/[0.10] text-ink h-14 rounded-xl flex flex-col items-center justify-center gap-1 hover:border-primary/30"
           >
             <Navigation size={18} />

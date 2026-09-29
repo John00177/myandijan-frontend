@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, getBusiness } from "../lib/api";
+import { ApiError, getBusiness, recordBusinessView } from "../lib/api";
 import type { Business, Lang } from "../types";
 
 interface UseBusinessResult {
@@ -29,7 +29,12 @@ export function useBusiness(slug: string, lang: Lang): UseBusinessResult {
 
     getBusiness(slug, lang)
       .then((data) => {
-        if (!cancelled) setBusiness(data);
+        if (!cancelled) {
+          setBusiness(data);
+          // Only the initial load counts as a "view" — a reload after posting
+          // a review/reply is the same visit, not a second one.
+          if (reloadTick === 0) recordBusinessView(data.id);
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return;

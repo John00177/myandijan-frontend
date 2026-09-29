@@ -37,6 +37,7 @@ import type {
 const BASE = import.meta.env.VITE_API_URL || "https://myandijan-api-production.up.railway.app";
 const TIMEOUT_MS = 10_000;
 const TOKEN_KEY = "myandijan_token";
+const REFRESH_TOKEN_KEY = "myandijan_refresh_token";
 const USER_KEY = "myandijan_user";
 
 /** Fired when a request proves the stored token is no longer valid. */
@@ -67,8 +68,48 @@ class ApiError extends Error {
 function handleUnauthorized(hadToken: boolean, status: number): void {
   if (!hadToken || status !== 401) return;
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+}
+
+/**
+ * Single-flight silent refresh. On a 401 from an authenticated request, each
+ * of the request helpers below calls this once before giving up — it trades
+ * the opaque refresh token (POST /auth/refresh) for a new access+refresh
+ * pair and persists both, so a session survives past the 15-minute access
+ * token instead of forcing a re-login. Concurrent 401s share one in-flight
+ * call rather than each racing to redeem the same rotating refresh token.
+ * Returns null (never throws) on any failure — callers then fall through to
+ * the existing handleUnauthorized/logout path unchanged.
+ */
+let refreshInFlight: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  if (!storedRefreshToken) return null;
+
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(new URL("/auth/refresh", BASE).toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ refreshToken: storedRefreshToken }),
+        });
+        if (!res.ok) return null;
+        const data = (await res.json()) as { accessToken: string; refreshToken: string };
+        localStorage.setItem(TOKEN_KEY, data.accessToken);
+        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+        return data.accessToken;
+      } catch {
+        return null;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
 }
 
 async function request<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
@@ -91,7 +132,14 @@ async function request<T>(path: string, params?: Record<string, string | number 
   }
 
   try {
-    const res = await fetch(url.toString(), { headers, signal: controller.signal });
+    let res = await fetch(url.toString(), { headers, signal: controller.signal });
+    if (res.status === 401 && token) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        res = await fetch(url.toString(), { headers, signal: controller.signal });
+      }
+    }
     if (!res.ok) {
       handleUnauthorized(!!token, res.status);
       throw new ApiError(`Request failed: ${res.status}`, res.status);
@@ -108,6 +156,15 @@ export function getRegions(lang?: Lang): Promise<Region[]> {
 
 export function getCategories(lang?: Lang): Promise<Category[]> {
   return request<Category[]>("/categories", { lang });
+}
+
+/**
+ * Purpose-built for the homepage's category tiles — the server already
+ * applies the `showOnHomepage` filter, so callers that only need that subset
+ * fetch it directly instead of pulling the full tree and filtering client-side.
+ */
+export function getCategoriesHomepage(lang?: Lang): Promise<Category[]> {
+  return request<Category[]>("/categories/homepage", { lang });
 }
 
 /**
@@ -310,12 +367,24 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
     // No Content-Type header here — the browser sets
     // multipart/form-data with the correct boundary itself; setting it
     // manually would drop the boundary and break the upload.
-    const res = await fetch(new URL("/upload/image", BASE).toString(), {
+    let res = await fetch(new URL("/upload/image", BASE).toString(), {
       method: "POST",
       headers,
       body: formData,
       signal: controller.signal,
     });
+    if (res.status === 401 && token) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        res = await fetch(new URL("/upload/image", BASE).toString(), {
+          method: "POST",
+          headers,
+          body: formData,
+          signal: controller.signal,
+        });
+      }
+    }
     if (!res.ok) {
       handleUnauthorized(!!token, res.status);
       const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
@@ -330,6 +399,41 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
 
 export function getEvents(): Promise<PaginatedResponse<Event>> {
   return request<PaginatedResponse<Event>>("/events");
+}
+
+export type AnalyticsClickAction = "CALL" | "DIRECTION" | "FAVORITE" | "SHARE" | "WEBSITE";
+
+/**
+ * Fire-and-forget telemetry for the public, anonymous /analytics/* endpoints.
+ * Their response is never used and a network hiccup here must never surface
+ * as a user-facing error, so failures are swallowed at this single choke
+ * point rather than requiring every call site to remember to catch them.
+ */
+function recordAnalytics(path: string, body: unknown): void {
+  fetch(new URL(path, BASE).toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
+export function recordBusinessView(businessId: number, cityId?: number): void {
+  recordAnalytics("/analytics/view", { businessId, cityId });
+}
+
+export function recordBusinessClick(businessId: number, action: AnalyticsClickAction): void {
+  recordAnalytics("/analytics/click", { businessId, action });
+}
+
+export function recordSearch(payload: {
+  query: string;
+  categoryId?: number;
+  districtId?: number;
+  cityId?: number;
+  businessId?: number;
+  resultCount: number;
+}): void {
+  recordAnalytics("/analytics/search", payload);
 }
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
@@ -442,11 +546,22 @@ async function authedDelete(path: string): Promise<void> {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const res = await fetch(new URL(path, BASE).toString(), {
+    let res = await fetch(new URL(path, BASE).toString(), {
       method: "DELETE",
       headers,
       signal: controller.signal,
     });
+    if (res.status === 401 && token) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        res = await fetch(new URL(path, BASE).toString(), {
+          method: "DELETE",
+          headers,
+          signal: controller.signal,
+        });
+      }
+    }
     if (!res.ok) {
       handleUnauthorized(!!token, res.status);
       throw new ApiError(`Request failed: ${res.status}`, res.status);
@@ -474,12 +589,24 @@ async function authedJson<T>(method: "POST" | "PATCH" | "PUT", path: string, bod
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const res = await fetch(new URL(path, BASE).toString(), {
+    let res = await fetch(new URL(path, BASE).toString(), {
       method,
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+    if (res.status === 401 && token) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        res = await fetch(new URL(path, BASE).toString(), {
+          method,
+          headers,
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      }
+    }
     if (!res.ok) {
       handleUnauthorized(!!token, res.status);
       const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
@@ -506,12 +633,24 @@ async function authedFormData<T>(method: "POST" | "PUT" | "PATCH", path: string,
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const res = await fetch(new URL(path, BASE).toString(), {
+    let res = await fetch(new URL(path, BASE).toString(), {
       method,
       headers,
       body,
       signal: controller.signal,
     });
+    if (res.status === 401 && token) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        headers.Authorization = `Bearer ${newToken}`;
+        res = await fetch(new URL(path, BASE).toString(), {
+          method,
+          headers,
+          body,
+          signal: controller.signal,
+        });
+      }
+    }
     if (!res.ok) {
       handleUnauthorized(!!token, res.status);
       const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null;
@@ -526,6 +665,15 @@ async function authedFormData<T>(method: "POST" | "PUT" | "PATCH", path: string,
 
 function authedPostJson<T>(path: string, body: unknown): Promise<T> {
   return authedJson<T>("POST", path, body);
+}
+
+/**
+ * Revokes the refresh token server-side on logout. Best-effort by design —
+ * AuthContext calls this without awaiting it and clears local session state
+ * regardless of the outcome, so a network failure here never blocks logout.
+ */
+export function revokeSession(refreshToken: string): Promise<void> {
+  return authedPostJson<void>("/auth/logout", { refreshToken });
 }
 
 function authedPatchJson<T>(path: string, body: unknown): Promise<T> {

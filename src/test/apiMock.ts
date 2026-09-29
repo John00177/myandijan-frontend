@@ -64,12 +64,17 @@ export const emptyPage: PaginatedResponse<Business> = {
 
 export const getRegions = vi.fn().mockResolvedValue(mockRegions);
 export const getCategories = vi.fn().mockResolvedValue(mockCategories);
+export const getCategoriesHomepage = vi.fn().mockResolvedValue(mockCategories);
 export const getFeaturedBusinesses = vi.fn().mockResolvedValue([]);
 export const searchBusinesses = vi.fn().mockResolvedValue(emptyPage);
 export const getBusiness = vi.fn().mockResolvedValue(mockBusiness);
 export const getMe = vi.fn().mockRejectedValue(new Error("not authenticated"));
 export const getFavorites = vi.fn().mockResolvedValue([]);
 export const getEvents = vi.fn().mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
+export const recordBusinessView = vi.fn();
+export const recordBusinessClick = vi.fn();
+export const recordSearch = vi.fn();
+export const revokeSession = vi.fn().mockResolvedValue(undefined);
 
 class ApiError extends Error {
   status: number;

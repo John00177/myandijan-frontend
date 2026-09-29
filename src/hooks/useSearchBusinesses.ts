@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { searchBusinesses } from "../lib/api";
+import { recordSearch, searchBusinesses } from "../lib/api";
 import type { Business, PaginatedResponse, SearchBusinessesParams } from "../types";
 
 interface UseSearchBusinessesResult {
@@ -27,6 +27,11 @@ export function useSearchBusinesses(params: SearchBusinessesParams): UseSearchBu
         if (!cancelled) {
           setBusinesses(res.data);
           setMeta(res.meta);
+          // Only a real text query is a "search" worth logging — browsing by
+          // category/district alone isn't what SearchAnalytics is for.
+          if (search) {
+            recordSearch({ query: search, districtId: district, cityId: city, resultCount: res.meta.total });
+          }
         }
       })
       .catch(() => {

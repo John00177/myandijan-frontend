@@ -26,7 +26,7 @@ export default function LoginForm({ onSuccess, onForgotPassword }: LoginFormProp
 
     try {
       const res = await apiLogin({ phone, password });
-      login(res.accessToken, res.user);
+      login(res.accessToken, res.user, res.refreshToken);
       onSuccess();
     } catch (err) {
       setErrorMessage(err instanceof ApiError ? err.message : t("auth.loginError"));

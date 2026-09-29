@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { useCategories } from "../../hooks/useCategories";
+import { useCategoriesHomepage } from "../../hooks/useCategoriesHomepage";
 import { categoryColor, categoryIcon, hexToRgba } from "../../lib/categoryVisuals";
 import { localizedName } from "../../lib/localize";
 import AnimatedCard from "../../components/AnimatedCard";
@@ -10,9 +10,9 @@ import Skeleton from "../../components/ui/Skeleton";
 export default function CategoriesSection() {
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
-  const { categories, loading } = useCategories(lang);
+  const { categories, loading } = useCategoriesHomepage(lang);
 
-  const visible = categories.filter((c) => c.showOnHomepage).slice(0, 8);
+  const visible = categories.slice(0, 8);
 
   return (
     <section className="max-w-7xl mx-auto px-6 py-16">
