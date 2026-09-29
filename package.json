@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "sitemap": "tsx scripts/generate-sitemap.ts",
-    "og-image": "tsx scripts/generate-og-image.ts"
+    "og-image": "tsx scripts/generate-og-image.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.22",
@@ -24,17 +26,21 @@
     "recharts": "^3.10.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "autoprefixer": "^10.5.4",
+    "jsdom": "^25.0.1",
     "oxlint": "^1.75.0",
     "postcss": "^8.5.26",
     "sharp": "^0.35.3",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.12",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "vitest": "^2.1.9"
   }
 }
