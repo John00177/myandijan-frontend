@@ -208,6 +208,8 @@ const uz = {
   "description": "Tavsif",
   "businessNotFound": "Biznes topilmadi",
   "businessNotFoundBody": "Bu biznes mavjud emas yoki o'chirilgan bo'lishi mumkin.",
+  "eventNotFound": "Tadbir topilmadi",
+  "eventNotFoundBody": "Bu tadbir mavjud emas yoki o'chirilgan bo'lishi mumkin.",
   "branches": "Filiallar",
   "noBranches": "Filiallar yo'q",
   "noBranchesBody": "Bu biznes uchun qo'shimcha filiallar ko'rsatilmagan.",

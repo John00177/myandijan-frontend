@@ -151,17 +151,44 @@ export interface Business {
   primaryBranch?: Branch | null;
 }
 
+// Matches EVENT_LIST_SELECT on the backend (GET /events) — Event.title is a
+// single, non-localized column, unlike the taxonomy entities.
 export interface Event {
   id: number;
   slug: string;
-  nameUz: string;
-  nameRu: string;
-  nameEn: string;
+  title: string;
   type: string | null;
-  image: string | null;
-  startsAt: string;
-  location: string | null;
-  categoryLabel: string | null;
+  coverUrl: string | null;
+  startAt: string;
+  endAt: string;
+  venueName: string | null;
+  address: string | null;
+  isFree: boolean;
+  price: number | string | null;
+  currency: string | null;
+  attendeeCount: number;
+  business: { id: number; slug: string; name: string; logoUrl: string | null } | null;
+  district: { id: number; slug: string; nameUz: string } | null;
+}
+
+// GET /events/:slug returns every scalar Event column (Prisma `include`, not
+// `select`) plus these relations — a strict superset of the list shape.
+export interface EventDetail extends Event {
+  description: string;
+  allowRsvp: boolean;
+  maxAttendees: number | null;
+  registrationUrl: string | null;
+  category: { id: number; slug: string; nameUz: string; nameRu: string; nameEn: string } | null;
+}
+
+export interface CreateEventPayload {
+  businessId: number;
+  title: string;
+  description: string;
+  startAt: string;
+  endAt: string;
+  venueName?: string;
+  address?: string;
 }
 
 export interface PaginatedResponse<T> {

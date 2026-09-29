@@ -210,6 +210,8 @@ const ru: Record<keyof typeof uz, string> = {
   "description": "Описание",
   "businessNotFound": "Бизнес не найден",
   "businessNotFoundBody": "Этот бизнес не существует или был удалён.",
+  "eventNotFound": "Мероприятие не найдено",
+  "eventNotFoundBody": "Это мероприятие не существует или было удалено.",
   "branches": "Филиалы",
   "noBranches": "Филиалов нет",
   "noBranchesBody": "Для этого бизнеса не указаны дополнительные филиалы.",

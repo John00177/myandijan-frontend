@@ -286,6 +286,19 @@
 
 ---
 
+## Phase 6 — MVP gap audit (2026-09-29)
+
+### D-53 · Keep sitemap generation manual/deploy-time, not a CI step 🔓 REVISITABLE
+**Decision.** `npm run sitemap` was re-run to populate `sitemap-businesses.xml` (0 → 12 URLs), but it was **not** added to `package.json`'s `build` script or the CI workflow.
+**Rationale.** The generator fetches live data from the production API (`VITE_API_URL`/`SITE_URL` env-driven). Wiring it into `npm run build` would make every build — including the Phase 3 CI workflow's `npm run build` step on every push/PR — depend on a network call to production. That's a behavior change to CI (an external dependency, and a flaky-network failure mode) that wasn't asked for and wasn't evaluated for safety.
+**Consequence.** The file will go stale again as new businesses are added. Revisit by adding a scheduled job (cron, GitHub Actions on a schedule, or a manual step in the deploy checklist) — deliberately not decided here.
+
+### D-54 · What "Inventory" means for `InventoryView` ⚠️ NEEDS DECISION
+**Tension found.** The owner dashboard's mock `Product` type has `sku` and `quantity` (stock-keeping). The real backend catalog (`GET/POST /businesses/:id/menu`) has neither — it's `name`/`description`/`price`/`imageUrl`/`isAvailable` only, matching a restaurant-menu use case, not a warehouse.
+**Not decided.** Whether "Inventory" should become the existing menu/catalog concept (drop SKU/quantity from the UI) or gain real stock-tracking fields (a schema change). Implementing either without an answer would either silently narrow the feature or add columns nobody asked for.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
@@ -302,3 +315,5 @@ Listed because their absence is itself the finding, and because each will otherw
 | ⚠️ 8 | **Why is analytics ingestion unwired?** | 3 endpoints exist, nothing calls them, and no comment or note explains whether this was deferred or forgotten |
 | ⚠️ 9 | **What happens to `Notification` and `PlatformSetting`?** | Both tables exist and are entirely unused; `AdminSettingsView` is the missing consumer of the latter |
 | ⚠️ 10 | **Is `restaurantMock` acceptable in production?** | Users currently see invented cuisine/price/delivery data (D-24) |
+| ⚠️ 11 | **What does "Inventory" mean for `InventoryView`?** | Mock UI assumes stock/SKU tracking; the real backend catalog has neither (D-54) |
+| ⚠️ 12 | **Should the claim flow create real `BusinessClaim` records?** | No endpoint anywhere creates one today, so `GET /me/claims`/`GET /admin/claims` can never show data (Phase 4/5 audits) |

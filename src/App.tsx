@@ -45,6 +45,7 @@ const HomePage = lazy(() => import("./pages/HomePage"));
 const SearchPage = lazy(() => import("./pages/SearchPage"));
 const BusinessDetailPage = lazy(() => import("./pages/BusinessDetailPage"));
 const EventsPage = lazy(() => import("./pages/EventsPage"));
+const EventDetailPage = lazy(() => import("./pages/EventDetailPage"));
 const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -78,6 +79,7 @@ export default function App() {
                     <Route path="search" element={<SearchPage />} />
                     <Route path="business/:slug" element={<BusinessDetailPage />} />
                     <Route path="events" element={<EventsPage />} />
+                    <Route path="events/:slug" element={<EventDetailPage />} />
                     <Route path="favorites" element={<FavoritesPage />} />
                     <Route path="profile" element={<ProfilePage />} />
                     <Route path="pricing" element={<PricingPage />} />

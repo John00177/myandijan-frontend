@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { Business, Category, PaginatedResponse, Region } from "../types";
+import type { Business, Category, EventDetail, PaginatedResponse, Region } from "../types";
 
 // Central set of sensible empty defaults for every lib/api export a page
 // component's hooks might call. Individual tests override just the calls
@@ -71,6 +71,32 @@ export const getBusiness = vi.fn().mockResolvedValue(mockBusiness);
 export const getMe = vi.fn().mockRejectedValue(new Error("not authenticated"));
 export const getFavorites = vi.fn().mockResolvedValue([]);
 export const getEvents = vi.fn().mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
+
+export const mockEvent: EventDetail = {
+  id: 1,
+  slug: "milliy-taomlar-festivali",
+  title: "Milliy taomlar festivali",
+  type: "FESTIVAL",
+  coverUrl: null,
+  startAt: "2026-10-01T10:00:00.000Z",
+  endAt: "2026-10-01T18:00:00.000Z",
+  venueName: "Andijon markaziy bozori",
+  address: null,
+  isFree: true,
+  price: null,
+  currency: null,
+  attendeeCount: 3,
+  business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar", logoUrl: null },
+  district: null,
+  description: "Andijon viloyatidagi eng mazali milliy taomlar bir joyda.",
+  allowRsvp: true,
+  maxAttendees: null,
+  registrationUrl: null,
+  category: null,
+};
+
+export const getEventBySlug = vi.fn().mockResolvedValue(mockEvent);
+export const attendEvent = vi.fn().mockResolvedValue({});
 export const recordBusinessView = vi.fn();
 export const recordBusinessClick = vi.fn();
 export const recordSearch = vi.fn();

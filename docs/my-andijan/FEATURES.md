@@ -39,8 +39,9 @@ A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTUR
 | "Editor's Pick" carousel | **IMPLEMENTED** | `EditorsPickCarousel` |
 | Useful services section | **IMPLEMENTED** | `UsefulServices` |
 | Platform stats strip | **IMPLEMENTED** | `StatsStrip` with count-up animation |
-| Events listing | **IMPLEMENTED** | `/:lang/events`; **live API returns 0 events** |
-| Event detail page | **PLANNED** | `GET /events/:slug` exists; no page |
+| Events listing | **IMPLEMENTED** | `/:lang/events`. **Phase 5 (2026-09-29) also fixed a live bug here:** the frontend `Event` type/`EventCard` used field names (`nameUz`, `image`, `startsAt`, `location`, `categoryLabel`) that don't exist in the real `GET /events` response (`title`, `coverUrl`, `startAt`, `venueName`/`address`) — every card was rendering a blank title, no image and no date in production. Corrected to match `EVENT_LIST_SELECT`. |
+| Event detail page | **IMPLEMENTED** | **Phase 5:** `/:lang/events/:slug` added, backed by `GET /events/:slug`. Renders date range, venue, business link, description, attendee count |
+| Event RSVP | **IMPLEMENTED** | **Phase 5:** `POST /events/:slug/attend` wired to a button on the new detail page; gated behind login like favourites |
 | 404 page | **PLANNED** | No catch-all route |
 
 ## 2. Search & filtering
@@ -150,7 +151,7 @@ A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTUR
 | Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours |
 | Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
 | Reviews + reply | **IMPLEMENTED** | |
-| My events (list) | **IMPLEMENTED** | Create/edit/delete endpoints exist; **no UI** |
+| My events (list) | **IMPLEMENTED** | **Phase 5:** create wired — a "Yangi tadbir" modal (business picker + title/description/dates/venue) now calls `POST /me/events`, replacing the previously dead button. **Edit and delete endpoints still have no UI** — deprioritized this phase for scope, not blocked |
 | **Business claim flow** | **IMPLEMENTED** | 8 screens, live preview; submits to `POST /businesses` |
 | Claim status visibility | **PLANNED** | `GET /me/claims` exists; nothing calls it — an owner cannot see what happened to their claim. **Evaluated for Phase 4, not wired:** no endpoint anywhere in the backend ever creates a `BusinessClaim` row — the existing "claim flow" (`ClaimPage`/`useClaimFlow`) submits a new `Business` via `POST /businesses`, not a claim against an existing one. Wiring this UI today would always show an empty list; fixing it needs a product decision on whether/how the claim flow should create `BusinessClaim` records. Reported, not implemented. |
 | Add business (3-step) | **IMPLEMENTED** | `AddBusinessPage` |
@@ -196,7 +197,7 @@ A frontend/backend integration audit (full route-by-route matrix in `ARCHITECTUR
 | `robots.txt` | **IMPLEMENTED** | Wildcards private routes under every language prefix |
 | Sitemap index | **IMPLEMENTED** | 4 sub-sitemaps |
 | Sitemap: pages / categories / locations | **IMPLEMENTED** | 9 / 24 / 72 URLs |
-| **Sitemap: businesses** | **BROKEN** | **0 URLs** — the highest-value file is empty |
+| **Sitemap: businesses** | **PARTIALLY IMPLEMENTED** | **Superseded 2026-09-29 (Phase 5):** `npm run sitemap` re-run against live production — now **12 URLs** (4 businesses × 3 languages), `lastmod` refreshed. **Still not automated** — nothing re-runs it on a schedule or at deploy time, so it will go stale again as businesses are added; deliberately not wired into CI (would make every `npm run build` depend on the live production API — see `DECISIONS.md`) |
 | `noIndex` on private routes | **IMPLEMENTED** | `MetaTags` prop |
 | Per-business SEO overrides | **PARTIALLY IMPLEMENTED** | `metaTitle*`/`metaDescription*` columns exist; no admin/owner UI edits them |
 | **SSR / SSG / prerendering** | **PLANNED** | Deliberately deferred with a 5-step plan in `docs/SSG.md` |

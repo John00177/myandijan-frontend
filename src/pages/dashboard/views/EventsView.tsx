@@ -1,12 +1,13 @@
 import { Calendar, Plus } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
 import Skeleton from "../../../components/ui/Skeleton";
 import { useAdminResource } from "../../../hooks/useAdminResource";
-import { getMyEvents } from "../../../lib/api";
-import type { EventStatusValue } from "../../../types";
+import { ApiError, createMyEvent, getMyBusinesses, getMyEvents } from "../../../lib/api";
+import type { EventStatusValue, MyBusiness } from "../../../types";
+import CreateEventModal from "../CreateEventModal";
 
 const STATUS_LABEL: Record<EventStatusValue, string> = {
   DRAFT: "Qoralama",
@@ -35,15 +36,67 @@ export default function EventsView() {
   const { data, state, status, reload } = useAdminResource(fetcher);
   const events = data?.data ?? [];
 
+  const [businesses, setBusinesses] = useState<MyBusiness[]>([]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getMyBusinesses()
+      .then(setBusinesses)
+      .catch(() => {
+        // Not critical to the list view — only blocks opening the create modal.
+      });
+  }, []);
+
+  async function handleCreateEvent(form: {
+    businessId: string;
+    title: string;
+    description: string;
+    startAt: string;
+    endAt: string;
+    venueName: string;
+    address: string;
+  }) {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await createMyEvent({
+        businessId: Number(form.businessId),
+        title: form.title,
+        description: form.description,
+        startAt: new Date(form.startAt).toISOString(),
+        endAt: new Date(form.endAt).toISOString(),
+        venueName: form.venueName || undefined,
+        address: form.address || undefined,
+      });
+      setModalOpen(false);
+      reload();
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Tadbirni saqlab bo'lmadi.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-ink-muted">{state === "ok" ? `${events.length} ta tadbir` : "Tadbirlar"}</p>
-        <Button variant="primary" size="sm">
+        <Button variant="primary" size="sm" onClick={() => setModalOpen(true)} disabled={businesses.length === 0}>
           <Plus size={16} />
           Yangi tadbir
         </Button>
       </div>
+
+      <CreateEventModal
+        open={modalOpen}
+        businesses={businesses}
+        onClose={() => setModalOpen(false)}
+        onSave={handleCreateEvent}
+        saving={saving}
+        error={saveError}
+      />
 
       {state === "loading" && (
         <div className="flex flex-col gap-3">

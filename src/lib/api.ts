@@ -13,7 +13,9 @@ import type {
   BusinessEditDetail,
   Category,
   CreateBusinessPayload,
+  CreateEventPayload,
   Event,
+  EventDetail,
   Lang,
   LoginPayload,
   MenuItem,
@@ -399,6 +401,19 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
 
 export function getEvents(): Promise<PaginatedResponse<Event>> {
   return request<PaginatedResponse<Event>>("/events");
+}
+
+export function getEventBySlug(slug: string): Promise<EventDetail> {
+  return request<EventDetail>(`/events/${slug}`);
+}
+
+/** Idempotent — calling it again on an existing active RSVP just returns it. */
+export function attendEvent(slug: string): Promise<unknown> {
+  return authedPostJson(`/events/${slug}/attend`, {});
+}
+
+export function createMyEvent(payload: CreateEventPayload): Promise<MyEvent> {
+  return authedPostJson<MyEvent>("/me/events", payload);
 }
 
 export type AnalyticsClickAction = "CALL" | "DIRECTION" | "FAVORITE" | "SHARE" | "WEBSITE";

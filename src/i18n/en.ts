@@ -210,6 +210,8 @@ const en: Record<keyof typeof uz, string> = {
   "description": "Description",
   "businessNotFound": "Business not found",
   "businessNotFoundBody": "This business doesn't exist or may have been removed.",
+  "eventNotFound": "Event not found",
+  "eventNotFoundBody": "This event doesn't exist or may have been removed.",
   "branches": "Branches",
   "noBranches": "No branches",
   "noBranchesBody": "No additional branches listed for this business.",
