@@ -41,7 +41,7 @@
 ## Backend
 
 ### Unwired capability — endpoints exist, nothing calls them
-- [ ] `GET /search` — the `pg_trgm`/tsvector/transliteration search. **Nothing calls it**; the frontend uses `GET /businesses` **[REVIEW]**
+- [x] `GET /search` — the `pg_trgm`/tsvector/transliteration search. **Done, Phase 8** — wired into `SearchPage` for text queries via `type=business`; product-type results still have no UI (see `ARCHITECTURE.md` §25) **[REVIEW]**
 - [ ] **10 command-centre endpoints** — no UI at all **[REVIEW]**
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
@@ -129,6 +129,7 @@
 - [ ] `border` design token is inconsistently used (components inline `border-white/[0.08]`) **[REVIEW]**
 - [?] **Accessibility audit** — reduced motion is handled well app-wide; contrast, focus order, ARIA and screen-reader behaviour are **unverified** **[REVIEW]**
 - [ ] Surface the privacy policy in the app (`api/PRIVACY_POLICY.md` exists, 842 bytes, unreferenced); write a ToS **[REVIEW]**
+- [ ] **`SearchPage`/`SearchHeader` hardcode Uzbek UI strings instead of using i18n** — placeholder, submit button, filter "all" labels, sort labels, result-count text, empty-state copy. `search.placeholder`/`search.button` keys already exist in `i18n/*.ts` but are unused. Found during Phase 8's FTS integration; explicitly out of that phase's scope (a full retrofit is a SearchPage redesign, not a search-integration change) — flagged here rather than fixed **[REVIEW]**
 
 ### Do NOT change — deliberate decisions
 - [x] **No progress bar in signup/claim** — Yelp-researched, reduces drop-off

@@ -251,6 +251,22 @@ export function searchBusinesses(params: SearchBusinessesParams): Promise<Pagina
   }));
 }
 
+/**
+ * GET /search — the real Postgres FTS + trigram endpoint (transliteration
+ * folding, relevance ranking), scoped to `type=business` so the result shape
+ * matches BusinessListCard. Only used when there's an actual text query;
+ * category/district-only browsing keeps using searchBusinesses(), which
+ * already paginates and filters correctly server-side without needing FTS
+ * ranking (there is nothing to rank without a query term).
+ */
+export function searchBusinessesFts(params: SearchBusinessesParams): Promise<PaginatedResponse<Business>> {
+  const { search, lang: _lang, ...rest } = params;
+  return request<PaginatedResponse<any>>("/search", { ...rest, q: search, type: "business" }).then((res) => ({
+    ...res,
+    data: res.data.map(normalizeBusiness),
+  }));
+}
+
 export function getBusiness(slug: string, lang?: Lang): Promise<Business> {
   return request<any>(`/businesses/${slug}`, { lang }).then(normalizeBusiness);
 }

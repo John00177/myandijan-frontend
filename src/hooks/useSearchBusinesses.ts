@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { recordSearch, searchBusinesses } from "../lib/api";
+import { recordSearch, searchBusinesses, searchBusinessesFts } from "../lib/api";
 import type { Business, PaginatedResponse, SearchBusinessesParams } from "../types";
 
 interface UseSearchBusinessesResult {
@@ -22,7 +22,13 @@ export function useSearchBusinesses(params: SearchBusinessesParams): UseSearchBu
     setLoading(true);
     setError(false);
 
-    searchBusinesses({ category, district, city, search, page, limit, lang })
+    // A real text query gets ranked full-text search; pure category/district
+    // browsing (no query term) has nothing to rank, so it keeps using the
+    // regular paginated business list.
+    const hasQuery = !!search && search.trim().length > 0;
+    const fetchResults = hasQuery ? searchBusinessesFts : searchBusinesses;
+
+    fetchResults({ category, district, city, search, page, limit, lang })
       .then((res) => {
         if (!cancelled) {
           setBusinesses(res.data);

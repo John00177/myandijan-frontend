@@ -82,6 +82,7 @@ export const getCategoriesHomepage = vi.fn().mockResolvedValue(mockCategories);
 export const getCategoryBySlug = vi.fn().mockResolvedValue(mockCategories[0]);
 export const getFeaturedBusinesses = vi.fn().mockResolvedValue([]);
 export const searchBusinesses = vi.fn().mockResolvedValue(emptyPage);
+export const searchBusinessesFts = vi.fn().mockResolvedValue(emptyPage);
 export const getBusiness = vi.fn().mockResolvedValue(mockBusiness);
 export const getMe = vi.fn().mockRejectedValue(new Error("not authenticated"));
 export const getFavorites = vi.fn().mockResolvedValue([]);

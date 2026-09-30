@@ -314,6 +314,17 @@
 
 ---
 
+## Phase 8 — Advanced search integration (2026-10-01)
+
+### D-57 · Canonical search contract: FTS for text queries, `/businesses` for pure browsing 🔒 LOCKED
+**Decision.** `useSearchBusinesses` now dispatches on whether a text query is present: a non-empty `search` calls the new `searchBusinessesFts()` → `GET /search?type=business`; no `search` term keeps calling the existing `searchBusinesses()` → `GET /businesses`. `SearchPage.tsx` itself needed no changes — the branch lives entirely inside the hook.
+**Rationale.** `GET /search`'s `q` is required-non-empty by design (there is nothing to rank without a query term), while `GET /businesses` already correctly paginates/filters pure category/district browsing server-side. Loosening `q` to optional so one endpoint could serve both cases would have meant inventing browse-mode ranking behavior inside the FTS system — explicitly out of scope ("do not invent a new scoring algorithm").
+**Companion change.** Added `SearchQueryDto.type?: 'business' | 'product'` to `GET /search`, restricting which CTE(s) feed the `hits` union in `SearchService.buildHitsCte`. This is the smallest safe backend adjustment that lets the frontend get an accurate, renderable business-only total/pagination instead of `GET /search`'s default mixed business+product count, which the app has no UI to display (no product-result card exists). Omitting `type` is unchanged, fully backward-compatible default behavior.
+**Why locked.** `useSearchBusinesses.ts`, `search.controller.ts`'s consumer contract, and the new test suites on both sides all depend on this exact split.
+**Not done, deliberately.** Product-type search results are not rendered anywhere in the public UI. Building a product/menu-item result card was judged to be new UI surface, not "integrating the existing search capability" — deferred.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

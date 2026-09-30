@@ -116,7 +116,7 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 | PUT | `/businesses/:id/hours` | 🔒 `BUSINESS_OWNER` | Replace the **primary branch's** 7-day hours wholesale | ✅ |
 | GET | `/businesses/featured` | — | `isFeatured` businesses | ✅ |
 | GET | `/businesses/promoted` | — | `isPromoted` businesses | **⭕** |
-| GET | `/businesses` | — | **List + search + filter + paginate** | ✅ |
+| GET | `/businesses` | — | **List + filter + paginate** (name `contains`, no ranking) — used for category/district-only browsing | ✅ |
 | GET | `/businesses/:id` | — | Detail by **id or slug**; only `APPROVED` | ✅ |
 | GET | `/businesses/:id/reviews` | — | Reviews for a business | ✅ |
 | POST | `/businesses/:id/reviews` | 🔒 `CUSTOMER` | Create a review; resolves to the primary branch server-side | ✅ |
@@ -146,13 +146,15 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| GET | `/search` | — | Unified full-text search over businesses **and** products | **⭕** |
+| GET | `/search` | — | Unified full-text search over businesses **and** products | ✅ **(Phase 8)** |
 
-**Query (`SearchQueryDto`):** `q` **required**, non-empty, ≤200 chars; `category?`, `district?`, `city?`, `page` (default 1), `limit` (1–100, default 20).
+**Query (`SearchQueryDto`):** `q` **required**, non-empty, ≤200 chars; `category?`, `district?`, `city?`, `page` (default 1), `limit` (1–100, default 20), `type?` (`"business"` \| `"product"` — **added Phase 8**, restricts the result set to one kind; omitted returns both, unchanged from before).
 
-**Response:** `{ data, meta: { page, limit, total, totalPages, query, normalizedQuery } }` where `normalizedQuery` exposes what the query folded down to after Uzbek transliteration normalisation.
+**Response:** `{ data, meta: { page, limit, total, totalPages, query, normalizedQuery } }` where each `data` item carries a `type: "business" | "product"` discriminator and a relevance `score`, and `normalizedQuery` exposes what the query folded down to after Uzbek transliteration normalisation.
 
-> **This is the most capable endpoint in the API and nothing calls it.** It uses `pg_trgm` + tsvector with four custom Postgres functions, ranks businesses and products in one CTE, and matches a product's category through its own or its business's. The frontend searches via `GET /businesses` instead.
+**Frontend integration (Phase 8):** `SearchPage`/`useSearchBusinesses` now call `GET /search?type=business` (via `searchBusinessesFts()` in `src/lib/api.ts`) whenever the user has typed a text query, so free-text search gets real `pg_trgm`/tsvector ranking and transliteration folding instead of the old `GET /businesses?search=` case-insensitive substring match. Pure category/district browsing (no text) still uses `GET /businesses`, which already paginates and filters correctly server-side — there is nothing to *rank* without a query term, so FTS adds no value there. See `ARCHITECTURE.md` §25 and `DECISIONS.md` D-57.
+
+**Product hits are intentionally excluded from the public search UI** — `type=business` is always passed — because the app has no product/menu-item result card; showing `PRODUCT`-kind hits would require a new card component and mixed-type rendering, which is out of Phase 8's scope. `GET /search` without `type` (or `type=product`) is unchanged and still available for a future caller.
 
 ---
 

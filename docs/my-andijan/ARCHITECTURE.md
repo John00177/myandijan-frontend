@@ -343,7 +343,7 @@ Also:
 
 ## 9. Search
 
-The most technically substantial part of the backend — and currently unused by the frontend.
+The most technically substantial part of the backend. **As of Phase 8, the frontend uses it** for free-text queries — see §25.
 
 **Migration `20260810160018_add_search_fts_trgm`** creates:
 
@@ -355,7 +355,7 @@ The most technically substantial part of the backend — and currently unused by
 
 **`SearchService`** builds one CTE (`buildHitsCte`) and splices it into two parallel raw queries — a paged `SELECT` and a `count(*)` — so page and count always agree. It ranks businesses **and** products in a single unified result set (`kind: 'BUSINESS' | 'PRODUCT'`), then hydrates. Category filtering for a product matches through its own category or, when it has none, through its business's category. Geographic filtering is applied per-kind via a shared `geoClause`. The response exposes `normalizedQuery` so callers can see what the query folded down to.
 
-**Frontend search is separate and simpler.** It calls `GET /businesses` with filter params, and for the food category (`?category=oziq-ovqat`) `SearchPage` dispatches to `CategorySearchPage`, which fetches `limit=100` and does filtering, sorting and pagination **client-side** (`PAGE_SIZE = 12`) so the displayed count and the current page always agree.
+**Frontend search, as of Phase 8:** free-text queries use `GET /search?type=business` (real FTS ranking); category/district-only browsing (no text) still uses `GET /businesses` (see §25). For the food category (`?category=oziq-ovqat`) `SearchPage` dispatches to `CategorySearchPage`, which fetches `limit=100` and does filtering, sorting and pagination **client-side** (`PAGE_SIZE = 12`, D-23) — untouched by Phase 8, since it is a separate, already-decided UI with no product/text-search integration point.
 
 ---
 
@@ -686,3 +686,49 @@ Found and fixed one real issue: `scripts/generate-sitemap.ts` already emitted `c
 - **A city landing page (`/:lang/city/:slug`).** Out of scope for this phase (only category + district were requested); flagged as the natural next step given the sitemap already had city data available.
 - **Subcategory hierarchy navigation on the category page.** `Category.parentId`/`children` exist and `findBySlug` already returns them, but rendering a subcategory nav UI was judged beyond "provide useful navigation back to discovery" and into new UI surface — deferred, not blocked.
 - **Breadcrumbs on `SearchPage`/`BusinessDetailPage`/`EventDetailPage`.** Only the two new pages got `BreadcrumbList`; retrofitting existing pages was out of scope.
+
+---
+
+## 25. Advanced search integration — 2026-10-01 (Phase 8)
+
+Integrated the existing PostgreSQL FTS/trigram search (§9) into the public search page, which had been calling `GET /businesses?search=` (a plain case-insensitive `contains` on `name`, no ranking, no transliteration folding) instead of the sophisticated `GET /search` endpoint that already existed and had zero callers (confirmed by grep before any change was made — `CURRENT_STATE.md` and `API.md` had both already documented this gap from an earlier audit).
+
+### Root cause of the frontend/backend mismatch
+
+Two contract-shape problems, not just "nobody wired it up":
+1. `GET /search` unconditionally unions `BUSINESS` and `PRODUCT` hits into one ranked list (`kind` discriminator). The frontend has no product-result card — only `BusinessListCard` — so a naive switch to `GET /search` would either crash rendering product-shaped rows through a business card, or silently under-render while `meta.total` (which counts both kinds) told the user a bigger, wrong number.
+2. `GET /search`'s `q` is required and non-empty, but the search page also supports pure category/district *browsing* with no text at all — a query the FTS endpoint was never designed to answer (there is nothing to rank without a query term).
+
+### Canonical contract adopted (D-57, locked)
+
+- **A real text query** → `GET /search?q=&type=business&category=&district=&city=&page=&limit=` via the new `searchBusinessesFts()` in `src/lib/api.ts`. `type` is a new optional `SearchQueryDto` field (`"business" | "product"`, added this phase) that restricts which CTE(s) feed the `hits` union in `SearchService.buildHitsCte` — the smallest safe backend change that resolves problem 1 without touching ranking, indexes, or the response shape for any other caller. Omitting `type` is fully backward-compatible (both kinds, as before).
+- **No text query (pure browsing)** → `GET /businesses?category=&district=&city=&page=&limit=` via the existing `searchBusinesses()`, unchanged. This resolves problem 2 without loosening `SearchQueryDto`'s `q` validation or inventing a "browse mode" inside the FTS system.
+- `useSearchBusinesses.ts` picks between the two based on whether `search` is a non-empty string; `SearchPage.tsx` itself required **zero changes** — it already passed the same params either way.
+
+### Response hydration
+
+`SearchService.hydrate()`'s business shape (`id, slug, name, description, logoUrl, ratingAvg, reviewCount, category, primaryBranch`) is close enough to `GET /businesses`' list shape that the existing `normalizeBusiness()` adapter in `lib/api.ts` handles both without modification — `rating`/`ratingAvg`, `descriptionUz`/`description`, and `district`/`city` (derived from `primaryBranch`) fallbacks already existed for exactly this kind of shape variance. Fields `GET /search` doesn't return (`isPromoted`, `isFeatured`, `hasDelivery`, `coverUrl`) come through as `undefined`, which `BusinessListCard` already treats as "unknown," not fabricated data.
+
+### Relevance / ranking
+
+Preserved exactly as implemented: `ts_rank` over the weighted tsvector document when the normalized query matches (`0.6 + ts_rank(...)`), falling back to trigram `word_similarity` for typo/transliteration tolerance, `GREATEST` of the two. The frontend applies **no client-side re-sort** to FTS results — the existing "Reyting bo'yicha" / "Nomi bo'yicha" sort dropdown still works exactly as before (it only re-sorts the already-fetched page, same as it did for `GET /businesses` results), and the default "no sort selected" state now shows the backend's real relevance order instead of raw insertion order.
+
+### Visibility / security
+
+No change needed — `SearchService`'s CTEs already filter `b.status = 'APPROVED'` / `b.deletedAt IS NULL` (business side) and `p.isActive = true` / `p.deletedAt IS NULL` plus the owning business's `APPROVED` status (product side). Verified directly in `search.service.spec.ts` by asserting these clauses are present in the generated SQL.
+
+### Performance
+
+No new indexes needed — the four GIN indexes from migration `20260810160018_add_search_fts_trgm` already cover both the tsvector documents and the trigram similarity lookups for businesses and products. The `type` filter is implemented by omitting the unreferenced CTE from the final `UNION ALL` rather than post-filtering, so PostgreSQL never executes the kind that wasn't requested.
+
+### Tests
+
+- Backend: `search.service.spec.ts` (new, 10 tests) — response contract/hydration, empty results, pagination offset/limit math, the new `type` filter (asserted against the generated SQL text for both `business` and `product`, plus the unchanged default), visibility-rule SQL assertions, category/district filter SQL assertions. `search-query.dto.spec.ts` gained 2 tests for the new `type` field's validation.
+- Frontend: `useSearchBusinesses.test.ts` updated (not removed) to assert the FTS-vs-list branching by query presence; `SearchPage.test.tsx` gained a new test asserting a `?q=` URL renders via `searchBusinessesFts()` while a query-less URL still uses `searchBusinesses()`.
+
+### Deliberately not implemented
+
+- **Product results in the public search UI.** `GET /search` still supports `type=product` (or the mixed default) for a future caller; the public `SearchPage` always passes `type=business` because there is no product/menu-item result card. Building one was judged beyond "integrate the existing capability" and into new UI surface.
+- **FTS for `CategorySearchPage`** (the food-category specialized restaurant search, D-21/D-23). It fetches up to 100 matching businesses and filters/sorts/paginates client-side by design (D-23, revisitable) with no text-search input at all today — out of scope for this phase, which targeted the generic `SearchPage` only.
+- **Retrofitting i18n onto pre-existing `SearchPage`/`SearchHeader` strings.** Several UI strings (search placeholder/button, filter labels, empty-state text, the "N ta natija topildi" result count) are hardcoded Uzbek predating this phase — `search.placeholder`/`search.button` i18n keys already exist in `i18n/*.ts` but were never wired in. This is real, pre-existing tech debt (documented in `TODO.md`), not something Phase 8 introduced, and a full retrofit was judged to be "redesigning the SearchPage" rather than "integrating advanced search" — deferred rather than expanded into scope.
+- **Category+district combination as a dedicated discovery surface.** `GET /search` already accepts `category`, `district`, and `city` together (all three are applied to whichever CTE is active), so this is already available through the existing generic search page's filters — no separate "combo" endpoint or page was needed or built.

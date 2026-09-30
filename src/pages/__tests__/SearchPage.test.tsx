@@ -11,7 +11,7 @@ vi.mock("../../lib/api", () => import("../../test/apiMock"));
 // panel isn't part of what these tests are checking, so it's stubbed out.
 vi.mock("../search/SearchMap", () => ({ default: () => null }));
 
-import { mockBusiness, emptyPage, searchBusinesses } from "../../test/apiMock";
+import { mockBusiness, emptyPage, searchBusinesses, searchBusinessesFts } from "../../test/apiMock";
 
 function renderSearchPage(initialPath = "/uz/search") {
   return render(
@@ -37,6 +37,7 @@ function renderSearchPage(initialPath = "/uz/search") {
 describe("SearchPage", () => {
   afterEach(() => {
     searchBusinesses.mockReset();
+    searchBusinessesFts.mockReset();
   });
 
   it("shows a no-results state when the search returns nothing", async () => {
@@ -47,7 +48,7 @@ describe("SearchPage", () => {
     expect(await screen.findByText("Hech narsa topilmadi")).toBeInTheDocument();
   });
 
-  it("lists a business card when the search returns a result", async () => {
+  it("lists a business card when browsing without a text query", async () => {
     searchBusinesses.mockResolvedValue({
       data: [mockBusiness],
       meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
@@ -56,5 +57,19 @@ describe("SearchPage", () => {
     renderSearchPage();
 
     expect(await screen.findByText(mockBusiness.nameUz)).toBeInTheDocument();
+    expect(searchBusinessesFts).not.toHaveBeenCalled();
+  });
+
+  it("uses the FTS endpoint and lists a business card when a text query is present in the URL", async () => {
+    searchBusinessesFts.mockResolvedValue({
+      data: [mockBusiness],
+      meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+    });
+
+    renderSearchPage("/uz/search?q=osh");
+
+    expect(await screen.findByText(mockBusiness.nameUz)).toBeInTheDocument();
+    expect(searchBusinessesFts).toHaveBeenCalledWith(expect.objectContaining({ search: "osh" }));
+    expect(searchBusinesses).not.toHaveBeenCalled();
   });
 });

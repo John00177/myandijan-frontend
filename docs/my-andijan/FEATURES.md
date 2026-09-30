@@ -56,8 +56,8 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 
 | Feature | Status | Notes |
 | --- | --- | --- |
-| Text search | **IMPLEMENTED** | Via `GET /businesses?search=`; debounced input |
-| **Advanced FTS search** (`GET /search`) | **PARTIALLY IMPLEMENTED** | `pg_trgm` + tsvector, 4 custom PG functions, **Uzbek transliteration normalisation**, unified business+product ranking. **Nothing calls it.** The most capable unused asset in the project. **Evaluated for Phase 4, not wired:** its `hydrate()` response is a heterogeneous `{type: 'business'|'product', ...}` shape with a *different, smaller* field set than the `Business` type the existing search UI (`BusinessListCard`, open-now/promoted badges) renders — missing `nameUz/nameRu/nameEn`, `rating`, `hasDelivery`, `isPromoted`, hours, etc. Wiring it as a drop-in replacement for `GET /businesses?search=` would either silently degrade result cards or require deciding how to present product hits, both product/design decisions, not a mechanical connection. Reported, not implemented. |
+| Text search | **IMPLEMENTED** | **Phase 8:** debounced input now calls `GET /search?type=business` (real FTS ranking) whenever there's a query term; category/district-only browsing still uses `GET /businesses` |
+| **Advanced FTS search** (`GET /search`) | **IMPLEMENTED (Phase 8)** | `pg_trgm` + tsvector, 4 custom PG functions, **Uzbek transliteration normalisation**, unified business+product ranking. Wired into `SearchPage` via `searchBusinessesFts()`, scoped to `type=business` (new optional DTO field) since the app has no product-result card. See `ARCHITECTURE.md` §25, `DECISIONS.md` D-57. |
 | Category filter | **IMPLEMENTED** | |
 | District / city filter | **IMPLEMENTED** | |
 | Pagination | **IMPLEMENTED** | Server-side generic, client-side for restaurants |
@@ -68,7 +68,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Rating filter (≥4.5) | **IMPLEMENTED** | Real `ratingAvg` |
 | "Open now" filter | **IMPLEMENTED** | Real `BranchHour` data via `OpenNowBadge` |
 | Sort (rating / reviews / name) | **IMPLEMENTED** | `SortDropdown`, client-side |
-| Product/menu search | **PARTIALLY IMPLEMENTED** | Server ranks products; no UI surfaces product hits |
+| Product/menu search | **PARTIALLY IMPLEMENTED** | Server ranks products (`type=product`/omitted); no UI surfaces product hits — deliberately deferred in Phase 8, see `ARCHITECTURE.md` §25 |
 | Business-name typeahead | **IMPLEMENTED** | Claim step 1 |
 | Geo/radius/"near me" search | **PLANNED** | Blocked by the no-PostGIS constraint |
 | Search suggestions / autocomplete | **PLANNED** | — |

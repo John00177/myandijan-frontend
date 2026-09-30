@@ -125,8 +125,8 @@ Real `/:lang/category/:slug` and `/:lang/district/:slug` routes now exist — ea
 ### 18. Surface the health score to owners · **[REQUIRED]**
 A complete scoring engine, a 14-rule localized recommendation catalogue, and three endpoints — with **no UI at all**. It is also the intended upsell funnel (`VISIBILITY_BUY_PROMOTION` is one of the 14 codes). Note the impact figures are *"directional estimates chosen by the product, NOT measured lift"* — present them honestly.
 
-### 19. Switch frontend search to `GET /search` · **[OBSERVED]**
-The API has `pg_trgm` + tsvector search with **Uzbek transliteration normalisation** and unified business+product ranking. **Nothing calls it.** The frontend searches via `GET /businesses?search=`. Adopting it would let "osh" and "ош" match the same restaurants and would surface menu-item hits.
+### 19. ~~Switch frontend search to `GET /search`~~ — ✅ DONE 2026-10-01 (Phase 8) · **[OBSERVED]**
+Free-text queries on `SearchPage` now use `GET /search?type=business`, so "osh" and "ош" match the same businesses via real FTS ranking and trigram similarity. Category/district-only browsing (no text) still uses `GET /businesses`, which already handles that case correctly. Product-hit surfacing in the UI remains undone — see `ARCHITECTURE.md` §25 and `DECISIONS.md` D-57.
 
 ### 20. Add events detail + RSVP UI · **[REQUIRED]**
 `GET /events/:slug` and `POST /events/:slug/attend` exist; `EventAttendee` is modelled. The frontend has a list only. Also missing: owner event **create/edit/delete** UI (three endpoints exist) and `schema.org/Event` markup (the model has every required field).
