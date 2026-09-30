@@ -2,10 +2,17 @@ import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useCategoriesHomepage } from "../../hooks/useCategoriesHomepage";
 import { categoryColor, categoryIcon, hexToRgba } from "../../lib/categoryVisuals";
+import { FOOD_CATEGORY_SLUG } from "../../lib/foodCategory";
 import { localizedName } from "../../lib/localize";
 import AnimatedCard from "../../components/AnimatedCard";
 import StaggerContainer, { StaggerItem } from "../../components/StaggerContainer";
 import Skeleton from "../../components/ui/Skeleton";
+
+/** The food category keeps its specialized restaurant search UI (CategorySearchPage, D-21) instead of the generic landing page. */
+function categoryHref(lang: string, slug: string): string {
+  if (slug === FOOD_CATEGORY_SLUG) return `/${lang}/search?category=${slug}`;
+  return `/${lang}/category/${slug}`;
+}
 
 export default function CategoriesSection() {
   const { lang, t } = useLanguage();
@@ -32,7 +39,7 @@ export default function CategoriesSection() {
             return (
               <StaggerItem key={category.id}>
                 <AnimatedCard
-                  onClick={() => navigate(`/${lang}/search?category=${category.slug}`)}
+                  onClick={() => navigate(categoryHref(lang, category.slug))}
                   className="p-4 flex flex-col items-center text-center gap-3"
                 >
                   <div

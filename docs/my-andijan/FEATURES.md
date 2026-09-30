@@ -204,7 +204,9 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | JSON-LD structured data | **IMPLEMENTED** | `LocalBusiness`, `WebSite`+`SearchAction`, `BreadcrumbList`; correctly omits `aggregateRating` when `reviewCount` is 0 |
 | `robots.txt` | **IMPLEMENTED** | Wildcards private routes under every language prefix |
 | Sitemap index | **IMPLEMENTED** | 4 sub-sitemaps |
-| Sitemap: pages / categories / locations | **IMPLEMENTED** | 9 / 24 / 72 URLs |
+| Sitemap: pages / categories / locations | **IMPLEMENTED** | 9 / 24 / 42 URLs. **Phase 7 (2026-10-01):** category/location URLs now resolve to real dedicated pages (previously generic search); location count dropped from 72 to 42 — city URLs removed since no `/city/:slug` route exists |
+| **Category landing pages** (`/:lang/category/:slug`) | **IMPLEMENTED** | **Phase 7.** Real name, real business list (`GET /businesses?category=`), unique meta/canonical/hreflang, `BreadcrumbList`. The `oziq-ovqat` homepage tile still links to the specialized `/search?category=oziq-ovqat` UI instead (D-21) |
+| **District landing pages** (`/:lang/district/:slug`) | **IMPLEMENTED** | **Phase 7.** District resolved client-side from the already-fetched `GET /geography/regions`; real business list (`GET /businesses?district=`); same SEO treatment as category pages |
 | **Sitemap: businesses** | **PARTIALLY IMPLEMENTED** | **Superseded 2026-09-29 (Phase 5):** `npm run sitemap` re-run against live production — now **12 URLs** (4 businesses × 3 languages), `lastmod` refreshed. **Still not automated** — nothing re-runs it on a schedule or at deploy time, so it will go stale again as businesses are added; deliberately not wired into CI (would make every `npm run build` depend on the live production API — see `DECISIONS.md`) |
 | `noIndex` on private routes | **IMPLEMENTED** | `MetaTags` prop |
 | Per-business SEO overrides | **PARTIALLY IMPLEMENTED** | `metaTitle*`/`metaDescription*` columns exist; no admin/owner UI edits them |

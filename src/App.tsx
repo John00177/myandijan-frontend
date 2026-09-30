@@ -46,6 +46,8 @@ const SearchPage = lazy(() => import("./pages/SearchPage"));
 const BusinessDetailPage = lazy(() => import("./pages/BusinessDetailPage"));
 const EventsPage = lazy(() => import("./pages/EventsPage"));
 const EventDetailPage = lazy(() => import("./pages/EventDetailPage"));
+const CategoryLandingPage = lazy(() => import("./pages/CategoryLandingPage"));
+const DistrictLandingPage = lazy(() => import("./pages/DistrictLandingPage"));
 const FavoritesPage = lazy(() => import("./pages/FavoritesPage"));
 const ProfilePage = lazy(() => import("./pages/ProfilePage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -77,6 +79,8 @@ export default function App() {
                   <Route element={<Layout />}>
                     <Route index element={<HomePage />} />
                     <Route path="search" element={<SearchPage />} />
+                    <Route path="category/:slug" element={<CategoryLandingPage />} />
+                    <Route path="district/:slug" element={<DistrictLandingPage />} />
                     <Route path="business/:slug" element={<BusinessDetailPage />} />
                     <Route path="events" element={<EventsPage />} />
                     <Route path="events/:slug" element={<EventDetailPage />} />

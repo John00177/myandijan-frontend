@@ -647,3 +647,42 @@ Backend: `roles.guard.spec.ts` (6 tests), `admin.service.spec.ts` (4 tests — p
 - **Reports queue UI, claims moderation UI, verify/suspend/promote UI** — out of scope per this phase's guardrails; unrelated admin modules.
 - **Edit/delete a review's own content from the admin panel** — not requested; `ReviewsService.update`/`remove` are user-scoped (owner-of-review only) by design, and giving admin a bypass would be a new business rule, not a connection of an existing one.
 - **`ReviewReport` (user-submitted reports) surfacing on this view** — `GET /admin/reports` already exists as its own endpoint/view; folding report counts into the reviews list was considered scope creep for this task and left as `reportCount` on the type (unused in the UI) for a future pass.
+
+## 24. SEO landing pages & discovery architecture — 2026-10-01 (Phase 7)
+
+Turned the two undedicated discovery concepts — category and district browsing — into real, indexable landing pages, closing what `SEO.md` had called "the largest structural SEO gap in the project."
+
+### URL decision
+
+`/:lang/category/:slug` and `/:lang/district/:slug` — the exact structure requested, adopted as-is (see `DECISIONS.md` D-55). No alternative convention was needed: both slugs already exist and are already unique (`Category.slug`, `District.slug`, both `@unique` in the schema), and `MetaTags`' canonical/hreflang logic already derives everything from `useLocation().pathname`, so a real path-based route gets correct canonical/hreflang for free — no changes to `MetaTags` were needed.
+
+### What was reused vs. added
+
+**Zero backend changes.** Both pages run entirely on endpoints that already existed and were already unused:
+- `GET /categories/:slug` (`CategoriesService.findBySlug`) — category name/description. Flagged as unused in the Phase 4 audit; now wired.
+- `GET /geography/regions` (`GeographyService.findAllRegions`) — already fetched by `useRegions` for the search filters and `DistrictsSection`; districts are resolved from its nested list client-side. No `GET /geography/districts/:slug` was added — with only ~14 districts, a dedicated lookup endpoint would be a needless round trip.
+- `GET /businesses?category=<slug>` / `?district=<id>` — the same `useSearchBusinesses` hook `SearchPage` already uses, unmodified.
+
+**New frontend-only additions:** `getCategoryBySlug()` in `lib/api.ts`; `useCategoryDetail` hook (mirrors `useBusiness`/`useEventDetail`); `CategoryLandingPage.tsx` and `DistrictLandingPage.tsx`, both reusing `BusinessListCard`, `Pagination`, `MetaTags`, and `JsonLd`'s existing `BreadcrumbList` type (built in an earlier phase, never used until now) verbatim — no duplicate business-card component, no new JSON-LD schema type invented.
+
+### Real-data discipline
+
+Business counts shown in the title, meta description, and on-page copy come from the businesses list's own `meta.total` (status-filtered to `APPROVED`), never from `CategoriesService.findBySlug`'s `_count.businesses` (which counts every status, not just approved) and never invented. When a category/district has zero approved businesses, the copy switches to a count-free sentence rather than showing "0" or a fabricated number.
+
+### Internal linking
+
+Homepage `CategoriesSection` and `DistrictsSection` tiles now navigate to the dedicated pages instead of `/search?category=`/`?district=`. One deliberate exception: `oziq-ovqat` (food) keeps navigating to `/search?category=oziq-ovqat` to preserve the specialized restaurant search UI (`CategorySearchPage`, locked decision D-21) — `/category/oziq-ovqat` still exists and is still sitemapped as that category's canonical URL; only the one homepage click target was special-cased.
+
+### Canonical/indexing safety (Phase 7 STEP 9 check)
+
+Found and fixed one real issue: `scripts/generate-sitemap.ts` already emitted `city/:slug` sitemap entries (written in anticipation of routes that were never built), but no `/:lang/city/:slug` route exists anywhere in the app — those URLs would have resolved to the SPA's empty-`Layout` fallback (the same missing-404-route gap `TODO.md` already documented) rather than real content. City entries were removed from the generator; `sitemap-locations.xml` dropped from 72 to 42 URLs (districts only). No duplicate-content, trailing-slash, or language-duplication issues were found — every route is a single canonical path per language, and `MetaTags`' existing canonical/hreflang machinery covers the new pages without modification.
+
+### Tests
+
+`CategoryLandingPage.test.tsx` and `DistrictLandingPage.test.tsx` (4 tests each): real business rendering + link to detail page, empty state, not-found state, unique title/meta assertion. No backend changes, so no backend tests were added this phase.
+
+### Deliberately not implemented
+
+- **A city landing page (`/:lang/city/:slug`).** Out of scope for this phase (only category + district were requested); flagged as the natural next step given the sitemap already had city data available.
+- **Subcategory hierarchy navigation on the category page.** `Category.parentId`/`children` exist and `findBySlug` already returns them, but rendering a subcategory nav UI was judged beyond "provide useful navigation back to discovery" and into new UI surface — deferred, not blocked.
+- **Breadcrumbs on `SearchPage`/`BusinessDetailPage`/`EventDetailPage`.** Only the two new pages got `BreadcrumbList`; retrofitting existing pages was out of scope.

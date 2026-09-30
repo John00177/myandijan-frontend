@@ -231,9 +231,6 @@ async function main(): Promise<void> {
   const districts = dedupeBySlug(
     regions.flatMap((region) => region.districts ?? []).filter((district) => district.isActive !== false),
   );
-  const cities = dedupeBySlug(
-    districts.flatMap((district) => district.cities ?? []).filter((city) => city.isActive !== false),
-  );
   const categoryList = dedupeBySlug(flattenCategories(categories));
   const businessList = dedupeBySlug(businesses);
 
@@ -255,10 +252,15 @@ async function main(): Promise<void> {
     lastmod: category.updatedAt,
   }));
 
-  const locationEntries: SitemapEntry[] = [
-    ...districts.map((district) => ({ path: `district/${district.slug}`, lastmod: district.updatedAt })),
-    ...cities.map((city) => ({ path: `city/${city.slug}`, lastmod: city.updatedAt })),
-  ];
+  // No /:lang/city/:slug route exists in the app (only category and district
+  // landing pages were built — see ARCHITECTURE.md's Phase 7 section), so city
+  // URLs are deliberately left out here: submitting a URL with no matching
+  // route would point crawlers at the SPA's empty-Layout fallback rather than
+  // real content.
+  const locationEntries: SitemapEntry[] = districts.map((district) => ({
+    path: `district/${district.slug}`,
+    lastmod: district.updatedAt,
+  }));
 
   const files: Array<{ name: string; entries: SitemapEntry[] }> = [
     { name: "sitemap-pages.xml", entries: pages },

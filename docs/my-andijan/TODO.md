@@ -145,8 +145,8 @@
 - [ ] **Wire sitemap generation into the build or a schedule** — the committed file is a static artifact **[REVIEW]**
 - [ ] **Add a static `<meta name="description">` and default OG block to `index.html`.** Social scrapers do not run JS, so every shared link previews with a bare title and no image **[REVIEW]**
 - [ ] **Decide on prerendering** — full five-step plan in `docs/SSG.md`. **The deferral premise has changed** (the API now returns businesses) **[CODE]**
-- [ ] **Build real `/category/:slug` and `/district/:slug` landing pages.** The sitemaps advertise **96 URLs** that resolve to a generic query-string search page **[REVIEW]**
-- [ ] **Render breadcrumbs** — the `BreadcrumbList` JSON-LD builder exists and is never used **[REVIEW]**
+- [x] **Build real `/category/:slug` and `/district/:slug` landing pages.** — **done, Phase 7 (2026-10-01).** Zero backend changes; reused `GET /categories/:slug`, `GET /geography/regions`, and `GET /businesses?category=/?district=`. City sitemap URLs removed (no route exists) — see D-56 **[REVIEW]**
+- [x] **Render breadcrumbs** — **done, Phase 7,** on the two new landing pages. Not yet retrofitted onto `SearchPage`/`BusinessDetailPage`/`EventDetailPage` **[REVIEW]**
 - [ ] **Emit `schema.org/Event`** — the `Event` model has every required field **[REVIEW]**
 - [ ] **Use specific `LocalBusiness` subtypes** (`Restaurant`, `Store`, …) from `Category`/`BusinessType` **[REVIEW]**
 - [ ] **Read and write `Business.metaTitle*` / `metaDescription*`** — columns exist, unused end to end **[REVIEW]**

@@ -170,6 +170,11 @@ export function getCategoriesHomepage(lang?: Lang): Promise<Category[]> {
   return request<Category[]>("/categories/homepage", { lang });
 }
 
+/** Backs the /:lang/category/:slug landing page — GET /categories/:slug already existed, unused until now. */
+export function getCategoryBySlug(slug: string): Promise<Category> {
+  return request<Category>(`/categories/${slug}`);
+}
+
 /**
  * The backend's Business/Branch models are NOT localized (a single `name`
  * column, not nameUz/nameRu/nameEn — those only exist on Category/District/

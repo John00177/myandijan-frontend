@@ -119,8 +119,8 @@ The real cost is already being paid: **social scrapers do not run JavaScript, so
 
 **A cheap partial fix first · [OBSERVED]:** add a static `<meta name="description">` and a default OG block to `index.html`. That converts a broken preview into an acceptable one for a few lines of HTML, without touching `App.tsx`.
 
-### 17. Build category and district landing pages · **[OBSERVED]**
-`sitemap-categories.xml` and `sitemap-locations.xml` advertise **96 URLs that resolve to a generic query-string search page** with no unique title, description or copy. Real `/category/:slug` and `/district/:slug` routes — each with a unique H1, intro text, localized meta, `BreadcrumbList` and links down to businesses — are the pages that rank for the highest-intent local queries ("Asakada restoranlar"). **The largest structural SEO opportunity in the project.**
+### 17. ~~Build category and district landing pages~~ — ✅ DONE 2026-10-01 (Phase 7) · **[OBSERVED]**
+Real `/:lang/category/:slug` and `/:lang/district/:slug` routes now exist — each with a unique H1, localized meta title/description, `BreadcrumbList` JSON-LD, and real business listings — reusing the pre-existing `GET /categories/:slug` endpoint and `useSearchBusinesses`/`useRegions` hooks with zero backend changes. See `ARCHITECTURE.md` §24 and `DECISIONS.md` D-55/D-56 for the full URL-architecture decision and the sitemap tradeoff (city URLs removed rather than left as thin pages).
 
 ### 18. Surface the health score to owners · **[REQUIRED]**
 A complete scoring engine, a 14-rule localized recommendation catalogue, and three endpoints — with **no UI at all**. It is also the intended upsell funnel (`VISIBILITY_BUY_PROMOTION` is one of the 14 codes). Note the impact figures are *"directional estimates chosen by the product, NOT measured lift"* — present them honestly.

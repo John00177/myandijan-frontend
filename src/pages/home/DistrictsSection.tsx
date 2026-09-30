@@ -39,7 +39,7 @@ export default function DistrictsSection() {
             return (
               <StaggerItem key={district.id}>
                 <AnimatedCard
-                  onClick={() => navigate(`/${lang}/search?district=${district.id}`)}
+                  onClick={() => navigate(`/${lang}/district/${district.slug}`)}
                   className={`p-5 flex items-center justify-between ${
                     isCenter ? "border-primary/30 bg-primary/[0.05]" : ""
                   }`}

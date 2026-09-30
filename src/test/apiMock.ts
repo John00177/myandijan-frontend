@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import type { AdminReview, Business, Category, EventDetail, PaginatedResponse, Region } from "../types";
+import type { AdminReview, Business, Category, District, EventDetail, PaginatedResponse, Region } from "../types";
 
 // Central set of sensible empty defaults for every lib/api export a page
 // component's hooks might call. Individual tests override just the calls
@@ -62,9 +62,24 @@ export const emptyPage: PaginatedResponse<Business> = {
   meta: { page: 1, limit: 20, total: 0, totalPages: 1 },
 };
 
+export const mockDistrict: District = {
+  id: 1,
+  regionId: 1,
+  slug: "andijon-tumani",
+  nameUz: "Andijon",
+  nameRu: "Андижан",
+  nameEn: "Andijan",
+  isActive: true,
+  sortOrder: 1,
+  lat: null,
+  lng: null,
+  cities: [],
+};
+
 export const getRegions = vi.fn().mockResolvedValue(mockRegions);
 export const getCategories = vi.fn().mockResolvedValue(mockCategories);
 export const getCategoriesHomepage = vi.fn().mockResolvedValue(mockCategories);
+export const getCategoryBySlug = vi.fn().mockResolvedValue(mockCategories[0]);
 export const getFeaturedBusinesses = vi.fn().mockResolvedValue([]);
 export const searchBusinesses = vi.fn().mockResolvedValue(emptyPage);
 export const getBusiness = vi.fn().mockResolvedValue(mockBusiness);

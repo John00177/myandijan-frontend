@@ -51,7 +51,7 @@ Every user-facing route is language-prefixed. This is the single most consequent
 
 **Weaknesses**
 - **`/` redirects to `/uz` client-side**, not with a server 301. Crawlers must execute JS to follow it.
-- **No category or location landing pages as routes.** `/uz/search?category=oziq-ovqat` is a query string, not a path. Query-parameter URLs are weaker landing pages than `/uz/category/oziq-ovqat`, and the sitemap still lists 24 category and 72 location URLs — meaning **the sitemap advertises URLs that are query-parameter search pages rather than dedicated landing pages.** For a directory, purpose-built `/category/:slug` and `/district/:slug` routes with unique copy are the highest-leverage structural SEO change available.
+- **Superseded 2026-10-01 (Phase 7).** Real `/category/:slug` and `/district/:slug` routes now exist with unique H1/meta/copy — see §11. The one exception: the `oziq-ovqat` (food) category's homepage tile still links to `/search?category=oziq-ovqat`, deliberately, because that query preserves the specialized restaurant search UI (`CategorySearchPage`, a locked decision — `DECISIONS.md` D-21). `/category/oziq-ovqat` still exists and is still the sitemapped, canonical page for that category; only the one homepage internal link was kept pointing at the enhanced UX variant instead.
 - **No trailing-slash policy** stated anywhere.
 
 ---
@@ -161,14 +161,16 @@ Two notes:
 
 ## 6. Sitemaps
 
-`public/sitemap.xml` is a `sitemapindex` pointing at four files, all with `<lastmod>2026-08-13</lastmod>`.
+`public/sitemap.xml` is a `sitemapindex` pointing at four files.
+
+> **Superseded 2026-10-01 (Phase 7).** Regenerated after building real `/category/:slug` and `/district/:slug` routes (see §11). Every URL below now resolves to a real, indexable page — none are query-string search pages.
 
 | File | URLs | State |
 | --- | --- | --- |
 | `sitemap-pages.xml` | 9 | ✅ |
-| `sitemap-categories.xml` | 24 | ✅ |
-| `sitemap-locations.xml` | 72 | ✅ |
-| **`sitemap-businesses.xml`** | **0** | ❌ **empty `<urlset>`** |
+| `sitemap-categories.xml` | 24 (8 categories × 3 languages) | ✅ each now resolves to a dedicated `/category/:slug` page |
+| `sitemap-locations.xml` | 42 (14 districts × 3 languages) | ✅ each now resolves to a dedicated `/district/:slug` page. **City URLs removed** — no `/:lang/city/:slug` route exists, and a URL with no matching route would point crawlers at the SPA's empty-`Layout` fallback rather than content (see §9's canonical-safety note) |
+| `sitemap-businesses.xml` | 12 (4 businesses × 3 languages) | ✅ populated in Phase 5 |
 
 ### Generator: `scripts/generate-sitemap.ts` (`npm run sitemap`)
 
@@ -277,14 +279,16 @@ Blocker 2 is a behaviour change to auth and language resolution, which is why it
 
 ---
 
-## 11. Category & location pages
+## 11. Category & location pages — IMPLEMENTED 2026-10-01 (Phase 7)
 
-**Neither exists as a dedicated route.** Both are query-string views of `/:lang/search`:
+Real, indexable, language-prefixed routes now exist:
 
-- Category → `/:lang/search?category=<slug>` (with the food category dispatching to the restaurant UI)
-- Location → filtered via `?district=` / `?city=`
+- **`/:lang/category/:slug`** — `CategoryLandingPage.tsx`. Backed by `GET /categories/:slug` (pre-existing, previously unused) for the category's localized name, plus `GET /businesses?category=<slug>` (via the existing `useSearchBusinesses` hook — same hook `SearchPage` uses) for the real, paginated, status-filtered business list. No backend changes were required.
+- **`/:lang/district/:slug`** — `DistrictLandingPage.tsx`. The district is resolved client-side from `GET /geography/regions`'s already-nested district list (via `useRegions`, also pre-existing) rather than adding a new `GET /geography/districts/:slug` endpoint — only ~14 districts exist, so a dedicated lookup endpoint would be a needless round trip for a dataset this small. Businesses again come from `GET /businesses?district=<id>`.
 
-Yet **`sitemap-categories.xml` lists 24 URLs and `sitemap-locations.xml` lists 72** — so the sitemap is advertising 96 URLs that resolve to a generic search page with no unique title, description or copy. **This is the largest structural SEO gap in the project.** For a regional directory, `/uz/category/oziq-ovqat` and `/uz/district/asaka` — each with a unique H1, intro copy, localized meta, `BreadcrumbList`, and internal links down to businesses — are exactly the pages that rank for the highest-intent local queries ("Asakada restoranlar").
+Both pages reuse `BusinessListCard` and `Pagination` verbatim (no duplicate card component), the existing loading/empty/error state conventions, and `MetaTags`/`JsonLd` for SEO — canonical, hreflang ×3 + x-default, Open Graph, and a `BreadcrumbList` schema (Home → Category/District list → this page), all with **real data**: the business count in the title/description/on-page copy comes from the actual filtered `meta.total` on the businesses list, never from the category's own `_count.businesses` (which isn't status-filtered) or an invented number.
+
+**One deliberate exception:** the `oziq-ovqat` (food) category's homepage tile still navigates to `/search?category=oziq-ovqat`, not `/category/oziq-ovqat`, to preserve the specialized restaurant search UI (`CategorySearchPage` — a locked decision, `DECISIONS.md` D-21). `/category/oziq-ovqat` still exists, still renders, and is still the one sitemapped/canonical URL for that category — only that one homepage click target was special-cased. See `ARCHITECTURE.md` §24 for the full implementation record and `DECISIONS.md` D-55 for the URL-structure decision.
 
 ---
 
@@ -292,11 +296,11 @@ Yet **`sitemap-categories.xml` lists 24 URLs and `sitemap-locations.xml` lists 7
 
 | # | Impact | Effort | Gap | Action |
 | --- | --- | --- | --- | --- |
-| 1 | **High** | **Trivial** | `sitemap-businesses.xml` is empty and all `lastmod` dates are stale | Run `npm run sitemap`; then wire it into the build or a schedule |
+| 1 | **High** | **Trivial** | ~~`sitemap-businesses.xml` is empty and all `lastmod` dates are stale~~ | **Done — Phase 5/7.** Still not scheduled (`DECISIONS.md` D-53); re-run `npm run sitemap` manually before each deploy |
 | 2 | **High** | Low | Shared links preview with a bare title — no description, no OG image | Add static `description` + default OG block to `index.html` **now**; ship prerendering for per-page previews |
 | 3 | **High** | High | No SSR/SSG — slow indexing, no scraper support | Follow the 5-step plan in `docs/SSG.md`; the "no real slugs" caveat no longer applies |
-| 4 | **High** | Medium | 96 sitemap URLs point at generic query-string search pages | Build real `/category/:slug` and `/district/:slug` routes with unique content |
-| 5 | Medium | Low | No breadcrumbs rendered, though the JSON-LD builder exists | Add a breadcrumb component and emit `BreadcrumbList` |
+| 4 | **High** | Medium | ~~96 sitemap URLs point at generic query-string search pages~~ | **Done — Phase 7.** Real `/category/:slug` and `/district/:slug` routes built; city URLs removed from the sitemap pending a future city page |
+| 5 | Medium | Low | ~~No breadcrumbs rendered, though the JSON-LD builder exists~~ | **Done — Phase 7,** on the two new landing pages. Not yet added to `SearchPage`/`BusinessDetailPage`/`EventDetailPage` |
 | 6 | Medium | Low | No `Event` structured data | Emit `schema.org/Event` — the model already has every required field |
 | 7 | Medium | Low | Generic `LocalBusiness` instead of a specific subtype | Map `Category`/`BusinessType` → `Restaurant`, `Store`, etc. |
 | 8 | Medium | Medium | `metaTitle*`/`metaDescription*` columns unused end to end | Read them in `MetaTags`; expose them in the owner/admin edit UI |

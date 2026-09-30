@@ -299,6 +299,21 @@
 
 ---
 
+## Phase 7 — SEO landing pages & discovery architecture (2026-10-01)
+
+### D-55 · Category/district landing page URLs: `/:lang/category/:slug` and `/:lang/district/:slug` 🔒 LOCKED
+**Decision.** Adopted the exact structure proposed, with no deviation. `Category.slug` and `District.slug` are both already `@unique` in the schema, so no collision or ambiguity risk existed.
+**Rationale.** `MetaTags`' canonical/hreflang generation (`src/lib/seo.ts`'s `pathForLang`) already derives everything from `useLocation().pathname`, so any real path-based route gets correct canonical/hreflang for free — a query-string alternative would have needed new logic; a real path needed none.
+**One carve-out, not a deviation from the URL structure itself.** The `oziq-ovqat` (food) category's homepage tile still links to `/search?category=oziq-ovqat` rather than `/category/oziq-ovqat`, to preserve the specialized restaurant search UI (D-21, locked). `/category/oziq-ovqat` still exists, still renders, and is still the sitemapped canonical URL for that category — only that one internal link target was special-cased.
+**Why locked.** The sitemap (`scripts/generate-sitemap.ts`) and internal links (`CategoriesSection`, `DistrictsSection`) both now depend on this exact path shape.
+
+### D-56 · Removed `city/:slug` entries from the sitemap rather than building a city page 🔓 REVISITABLE
+**What was found.** `scripts/generate-sitemap.ts` already emitted `city/:slug` URLs (written in an earlier session, apparently in anticipation of a page that was never built). No `/:lang/city/:slug` route exists anywhere in the app.
+**Decision.** Removed city entries from the sitemap generator rather than building a third landing-page type this phase (out of the requested scope: only category + district). Submitting a sitemap URL with no matching route would point crawlers at the SPA's empty-`Layout` fallback (the same gap `TODO.md` already flags: "No 404 route").
+**Revisit when.** A city landing page is explicitly requested — the sitemap data (`GET /geography/regions`'s nested `cities`) is already available; only the route/page/hook would need building, following the exact same pattern as `DistrictLandingPage`.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
