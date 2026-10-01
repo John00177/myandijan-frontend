@@ -96,13 +96,13 @@ See `SECURITY.md` for the full ranked list.
 ### 12. Correct the stale comments in `src/lib/api.ts` · **[REQUIRED]**
 The file asserts that password reset, `POST /businesses`, `/admin/audit-logs` and `/admin/reviews` are 404. **Each was true when probed and is now wrong.** Because the comments in this codebase are otherwise unusually trustworthy, these will actively mislead. Full list in `CURRENT_STATE.md` §5. Same for `AuthContext`'s *"the backend has no profile-update endpoint or age/gender columns yet"* and `docs/SSG.md`'s *"the API returns zero businesses."*
 
-### 13. Add claim-status visibility · **[REQUIRED]**
-`GET /me/claims` exists and nothing calls it. An owner who completes the 8-step claim flow has **no way to see what happened to it.** For an acquisition funnel, that is a conversion hole, not a polish item.
+### 13. ~~Add claim-status visibility~~ — ✅ DONE 2026-10-01 (Phase 9, production-verified) · **[REQUIRED]**
+Claims can now actually be created (`POST /me/claims`, for existing unowned listings — the 8-step `/uz/claim` flow is a *new-listing* flow and never created claims) and their status is shown on `ProfilePage` via `GET /me/claims`. Deployed in backend `0d73c60` / frontend `ec40b51`. See `ARCHITECTURE.md` §26.
 
 ### 14. Build the admin moderation UI · **[REQUIRED]**
 **20 of 31 admin endpoints have no UI.** In rough value order:
-- **Claims** — approve/reject (3 endpoints). Without this, claims cannot be processed at all, so the claim flow has no operational counterpart.
-- **Review moderation** — hide/restore exist, but **`GET /admin/reviews` does not**, which is why `AdminReviewsView` is mock. **A list endpoint must be added first.**
+- ~~**Claims** — approve/reject (3 endpoints)~~ — ✅ **DONE, Phase 9** (`AdminClaimsView`; approval is atomic, D-60)
+- ~~**Review moderation**~~ — ✅ **DONE, Phase 6** (`GET /admin/reviews` added; `AdminReviewsView` is real)
 - **Reports** — list + resolve (2 endpoints)
 - **Business actions** — verify, suspend, promote (3). `promote` is currently the *only* way promotion is granted.
 - **Users** — suspend, activate (2)
