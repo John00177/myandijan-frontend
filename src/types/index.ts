@@ -117,7 +117,8 @@ export interface AdminReviewReport {
   createdAt: string;
   resolvedAt?: string | null;
   resolutionNote?: string | null;
-  reporter: { id: number; fullName: string | null } | null;
+  /** fullName is omitted for MODERATOR viewers (D-72). */
+  reporter: { id: number; fullName?: string | null } | null;
   review: {
     id: number;
     rating: number;
@@ -393,6 +394,8 @@ export interface AdminBusiness {
   promotedUntil?: string | null;
   /** Rejection OR suspension reason — the schema shares one column. */
   rejectionReason?: string | null;
+  /** Status recorded when a SUPER_ADMIN hid the listing; unhide restores it (D-73). */
+  statusBeforeHide?: string | null;
   category?: { id?: number; nameUz?: string | null; slug?: string | null } | null;
   // The real GET /admin/businesses response nests district under the
   // primary branch (`branches[0].district`) — there is no top-level

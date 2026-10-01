@@ -12,6 +12,8 @@ interface AuthContextValue {
   isOwner: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  /** MODERATOR, ADMIN or SUPER_ADMIN — the server's moderation floor (D-72). */
+  canModerate: boolean;
   login: (token: string, user: AuthUser, refreshToken: string) => void;
   register: (token: string, user: AuthUser, refreshToken: string) => void;
   logout: () => void;
@@ -184,6 +186,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isOwner: user?.role === "BUSINESS_OWNER" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
       isAdmin: user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
       isSuperAdmin: user?.role === "SUPER_ADMIN",
+      // Mirrors the MODERATOR floor on the moderation routes (Phase 14):
+      // business approve/reject + list, review and report moderation. Every
+      // other admin view still needs isAdmin. SUPPORT ranks below MODERATOR.
+      canModerate: user?.role === "MODERATOR" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
       login,
       register,
       logout,

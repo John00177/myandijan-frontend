@@ -134,7 +134,10 @@ export default function AdminReportsView() {
                         {review?.branch?.business?.name ?? review?.branch?.name ?? "Noma'lum biznes"}
                       </div>
                       <div className="text-xs text-ink-muted truncate">
-                        Shikoyatchi: {report.reporter?.fullName ?? "Noma'lum"} · {formatDate(report.createdAt)}
+                        {/* Moderators get the reporter id only, not the name (D-72). */}
+                        Shikoyatchi:{" "}
+                        {report.reporter?.fullName ?? (report.reporter ? `#${report.reporter.id}` : "Noma'lum")} ·{" "}
+                        {formatDate(report.createdAt)}
                       </div>
                     </div>
                     <ReportStatusBadge status={report.status} />

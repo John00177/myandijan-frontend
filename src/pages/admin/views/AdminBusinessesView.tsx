@@ -1,7 +1,9 @@
 import {
+  ArchiveRestore,
   Ban,
   Check,
   Eye,
+  EyeOff,
   Megaphone,
   MegaphoneOff,
   Pencil,
@@ -13,14 +15,17 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdminResource } from "../../../hooks/useAdminResource";
 import { useCategories } from "../../../hooks/useCategories";
+import { useAuth } from "../../../contexts/AuthContext";
 import { useLanguage } from "../../../contexts/LanguageContext";
 import {
   ApiError,
   approveAdminBusiness,
   getAdminBusinesses,
+  hideAdminBusiness,
   promoteAdminBusiness,
   rejectAdminBusiness,
   suspendAdminBusiness,
+  unhideAdminBusiness,
   unpromoteAdminBusiness,
   unsuspendAdminBusiness,
   unverifyAdminBusiness,
@@ -93,8 +98,19 @@ function defaultPromotionDate(): string {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+/**
+ * What unhide will restore — mirrors the server rule (D-73): the recorded
+ * pre-hide status, or PENDING (re-review) when none was recorded.
+ */
+function restoreTargetLabel(b: AdminBusiness): string {
+  const recorded = (b.statusBeforeHide ?? "").toUpperCase();
+  const option = STATUS_OPTIONS.find((o) => o.value === recorded && recorded !== "HIDDEN");
+  return option ? option.label : "Kutilmoqda (qayta ko'rib chiqish)";
+}
+
 export default function AdminBusinessesView() {
   const { lang } = useLanguage();
+  const { isAdmin, isSuperAdmin } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -207,6 +223,16 @@ export default function AdminBusinessesView() {
     return runOperation(b.id, () => unpromoteAdminBusiness(b.id), "Reklama to'xtatildi");
   }
 
+  function handleHide(b: AdminBusiness) {
+    if (!window.confirm(`"${businessName(b)}" platformadan yashirilsinmi? Joriy holati saqlanadi.`)) return;
+    return runOperation(b.id, () => hideAdminBusiness(b.id), "Biznes yashirildi");
+  }
+
+  function handleUnhide(b: AdminBusiness) {
+    if (!window.confirm(`"${businessName(b)}" tiklansinmi? Holati: ${restoreTargetLabel(b)}.`)) return;
+    return runOperation(b.id, () => unhideAdminBusiness(b.id), "Biznes tiklandi");
+  }
+
   function openEditModal(business: AdminBusiness) {
     setEditingBusiness(toEditableBusiness(business));
     setEditError(null);
@@ -302,6 +328,9 @@ export default function AdminBusinessesView() {
           {statusOf(b) === "SUSPENDED" && b.rejectionReason && (
             <span className="text-xs text-ink-muted">Sabab: {b.rejectionReason}</span>
           )}
+          {statusOf(b) === "HIDDEN" && (
+            <span className="text-xs text-ink-muted">Tiklanganda: {restoreTargetLabel(b)}</span>
+          )}
         </div>
       ),
     },
@@ -338,6 +367,10 @@ export default function AdminBusinessesView() {
             </>
           )}
 
+          {/* Everything below up to the public link is ADMIN-only on the
+              server; a MODERATOR only gets approve/reject above (D-72). */}
+          {isAdmin && (
+            <>
           {/* Verification: grant on live listings; revoke whenever set. */}
           {b.isVerified ? (
             <button
@@ -411,6 +444,33 @@ export default function AdminBusinessesView() {
               </button>
             )
           )}
+            </>
+          )}
+
+          {/* Hide / restore: SUPER_ADMIN only (D-73). Restore returns the
+              listing to the status recorded at hide time, or PENDING. */}
+          {isSuperAdmin &&
+            (statusOf(b) === "HIDDEN" ? (
+              <button
+                aria-label="Yashirishni bekor qilish"
+                title="Yashirishni bekor qilish"
+                disabled={pendingActionId === b.id}
+                onClick={() => handleUnhide(b)}
+                className={iconButtonClasses}
+              >
+                <ArchiveRestore size={16} />
+              </button>
+            ) : (
+              <button
+                aria-label="Yashirish"
+                title="Yashirish"
+                disabled={pendingActionId === b.id}
+                onClick={() => handleHide(b)}
+                className={`${iconButtonClasses} hover:!text-danger`}
+              >
+                <EyeOff size={16} />
+              </button>
+            ))}
 
           {/* Public page — only an APPROVED listing has one (others 404). */}
           {statusOf(b) === "APPROVED" && b.slug && (
@@ -425,9 +485,11 @@ export default function AdminBusinessesView() {
               <Eye size={16} />
             </a>
           )}
-          <button aria-label="Tahrirlash" title="Tahrirlash" onClick={() => openEditModal(b)} className={iconButtonClasses}>
-            <Pencil size={16} />
-          </button>
+          {isAdmin && (
+            <button aria-label="Tahrirlash" title="Tahrirlash" onClick={() => openEditModal(b)} className={iconButtonClasses}>
+              <Pencil size={16} />
+            </button>
+          )}
         </div>
       ),
     },

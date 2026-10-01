@@ -889,6 +889,16 @@ export function unpromoteAdminBusiness(id: number): Promise<AdminBusiness> {
   return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/unpromote`, {});
 }
 
+// SUPER_ADMIN only (Phase 14, D-73). Hide records the current status;
+// unhide restores it, or PENDING if none was recorded. 409 on wrong state.
+export function hideAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPatchJson<AdminBusiness>(`/admin/businesses/${id}/hide`, {});
+}
+
+export function unhideAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPatchJson<AdminBusiness>(`/admin/businesses/${id}/unhide`, {});
+}
+
 export function updateAdminBusiness(
   id: number,
   payload: { name?: string; description?: string; categoryId?: number },

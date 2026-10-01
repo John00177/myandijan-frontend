@@ -18,7 +18,7 @@ import Badge from "../../components/ui/Badge";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { initials } from "../../lib/initials";
-import type { AdminView } from "./types";
+import { canOpenView, type AdminView } from "./types";
 
 const MENU_ITEMS: { view: AdminView; label: string; icon: LucideIcon }[] = [
   { view: "home", label: "Boshqaruv paneli", icon: LayoutDashboard },
@@ -44,8 +44,9 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ activeView, onSelectView, onNavigate }: AdminSidebarProps) {
   const { lang } = useLanguage();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const items = MENU_ITEMS.filter((item) => canOpenView(item.view, isAdmin));
 
   function handleSelect(view: AdminView) {
     onSelectView(view);
@@ -63,11 +64,11 @@ export default function AdminSidebar({ activeView, onSelectView, onNavigate }: A
         <span className="font-bold text-lg tracking-tight">
           <span className="text-ink">My</span> <span className="text-primary">Andijan</span>
         </span>
-        <Badge tone="danger">Admin</Badge>
+        <Badge tone="danger">{isAdmin ? "Admin" : "Moderator"}</Badge>
       </div>
 
       <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
-        {MENU_ITEMS.map((item) => {
+        {items.map((item) => {
           const isActive = activeView === item.view;
           return (
             <button

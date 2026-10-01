@@ -8,7 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 import AdminLayout from "./AdminLayout";
-import type { AdminView } from "./types";
+import { canOpenView, type AdminView } from "./types";
 import AdminAuditLogsView from "./views/AdminAuditLogsView";
 import AdminBusinessesView from "./views/AdminBusinessesView";
 import AdminCategoriesView from "./views/AdminCategoriesView";
@@ -48,17 +48,19 @@ function AnalyticsFallback() {
 export default function AdminDashboard() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canModerate } = useAuth();
   const { user, token } = useRequireAuth();
-  const [activeView, setActiveView] = useState<AdminView>("home");
+  // A moderator has no home/stats access (ADMIN-only), so they land on the
+  // business approval queue instead.
+  const [activeView, setActiveView] = useState<AdminView>(isAdmin ? "home" : "businesses");
 
   // No token: useRequireAuth already opened the AuthModal. Render nothing rather
   // than the "no admin rights" message, which would flash underneath it.
   if (!token || !user) return null;
 
-  // Both CUSTOMER and BUSINESS_OWNER land here — neither has admin rights, and
-  // the message is the same for both.
-  if (!isAdmin) {
+  // CUSTOMER, BUSINESS_OWNER and SUPPORT land here — none has moderation
+  // rights on the server, and the message is the same for all.
+  if (!canModerate) {
     return (
       <div className="min-h-screen bg-base flex items-center justify-center px-6">
         <EmptyState
@@ -69,6 +71,16 @@ export default function AdminDashboard() {
           onAction={() => navigate(`/${lang}`)}
         />
       </div>
+    );
+  }
+
+  // Belt and braces for the sidebar filter: a moderator never renders an
+  // ADMIN-only view, even if activeView were somehow set to one.
+  if (!canOpenView(activeView, isAdmin)) {
+    return (
+      <AdminLayout activeView="businesses" onSelectView={setActiveView}>
+        <AdminBusinessesView />
+      </AdminLayout>
     );
   }
 
