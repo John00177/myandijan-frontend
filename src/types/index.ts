@@ -362,6 +362,12 @@ export interface AdminBusiness {
   deliveryTime?: string | null;
   owner?: { id?: number; fullName?: string | null; phone?: string | null } | null;
   ownerId?: number | null;
+  // Business-operation state (GET /admin/businesses returns every scalar).
+  isVerified?: boolean | null;
+  isPromoted?: boolean | null;
+  promotedUntil?: string | null;
+  /** Rejection OR suspension reason — the schema shares one column. */
+  rejectionReason?: string | null;
   category?: { id?: number; nameUz?: string | null; slug?: string | null } | null;
   // The real GET /admin/businesses response nests district under the
   // primary branch (`branches[0].district`) — there is no top-level

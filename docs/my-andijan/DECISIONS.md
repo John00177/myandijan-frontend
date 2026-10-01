@@ -361,6 +361,29 @@
 
 ---
 
+## Phase 11 — Admin claims & business operations (2026-10-01)
+
+### D-63 · Suspension applies only to APPROVED listings, and unsuspend restores APPROVED 🔒 LOCKED
+**Decision.** `POST /admin/businesses/:id/suspend` now 409s unless the business is `APPROVED` (previously any non-suspended status). New `POST /admin/businesses/:id/unsuspend` moves `SUSPENDED → APPROVED` and clears `rejectionReason`. Both are compare-and-set (`updateMany` with the expected status in `WHERE`, as D-60).
+**Rationale.** An unsuspend that restores `APPROVED` is only safe if everything suspended was `APPROVED` first. Without the precondition an `ADMIN` could suspend a `PENDING` listing and unsuspend it — approving it without review — or suspend a `HIDDEN` one and unsuspend it, undoing a `SUPER_ADMIN`-only hide. The schema stores no "previous status", so the invariant has to be enforced at the entry point.
+**Not done.** `unhide`: `PATCH …/hide` accepts any status and the prior one isn't stored, so "restore to what?" is a product decision. Deferred; hide has no UI.
+**Why locked.** `admin.service.business-ops.spec.ts` asserts both preconditions for every status; the admin UI only offers suspend on `APPROVED` rows and restore on `SUSPENDED` rows.
+
+### D-64 · Unverify clears `isVerified` only; reversals inherit the ADMIN floor 🔒 LOCKED
+**Decision.** New `POST …/unverify` sets `isVerified = false` and leaves `verifiedAt`/`verifiedById`; new `POST …/unpromote` clears `isPromoted`/`promotedUntil` (allowed even after expiry, to clean up a stale flag). All three reversal routes have no `@Roles` override, so they sit at the class-level `ADMIN` floor — the same as the action they undo.
+**Rationale.** `approveBusiness` also writes `verifiedAt`/`verifiedById` as the approval record; clearing them on unverify would erase who approved the listing. The public badge reads `isVerified` alone (D-58), and the audit log keeps the full history.
+
+### D-65 · Review-report admin UI deferred; DISMISS now records DISMISSED 🔓 REVISITABLE
+**Finding.** `GET /admin/reports` and `POST /admin/reports/:id/resolve` exist, but **no endpoint creates a `ReviewReport`** (and no business-report model exists at all), so the queue is permanently empty. Separately, resolving with `action: DISMISS` stored `RESOLVED` although the enum has `DISMISSED`.
+**Decision.** Fixed the status bug (backend only). Did **not** build an admin reports view — it would always be empty — nor a user-facing "report this review" flow, which would be a new reporting system (out of Phase 11's scope).
+**Revisit when.** User-side review reporting is scoped; the admin list/resolve endpoints are ready for it.
+
+### D-66 · `isFeatured` stays without an admin control 🔓 REVISITABLE
+**Finding.** "Editor's Pick" (`GET /businesses/featured`) reads `isFeatured`/`featuredUntil`, but no admin route sets them; `POST …/promote` sets `isPromoted` only (the API doc previously said "promoted/featured").
+**Decision.** Not added — it would be a new endpoint for a placement capability, which Phase 11 explicitly excluded.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

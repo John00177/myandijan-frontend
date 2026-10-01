@@ -45,7 +45,12 @@
 - [ ] **10 command-centre endpoints** — no UI at all **[REVIEW]**
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
-- [ ] **16 of 31 admin endpoints** — no UI (reports ×2, verify, suspend, promote, events approve/reject, category delete + reorder, district/city edit, user suspend/activate) **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**, via `AdminClaimsView`
+- [ ] **Admin endpoints still without UI** — reports ×2 (deferred: nothing creates reports, D-65), hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
+- [ ] **Business unhide** — needs a decision on which status a HIDDEN listing returns to (prior status isn't stored) (D-63) **[REVIEW]**
+- [ ] **User-side "report this review"** — `ReviewReport` admin list/resolve exist but nothing creates reports, so the moderation queue is permanently empty (D-65) **[REVIEW]**
+- [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**
+- [ ] **Expired promotions still sort first in `GET /businesses`** — `orderBy isPromoted desc` ignores `promotedUntil` (ranking change, out of Phase 11 scope) **[CODE]**
+- [ ] **MODERATOR can't open the admin UI** — frontend `isAdmin` is ADMIN+, while the API grants MODERATOR business approve/reject **[REVIEW]**
 - [x] `GET /me/claims` — **done, Phase 9**: claim status on `ProfilePage`; `POST /me/claims` added so claims can actually be created **[REVIEW]**
 - [ ] **Claims follow-ups (non-blocking, Phase 9):** show the rejection reason to the claimant on `ProfilePage`; show "pending" on `BusinessDetailPage` after reload instead of the CTA; audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**

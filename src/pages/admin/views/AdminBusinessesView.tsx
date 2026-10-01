@@ -1,4 +1,15 @@
-import { Check, Eye, Pencil, Trash2, X } from "lucide-react";
+import {
+  Ban,
+  Check,
+  Eye,
+  Megaphone,
+  MegaphoneOff,
+  Pencil,
+  RotateCcw,
+  ShieldCheck,
+  ShieldOff,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAdminResource } from "../../../hooks/useAdminResource";
 import { useCategories } from "../../../hooks/useCategories";
@@ -7,13 +18,20 @@ import {
   ApiError,
   approveAdminBusiness,
   getAdminBusinesses,
+  promoteAdminBusiness,
   rejectAdminBusiness,
+  suspendAdminBusiness,
+  unpromoteAdminBusiness,
+  unsuspendAdminBusiness,
+  unverifyAdminBusiness,
   updateAdminBusinessBranch,
   updateBusiness,
   updateBusinessHours,
+  verifyAdminBusiness,
 } from "../../../lib/api";
 import { localizedName } from "../../../lib/localize";
 import type { AdminBusiness } from "../../../types";
+import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import EditBusinessModal, {
   type EditableBusiness,
@@ -48,9 +66,31 @@ const PAGE_SIZE = 20;
 const inputClasses =
   "h-10 bg-elevated border border-white/[0.10] rounded-lg px-3 text-sm text-ink placeholder:text-ink-muted outline-none focus:border-primary/50";
 
+const iconButtonClasses =
+  "size-8 rounded-lg text-ink-muted hover:text-ink hover:bg-white/[0.05] flex items-center justify-center transition-colors disabled:opacity-50";
+
+/** Every BusinessStatus value — the filter is applied server-side via ?status=. */
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "APPROVED", label: "Tasdiqlangan" },
+  { value: "PENDING", label: "Kutilmoqda" },
+  { value: "REJECTED", label: "Rad etilgan" },
+  { value: "SUSPENDED", label: "To'xtatilgan" },
+  { value: "HIDDEN", label: "Yashirilgan" },
+  { value: "DRAFT", label: "Qoralama" },
+];
+
 /** Business names arrive either as nameUz/Ru/En or a flat `name`, depending on serializer. */
 function businessName(b: AdminBusiness): string {
   return b.nameUz ?? b.name ?? b.nameRu ?? b.nameEn ?? `#${b.id}`;
+}
+
+function statusOf(b: AdminBusiness): string {
+  return (b.status ?? "").toUpperCase();
+}
+
+/** YYYY-MM-DD, 30 days out — the prompt's suggested promotion end date. */
+function defaultPromotionDate(): string {
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 export default function AdminBusinessesView() {
@@ -60,7 +100,12 @@ export default function AdminBusinessesView() {
   const [statusFilter, setStatusFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  const fetcher = useCallback(() => getAdminBusinesses({ page, limit: PAGE_SIZE }), [page]);
+  // Status is filtered server-side so e.g. every SUSPENDED business is
+  // reachable, not just the ones that happen to be on the current page.
+  const fetcher = useCallback(
+    () => getAdminBusinesses({ page, limit: PAGE_SIZE, status: statusFilter || undefined }),
+    [page, statusFilter],
+  );
   const { data, state, status, reload } = useAdminResource(fetcher);
   const { categories } = useCategories(lang);
 
@@ -109,6 +154,57 @@ export default function AdminBusinessesView() {
     } finally {
       setPendingActionId(null);
     }
+  }
+
+  /** Shared runner for the business operations: busy state, toast, reload. */
+  async function runOperation(id: number, operation: () => Promise<unknown>, successText: string) {
+    setPendingActionId(id);
+    try {
+      await operation();
+      setToast({ tone: "success", text: successText });
+      reload();
+    } catch (err) {
+      setToast({ tone: "error", text: err instanceof ApiError ? err.message : "Xatolik yuz berdi" });
+    } finally {
+      setPendingActionId(null);
+    }
+  }
+
+  function handleVerify(b: AdminBusiness) {
+    return runOperation(b.id, () => verifyAdminBusiness(b.id), "Biznes verifikatsiya qilindi");
+  }
+
+  function handleUnverify(b: AdminBusiness) {
+    if (!window.confirm(`"${businessName(b)}" verifikatsiyasini bekor qilasizmi?`)) return;
+    return runOperation(b.id, () => unverifyAdminBusiness(b.id), "Verifikatsiya bekor qilindi");
+  }
+
+  function handleSuspend(b: AdminBusiness) {
+    const reason = window.prompt("To'xtatish sababi:");
+    if (!reason || !reason.trim()) return;
+    return runOperation(b.id, () => suspendAdminBusiness(b.id, reason.trim()), "Biznes to'xtatildi");
+  }
+
+  function handleUnsuspend(b: AdminBusiness) {
+    if (!window.confirm(`"${businessName(b)}" qayta faollashtirilsinmi?`)) return;
+    return runOperation(b.id, () => unsuspendAdminBusiness(b.id), "Biznes qayta faollashtirildi");
+  }
+
+  function handlePromote(b: AdminBusiness) {
+    const input = window.prompt("Reklama tugash sanasi (YYYY-MM-DD):", defaultPromotionDate());
+    if (!input || !input.trim()) return;
+    // End of the chosen local day, so "until 2026-11-01" includes that day.
+    const until = new Date(`${input.trim()}T23:59:59`);
+    if (Number.isNaN(until.getTime())) {
+      setToast({ tone: "error", text: "Sana noto'g'ri. Format: YYYY-MM-DD" });
+      return;
+    }
+    return runOperation(b.id, () => promoteAdminBusiness(b.id, until.toISOString()), "Reklama yoqildi");
+  }
+
+  function handleUnpromote(b: AdminBusiness) {
+    if (!window.confirm(`"${businessName(b)}" reklamasini to'xtatasizmi?`)) return;
+    return runOperation(b.id, () => unpromoteAdminBusiness(b.id), "Reklama to'xtatildi");
   }
 
   function openEditModal(business: AdminBusiness) {
@@ -180,15 +276,35 @@ export default function AdminBusinessesView() {
     const items = data?.items ?? [];
     return items.filter((b) => {
       if (search && !businessName(b).toLowerCase().includes(search.toLowerCase())) return false;
-      if (statusFilter && (b.status ?? "").toLowerCase() !== statusFilter) return false;
       if (categoryFilter && b.category?.slug !== categoryFilter) return false;
       return true;
     });
-  }, [data, search, statusFilter, categoryFilter]);
+  }, [data, search, categoryFilter]);
 
   const columns: Column<AdminBusiness>[] = [
     { key: "id", header: "ID", render: (b) => <span className="text-ink-muted">#{b.id}</span>, hideOnMobile: true },
-    { key: "name", header: "Nomi", render: (b) => <span className="font-medium text-ink">{businessName(b)}</span> },
+    {
+      key: "name",
+      header: "Nomi",
+      render: (b) => (
+        <div className="flex flex-col gap-1">
+          <span className="font-medium text-ink">{businessName(b)}</span>
+          {(b.isVerified || b.isPromoted) && (
+            <div className="flex flex-wrap gap-1">
+              {b.isVerified && <Badge tone="success">Verifikatsiyalangan</Badge>}
+              {b.isPromoted && (
+                <Badge tone="amber">
+                  Reklama{b.promotedUntil ? ` · ${formatDate(b.promotedUntil)} gacha` : ""}
+                </Badge>
+              )}
+            </div>
+          )}
+          {statusOf(b) === "SUSPENDED" && b.rejectionReason && (
+            <span className="text-xs text-ink-muted">Sabab: {b.rejectionReason}</span>
+          )}
+        </div>
+      ),
+    },
     { key: "owner", header: "Egasi", render: (b) => b.owner?.fullName ?? b.owner?.phone ?? "—" },
     { key: "category", header: "Turkum", render: (b) => b.category?.nameUz ?? "—" },
     { key: "district", header: "Tuman", render: (b) => b.branches?.[0]?.district?.nameUz ?? b.district?.nameUz ?? "—" },
@@ -200,7 +316,7 @@ export default function AdminBusinessesView() {
       hideOnMobile: true,
       render: (b) => (
         <div className="flex items-center gap-1">
-          {(b.status ?? "").toUpperCase() === "PENDING" && (
+          {statusOf(b) === "PENDING" && (
             <>
               <Button
                 size="sm"
@@ -221,24 +337,96 @@ export default function AdminBusinessesView() {
               </Button>
             </>
           )}
-          <button
-            aria-label="Ko'rish"
-            className="size-8 rounded-lg text-ink-muted hover:text-ink hover:bg-white/[0.05] flex items-center justify-center transition-colors"
-          >
-            <Eye size={16} />
-          </button>
-          <button
-            aria-label="Tahrirlash"
-            onClick={() => openEditModal(b)}
-            className="size-8 rounded-lg text-ink-muted hover:text-ink hover:bg-white/[0.05] flex items-center justify-center transition-colors"
-          >
+
+          {/* Verification: grant on live listings; revoke whenever set. */}
+          {b.isVerified ? (
+            <button
+              aria-label="Verifikatsiyani bekor qilish"
+              title="Verifikatsiyani bekor qilish"
+              disabled={pendingActionId === b.id}
+              onClick={() => handleUnverify(b)}
+              className={iconButtonClasses}
+            >
+              <ShieldOff size={16} />
+            </button>
+          ) : (
+            statusOf(b) === "APPROVED" && (
+              <button
+                aria-label="Verifikatsiya qilish"
+                title="Verifikatsiya qilish"
+                disabled={pendingActionId === b.id}
+                onClick={() => handleVerify(b)}
+                className={iconButtonClasses}
+              >
+                <ShieldCheck size={16} />
+              </button>
+            )
+          )}
+
+          {/* Suspension: only live listings can be suspended (backend 409s otherwise). */}
+          {statusOf(b) === "APPROVED" && (
+            <button
+              aria-label="To'xtatish"
+              title="To'xtatish"
+              disabled={pendingActionId === b.id}
+              onClick={() => handleSuspend(b)}
+              className={`${iconButtonClasses} hover:!text-danger`}
+            >
+              <Ban size={16} />
+            </button>
+          )}
+          {statusOf(b) === "SUSPENDED" && (
+            <button
+              aria-label="Qayta faollashtirish"
+              title="Qayta faollashtirish"
+              disabled={pendingActionId === b.id}
+              onClick={() => handleUnsuspend(b)}
+              className={iconButtonClasses}
+            >
+              <RotateCcw size={16} />
+            </button>
+          )}
+
+          {/* Promotion: start on live listings; end whenever set. */}
+          {b.isPromoted ? (
+            <button
+              aria-label="Reklamani to'xtatish"
+              title="Reklamani to'xtatish"
+              disabled={pendingActionId === b.id}
+              onClick={() => handleUnpromote(b)}
+              className={iconButtonClasses}
+            >
+              <MegaphoneOff size={16} />
+            </button>
+          ) : (
+            statusOf(b) === "APPROVED" && (
+              <button
+                aria-label="Reklamaga qo'yish"
+                title="Reklamaga qo'yish"
+                disabled={pendingActionId === b.id}
+                onClick={() => handlePromote(b)}
+                className={iconButtonClasses}
+              >
+                <Megaphone size={16} />
+              </button>
+            )
+          )}
+
+          {/* Public page — only an APPROVED listing has one (others 404). */}
+          {statusOf(b) === "APPROVED" && b.slug && (
+            <a
+              href={`/${lang}/business/${b.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Ko'rish"
+              title="Ko'rish"
+              className={iconButtonClasses}
+            >
+              <Eye size={16} />
+            </a>
+          )}
+          <button aria-label="Tahrirlash" title="Tahrirlash" onClick={() => openEditModal(b)} className={iconButtonClasses}>
             <Pencil size={16} />
-          </button>
-          <button
-            aria-label="O'chirish"
-            className="size-8 rounded-lg text-ink-muted hover:text-danger hover:bg-danger/10 flex items-center justify-center transition-colors"
-          >
-            <Trash2 size={16} />
           </button>
         </div>
       ),
@@ -268,11 +456,21 @@ export default function AdminBusinessesView() {
           placeholder="Nomi bo'yicha qidirish..."
           className={`${inputClasses} flex-1`}
         />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inputClasses}>
+        <select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Status"
+          className={inputClasses}
+        >
           <option value="">Barcha statuslar</option>
-          <option value="approved">Tasdiqlangan</option>
-          <option value="pending">Kutilmoqda</option>
-          <option value="rejected">Rad etilgan</option>
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClasses}>
           <option value="">Barcha turkumlar</option>

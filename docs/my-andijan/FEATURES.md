@@ -179,7 +179,12 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | --- | --- | --- |
 | Admin shell | **IMPLEMENTED** | 10 views, sidebar/drawer |
 | Platform stats | **IMPLEMENTED** | |
-| Business list + approve/reject | **IMPLEMENTED** | Reject requires a non-empty `reason` |
+| Business list + approve/reject | **IMPLEMENTED** | Reject requires a non-empty `reason`. **Phase 11:** status filter is server-side and covers every status (incl. SUSPENDED/HIDDEN/DRAFT); "Ko'rish" opens the public page; the dead "O'chirish" button was removed (no admin delete endpoint) |
+| **Business verification** (grant/revoke badge) | **IMPLEMENTED (Phase 11)** | `AdminBusinessesView` row action → `POST …/verify` / new `POST …/unverify` (confirm). "Verifikatsiyalangan" badge in the list. Claimed ≠ verified (D-58) |
+| **Business suspension** (suspend/restore) | **IMPLEMENTED (Phase 11)** | Suspend an APPROVED listing with a required reason; restore with new `POST …/unsuspend` → APPROVED. Reason shown on suspended rows. Preconditions enforced server-side (D-63) |
+| **Business promotion** (start/end) | **IMPLEMENTED (Phase 11)** | Promote until a chosen date (`POST …/promote`); end early with new `POST …/unpromote`. "Reklama · … gacha" badge. Admin-granted flag only — no payments, no ranking change |
+| Business hide (SUPER_ADMIN) | **PARTIALLY IMPLEMENTED** | Endpoint only; no unhide and no UI — restore semantics undecided (D-63) |
+| Featured / Editor's Pick control | **NOT IMPLEMENTED** | `isFeatured` is read publicly but no admin endpoint sets it (D-66) |
 | Business edit + branch edit | **IMPLEMENTED** | |
 | User list | **IMPLEMENTED** | |
 | Category CRUD | **PARTIALLY IMPLEMENTED** | List/create/update wired; delete + reorder endpoints unused |
@@ -190,7 +195,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | **Review moderation** | **IMPLEMENTED** | **Phase 6:** real list + hide/restore, replacing the mock |
 | **Admin settings** | **BROKEN** | Local state only; `/admin/settings` does not exist; `PlatformSetting` table unused |
 | **Claims moderation** | **IMPLEMENTED (Phase 9)** | `AdminClaimsView`: status filter, inline evidence/contact/claimant, approve, reject with reason; "pending claims" KPI on the admin home. Approval is atomic (D-60) |
-| Reports moderation | **PLANNED** | 2 endpoints exist; no UI |
+| Reports moderation | **PLANNED** | 2 endpoints exist; no UI — deliberately deferred in Phase 11 because **nothing creates reports**, so the queue is always empty. DISMISS now records `DISMISSED` (D-65) |
 | Verify / suspend / promote business | **PLANNED** | 3 endpoints exist; no UI |
 | Suspend / activate user | **PLANNED** | 2 endpoints exist; no UI |
 | **Command centre** (founder analytics) | **PLANNED** | **10 endpoints exist; no UI whatsoever** |
@@ -266,7 +271,7 @@ See `AI.md`.
 | Upgrade modal | **IMPLEMENTED** | With confirmation |
 | Premium view in owner dashboard | **IMPLEMENTED** | |
 | Promotion flags | **IMPLEMENTED** | `isPromoted`/`isFeatured` + `*Until` |
-| Promotion granting | **PARTIALLY IMPLEMENTED** | Only `POST /admin/businesses/:id/promote` — admin-granted, never purchased |
+| Promotion granting | **PARTIALLY IMPLEMENTED** | Admin-granted via `AdminBusinessesView` (Phase 11: promote + end early) — never purchased |
 | **Payments (Click/Payme/Uzum/cash)** | **PLANNED** | **UI labels only. No provider, no integration, no billing/subscription table.** |
 | **Advertising module** | **PLANNED** | Table + enums exist; explicitly *"DEFERRED TO PHASE 2 (ships with Click payments)"* |
 | Health score as an upsell funnel | **IMPLEMENTED** | Backend only; nudges with **estimated, not measured**, impact figures |
@@ -332,6 +337,6 @@ See `AI.md`.
 | Owner dashboard views | 8 (0 mock as of Phase 10 — Inventory now real; 1 non-persisting, 1 placeholder) |
 | Admin dashboard views | 10 (0 mock as of Phase 6 — Reviews now real; 1 non-persisting — Settings) |
 | i18n keys | **419 × 3 languages, full parity** (Phase 10) |
-| Tests | **220** (152 backend + 68 frontend, Phase 10) |
+| Tests | **367** (283 backend + 84 frontend, Phase 11) |
 | AI features | **0** |
 | 3D / immersive features | **0** |

@@ -16,6 +16,9 @@ const BUSINESS_STATUS: Record<string, { label: string; tone: Tone }> = {
   published: { label: "Tasdiqlangan", tone: "success" },
   pending: { label: "Kutilmoqda", tone: "amber" },
   rejected: { label: "Rad etilgan", tone: "danger" },
+  suspended: { label: "To'xtatilgan", tone: "danger" },
+  hidden: { label: "Yashirilgan", tone: "neutral" },
+  draft: { label: "Qoralama", tone: "neutral" },
 };
 
 export function BusinessStatusBadge({ status }: { status: string | null | undefined }) {

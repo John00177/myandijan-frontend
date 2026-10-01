@@ -841,6 +841,8 @@ export function getDashboardAnalytics(): Promise<DashboardAnalytics> {
 export async function getAdminBusinesses(params?: {
   page?: number;
   limit?: number;
+  /** Server-side BusinessStatus filter (e.g. "SUSPENDED"); omitted = all. */
+  status?: string;
 }): Promise<AdminListResult<AdminBusiness>> {
   const raw = await request<unknown>("/admin/businesses", params);
   return normalizeAdminList<AdminBusiness>(raw);
@@ -854,6 +856,35 @@ export function approveAdminBusiness(id: number): Promise<AdminBusiness> {
 // unlike approve, this can't be a bodyless POST.
 export function rejectAdminBusiness(id: number, reason: string): Promise<AdminBusiness> {
   return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/reject`, { reason });
+}
+
+// Business operations (Phase 11). All ADMIN-gated server-side; each reversal
+// returns 409 when the business isn't in the state it reverses.
+export function verifyAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/verify`, {});
+}
+
+export function unverifyAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/unverify`, {});
+}
+
+// SuspendBusinessDto requires a non-empty `reason`. Only APPROVED businesses
+// can be suspended (409 otherwise).
+export function suspendAdminBusiness(id: number, reason: string): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/suspend`, { reason });
+}
+
+export function unsuspendAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/unsuspend`, {});
+}
+
+/** `until` is an ISO date string and must be in the future (400 otherwise). */
+export function promoteAdminBusiness(id: number, until: string): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/promote`, { until });
+}
+
+export function unpromoteAdminBusiness(id: number): Promise<AdminBusiness> {
+  return authedPostJson<AdminBusiness>(`/admin/businesses/${id}/unpromote`, {});
 }
 
 export function updateAdminBusiness(

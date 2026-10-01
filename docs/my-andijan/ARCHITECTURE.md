@@ -843,3 +843,56 @@ Untouched: `product_search_doc`, `search_normalize`, product FTS indexes and `GE
 - **Reordering (`sortOrder`), `priceMax`/`unit`/`currency`, `isAvailable` toggle** in the owner UI — supported by the schema, not requested.
 - **Product hits in public search UI** — still deferred (Phase 8).
 - **Edit/hide in the inline `MenuSection` owner controls** — the business page keeps its existing add/delete shortcut; full management lives in the dashboard.
+
+## 28. Admin business operations — 2026-10-01 (Phase 11)
+
+Completes the admin business-operations layer on top of what already existed. Claims (Phase 9) and review moderation (Phase 6) were audited and needed no change. No migration.
+
+### Audit summary
+
+| Capability | Before Phase 11 | After |
+| --- | --- | --- |
+| Verify | `POST …/verify`, no reversal, no UI | + `POST …/unverify`; UI grant/revoke |
+| Suspend | `POST …/suspend` from **any** status, one-way, no UI | APPROVED-only; + `POST …/unsuspend`; UI suspend/restore |
+| Promote | `POST …/promote`, no reversal, no UI | + `POST …/unpromote`; UI start/end |
+| Hide (SUPER_ADMIN) | `PATCH …/hide`, no reversal, no UI | unchanged — deferred (D-63) |
+| Featured | read-only flag, no admin route | unchanged — not invented (D-66) |
+| Review reports | list/resolve endpoints; nothing creates reports; DISMISS stored `RESOLVED` | DISMISS → `DISMISSED`; UI deferred (D-65) |
+| Claims | complete (Phase 9) | unchanged |
+
+### State machine (business status)
+
+```
+PENDING ──approve (MODERATOR+)──▶ APPROVED ──suspend (ADMIN+, reason)──▶ SUSPENDED
+   │                                  ▲                                     │
+   └──reject (MODERATOR+)──▶ REJECTED └────────unsuspend (ADMIN+)───────────┘
+any ──hide (SUPER_ADMIN)──▶ HIDDEN   (no route back — deferred)
+```
+
+`isVerified` and `isPromoted` are orthogonal flags, not statuses. Suspend/unsuspend are compare-and-set (`updateMany` with the expected status in `WHERE`, `count === 0 → 409`), the same technique as claims (D-60). The APPROVED-only precondition on suspend is what makes `unsuspend → APPROVED` safe: it can never approve a PENDING listing or reverse a SUPER_ADMIN hide (D-63). Unverify keeps `verifiedAt`/`verifiedById` because `approveBusiness` also writes them as the approval record (D-64). Every operation writes an `AuditLog` row in the same transaction (`SUSPEND`, `RESTORE`, or `UPDATE`).
+
+### Authorization
+
+Unchanged architecture: class-level `JwtAuthGuard + RolesGuard + @Roles(ADMIN)` on `AdminController`; the three new reversal routes add no override, so they share the ADMIN floor of the action they undo. `business-ops.authorization.spec.ts` checks the real decorator metadata for every business-ops and report route against all six roles (+ anonymous): approve/reject → MODERATOR+, hide → SUPER_ADMIN, everything else → ADMIN+; `BUSINESS_OWNER`, `CUSTOMER` and `SUPPORT` are denied everywhere. The frontend admin shell is additionally gated to ADMIN+ (`isAdmin`), but that is convenience only — every mutation is enforced server-side.
+
+### Frontend (`AdminBusinessesView`)
+
+- Status filter moved server-side (`?status=`), with every `BusinessStatus` value, so suspended/hidden businesses beyond the first page are reachable; page resets to 1 on change. Name search and category filter remain client-side over the current page (pre-existing).
+- Per-row actions by state: PENDING → approve/reject (unchanged); APPROVED → verify, suspend (reason prompt), promote (date prompt, end of chosen local day), public-page link; SUSPENDED → restore; any verified row → revoke verification; any promoted row → end promotion. Revocations ask for confirmation. Errors (incl. backend 409 messages) surface as a toast; success reloads the list.
+- Badges: "Verifikatsiyalangan", "Reklama · <date> gacha", suspension reason, plus SUSPENDED/HIDDEN/DRAFT status labels (`statusLabels.tsx`).
+- Removed the dead "O'chirish" button (there is no admin business-delete endpoint); "Ko'rish" now links to the public page for APPROVED listings.
+- Uses the existing `window.prompt`/`confirm` pattern from reject; Uzbek-only like every admin view.
+
+### Tests
+
+- Backend: `admin.service.business-ops.spec.ts` (31 — every transition, 404, 409 for every invalid source status, compare-and-set loss, past promotion date, report DISMISS/HIDE_REVIEW/double-resolve/404); `business-ops.authorization.spec.ts` (100).
+- Frontend: `AdminBusinessesView.test.tsx` (16 — load, server-side filter, empty, forbidden, error, per-state actions, verify/unverify, suspend/cancel/restore, 409 toast, promote/invalid date/unpromote).
+
+### Deliberately not implemented
+
+- **Unhide / hide UI** — restore target undecided (D-63).
+- **Admin reports view, user-side "report review"** — queue has no producer; would be a new reporting system (D-65).
+- **`isFeatured` admin control** — new endpoint (D-66).
+- **Expired promotions still sort first in `GET /businesses`** (`orderBy isPromoted desc` ignores `promotedUntil`, unlike `/businesses/promoted`). A ranking change — out of scope; `unpromote` lets an admin clear a stale flag.
+- **MODERATOR access to the admin UI** — the backend lets MODERATOR approve/reject businesses, but the frontend admin shell is ADMIN-only (pre-existing).
+- **User suspend/activate UI** — endpoints exist; user operations were not in Phase 11's business scope.

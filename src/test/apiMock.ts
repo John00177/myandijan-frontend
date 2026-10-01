@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type {
+  AdminBusiness,
   AdminClaim,
   AdminReview,
   Business,
@@ -195,6 +196,34 @@ export const createMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
 export const updateMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
 export const deleteMenuItem = vi.fn().mockResolvedValue(undefined);
 export const uploadImage = vi.fn().mockResolvedValue({ url: "https://example.test/photo.jpg" });
+
+export const mockAdminBusiness: AdminBusiness = {
+  id: 5,
+  slug: "soy-milliy-taomlar",
+  name: "Soy milliy taomlar",
+  status: "APPROVED",
+  createdAt: "2026-09-20T10:00:00.000Z",
+  isVerified: false,
+  isPromoted: false,
+  promotedUntil: null,
+  rejectionReason: null,
+  owner: { id: 7, fullName: "Sardor Aliyev", phone: "+998901234567" },
+  category: { id: 1, nameUz: "Ovqatlanish", slug: "food" },
+  branches: [{ id: 1, address: "Andijon shahri", phone: "+998901234567", district: { id: 1, nameUz: "Andijon" } }],
+};
+
+export const getAdminBusinesses = vi.fn().mockResolvedValue({ items: [mockAdminBusiness], total: 1 });
+export const approveAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const rejectAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const verifyAdminBusiness = vi.fn().mockResolvedValue({ ...mockAdminBusiness, isVerified: true });
+export const unverifyAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const suspendAdminBusiness = vi.fn().mockResolvedValue({ ...mockAdminBusiness, status: "SUSPENDED" });
+export const unsuspendAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const promoteAdminBusiness = vi.fn().mockResolvedValue({ ...mockAdminBusiness, isPromoted: true });
+export const unpromoteAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const updateAdminBusinessBranch = vi.fn().mockResolvedValue({});
+export const updateBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const updateBusinessHours = vi.fn().mockResolvedValue([]);
 
 export const createClaim = vi.fn().mockResolvedValue(mockMyClaim);
 export const getMyClaims = vi
