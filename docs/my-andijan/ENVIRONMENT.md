@@ -201,16 +201,16 @@ Set: `VITE_API_URL` (the Railway URL) and `VITE_SITE_URL` (`https://myandijan.uz
 | | Frontend → Vercel | Backend → Railway |
 | --- | --- | --- |
 | Production branch | `main` of `John00177/myandijan-frontend` | `main` of `John00177/my-andijan-api` |
-| Trigger | **Automatic on push** via the Vercel GitHub App | **Manual only — auto-deploy is disabled and cannot currently be enabled** (see below) |
-| Evidence | GitHub Deployments API shows a `vercel[bot]` "Production" deployment for every recent `main` push (`889451b`, `5f4816a`, `a13bcf6`); live bundle hash matches the local build of `main` | Railway API: `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`; zero GitHub deployments/commit statuses on the repo; every deployment since Phase 9 was started manually |
+| Trigger | **Automatic on push** via the Vercel GitHub App | **Automatic on push** via the Railway GitHub App, **after CI passes** ("Wait for CI", `checkSuites: true`) — enabled and verified 2026-10-01 |
+| Evidence | GitHub Deployments API shows a `vercel[bot]` "Production" deployment for every recent `main` push (`889451b`, `5f4816a`, `a13bcf6`, `84de160`); live bundle hash matches the local build of `main` | Railway API: `autoDeploy.enabled=true, canEnable=true`; source `{repo, branch: main, checkSuites: true}`. Live test with docs-only `ded7b7a`: push 08:44:22 → Railway deployment `6b81b152` created 08:44:26 (no manual action) → CI green 08:45:11 → build started 08:45:16 (held until CI) → live 08:46:10. GitHub now shows `railway-app[bot]` deployment records |
 | Build config | `vercel.json` (SPA rewrite only) + project settings | `railway.json` (Nixpacks, `npm run build`; start = `npx prisma migrate deploy && npm run start:prod`) + `nixpacks.toml` (`npm ci --include=dev`, D-67) |
 | Service IDs | Vercel project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH` | project `3910b9c5-e86d-4c06-8058-def605847424`, service `4109a788-880f-4d6c-a0a6-766663cd2f24`, env `production` `653c2817-832a-4d76-a236-d91972b55d09` |
 
 **GitHub Actions is validation only.** Both repos' `.github/workflows/ci.yml` run `npm ci → test → build` on push/PR to `main` and contain no deploy step; neither host waits on them today (D-71).
 
-**Why Railway does not auto-deploy.** Railway can read the repo (it is public), so a manual deploy builds the requested commit, but auto-deploy needs a project member's GitHub account connected to Railway **and** the Railway GitHub App installed with access to `John00177/my-andijan-api`. Neither is in place, so Railway never receives push events. Reconnecting the source (`connect-service-source`, or Settings → Source in the dashboard) only starts a one-off deployment of the current `main` HEAD; it does not create a push trigger.
+**History — why Railway did not auto-deploy until 2026-10-01.** Railway could read the repo (it is public), so manual deploys built the requested commit, but auto-deploy needs a project member's GitHub account connected to Railway **and** the Railway GitHub App installed with access to `John00177/my-andijan-api`. Until the owner authorized it, the API reported `enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`, and reconnecting the source only started one-off deployments of `main` HEAD. **Resolved** by the owner action below; if auto-deploy ever stops, check that state first (Railway MCP `railway-agent` → "serviceAutoDeployTool"). The dashboard's "Could not load branches" message did not affect the trigger — the API reports `branch: main` and the push test deployed.
 
-**Owner action to enable auto-deploy (one-time):**
+**Owner action that enabled auto-deploy (done 2026-10-01; repeat if access is ever revoked):**
 1. Sign in to Railway with an account that is a member of the project → Account Settings → connect the GitHub account `John00177` (or any GitHub account with access to the repo).
 2. On GitHub → Settings → Applications → **Railway** → Configure: grant repository access to `John00177/my-andijan-api`; accept any pending permission request.
 3. Railway → service `myandijan-api` → Settings → Source: confirm repo `John00177/my-andijan-api`, branch `main`, turn **Auto Deploy** on. Recommended: enable **Wait for CI** so a red `test-and-build` run never ships.
@@ -218,9 +218,9 @@ Set: `VITE_API_URL` (the Railway URL) and `VITE_SITE_URL` (`https://myandijan.uz
 
 ### Release & recovery runbook (backend)
 
-Until auto-deploy is enabled, a backend release is: push to `main` → wait for CI green → trigger the deployment manually → verify.
+A backend release is: push to `main` → CI `test-and-build` green → Railway builds and deploys automatically → verify (deployment commit = `main` HEAD, smoke checks). A red CI run does not deploy.
 
-- **Trigger a deploy of `main` HEAD:** Railway dashboard → service → Deployments → "Deploy latest commit" (or Settings → Source → reconnect `main`; or the Railway MCP `connect-service-source` with `branch: main`).
+- **Trigger a deploy manually (only if auto-deploy is broken):** Railway dashboard → service → Deployments → "Deploy latest commit" (or Settings → Source → reconnect `main`; or the Railway MCP `connect-service-source` with `branch: main`).
 - **Identify what is live:** Railway → Deployments (top `SUCCESS` row shows the commit SHA); or MCP `get-deployment-diagnosis` on `latestDeployment.id` from `describe-service`. Cross-check with a route that only exists in the newest commit (e.g. an unauthenticated POST that returns `401` on the new build and `404` on the old one).
 - **Roll back to a known-good build:** Railway → Deployments → previous `SUCCESS` deployment → **Rollback/Redeploy** (re-uses that image; no rebuild). MCP: `redeploy` with that `deploymentId`. Rolled-back code stays on `main` in git — revert the commit on `main` too, or the next manual deploy re-ships it.
 - **Failed build:** production keeps serving the previous image (Railway only swaps on success). Read build logs (dashboard, or ask the MCP `railway-agent` for the build logs of the deployment ID) before retrying; a retry of a deterministic failure fails the same way (see D-67).
