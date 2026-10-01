@@ -166,7 +166,8 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Owner access after approval | **IMPLEMENTED (Phase 9)** | Approval sets `ownerId` and promotes a `CUSTOMER` to `BUSINESS_OWNER`; effective on the next request (role is reloaded from the DB per request). Claimed ≠ verified (D-58) |
 | Add business (3-step) | **IMPLEMENTED** | `AddBusinessPage` |
 | Multi-branch management | **PARTIALLY IMPLEMENTED** | `POST /me/businesses/:id/branches` + `PATCH /me/branches/:id` exist; branch **creation** has no UI |
-| Menu / product management | **PARTIALLY IMPLEMENTED** | API + `api.ts` wrappers + `ProductModal` exist; **`InventoryView` still renders mock data** |
+| Menu / product & service catalog management | **IMPLEMENTED (Phase 10)** | `InventoryView` on the real API (`GET /me/businesses/:id/menu` + POST/PATCH/DELETE): create/edit name, type (product/service), category, price, description, photo; publish/hide (`isActive`); delete with confirmation; business picker. Mock data and SKU/quantity removed (D-61). See `ARCHITECTURE.md` §27 |
+| Catalog on business detail page (customer) | **IMPLEMENTED** | `MenuSection` → public `GET /businesses/:id/menu` (APPROVED businesses, published items only — Phase 10). Loading, empty, and **error + retry** (Phase 10) states, localized uz/ru/en |
 | Owner analytics | **PARTIALLY IMPLEMENTED** | 6 endpoints exist; no UI, and the source tables are empty |
 | Health score for owners | **PARTIALLY IMPLEMENTED** | Full engine + localized recommendations; **no UI** |
 | **Owner settings (hours)** | **BROKEN** | Form saves nothing |
@@ -328,9 +329,9 @@ See `AI.md`.
 | Database models | **31** |
 | Models entirely unused by code | **3** (`Notification`, `PlatformSetting`, `Advertisement`) |
 | Frontend route pages | **12** + 3 redirects |
-| Owner dashboard views | 8 (1 mock, 1 non-persisting, 1 placeholder) |
+| Owner dashboard views | 8 (0 mock as of Phase 10 — Inventory now real; 1 non-persisting, 1 placeholder) |
 | Admin dashboard views | 10 (0 mock as of Phase 6 — Reviews now real; 1 non-persisting — Settings) |
-| i18n keys | **385 × 3 languages, full parity** |
-| Tests | **65** (48 backend + 17 frontend) |
+| i18n keys | **419 × 3 languages, full parity** (Phase 10) |
+| Tests | **220** (152 backend + 68 frontend, Phase 10) |
 | AI features | **0** |
 | 3D / immersive features | **0** |

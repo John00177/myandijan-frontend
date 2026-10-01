@@ -3,63 +3,99 @@ import { ImagePlus, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import Button from "../../components/ui/Button";
 import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/motion-config";
-import { PRODUCT_CATEGORIES, type Product } from "./mockData";
+import { localizedName } from "../../lib/localize";
+import type { Category, Lang, MenuItem, ProductTypeValue } from "../../types";
 
 const inputClasses =
   "h-12 bg-elevated border border-white/[0.10] rounded-xl px-4 text-ink placeholder:text-ink-muted outline-none focus:border-primary/50";
 
-interface ProductFormState {
+export interface ProductFormState {
   name: string;
-  sku: string;
-  category: string;
+  type: ProductTypeValue;
+  /** Category id as a string because it comes from a <select>; "" means none. */
+  categoryId: string;
   price: string;
-  quantity: string;
   description: string;
 }
 
 const EMPTY_FORM: ProductFormState = {
   name: "",
-  sku: "",
-  category: PRODUCT_CATEGORIES[0],
+  type: "PRODUCT",
+  categoryId: "",
   price: "",
-  quantity: "",
   description: "",
 };
 
-function productToForm(product: Product): ProductFormState {
+function productToForm(product: MenuItem): ProductFormState {
   return {
     name: product.name,
-    sku: product.sku,
-    category: product.category,
-    price: String(product.price),
-    quantity: String(product.quantity),
-    description: product.description,
+    type: product.type ?? "PRODUCT",
+    categoryId: product.categoryId != null ? String(product.categoryId) : "",
+    price: product.price != null ? String(Number(product.price)) : "",
+    description: product.description ?? "",
   };
 }
 
 interface ProductModalProps {
   open: boolean;
-  /** null means "add" mode; a Product means "edit" mode. */
-  product: Product | null;
+  /** null means "add" mode; a MenuItem means "edit" mode. */
+  product: MenuItem | null;
+  /** Real categories from GET /categories — no hardcoded category list. */
+  categories: Category[];
+  lang: Lang;
+  saving: boolean;
+  error: string | null;
   onClose: () => void;
-  onSave: (form: ProductFormState) => void;
+  onSave: (form: ProductFormState, photo: File | null) => void;
 }
 
 /**
- * Add/edit product modal. Structurally the same hardened pattern as AuthModal:
- * flex-centred (not translate-based, so Framer's inline transform can't fight
- * Tailwind's), pointerEvents included in both animate/exit targets, Escape and
- * scrim click wired as plain handlers so they work regardless of animation state.
+ * Add/edit catalog item modal. Structurally the same hardened pattern as
+ * AuthModal: flex-centred (not translate-based, so Framer's inline transform
+ * can't fight Tailwind's), pointerEvents included in both animate/exit targets,
+ * Escape and scrim click wired as plain handlers so they work regardless of
+ * animation state.
+ *
+ * Fields map 1:1 onto what the catalog API accepts (name, type, categoryId,
+ * price, description, photo). It deliberately has no SKU or stock-quantity
+ * input: `Product` has no such columns, so those inputs could only ever have
+ * been discarded on submit (see DECISIONS.md D-61).
  */
-export default function ProductModal({ open, product, onClose, onSave }: ProductModalProps) {
+export default function ProductModal({
+  open,
+  product,
+  categories,
+  lang,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: ProductModalProps) {
   const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const shouldAnimate = useShouldAnimate();
   const backdropTransition = useMotionTransition(TRANSITIONS.fast);
   const modalTransition = useMotionTransition(TRANSITIONS.modalSpring);
 
   useEffect(() => {
-    if (open) setForm(product ? productToForm(product) : EMPTY_FORM);
+    if (open) {
+      setForm(product ? productToForm(product) : EMPTY_FORM);
+      setPhoto(null);
+    }
   }, [open, product]);
+
+  // Blob URL, not the file itself — must be revoked when replaced/unmounted or
+  // it leaks for the life of the tab.
+  useEffect(() => {
+    if (!photo) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(photo);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photo]);
 
   useEffect(() => {
     if (!open) return;
@@ -74,13 +110,15 @@ export default function ProductModal({ open, product, onClose, onSave }: Product
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.sku.trim()) return;
-    onSave(form);
+    if (!form.name.trim() || !form.price.trim()) return;
+    onSave(form, photo);
   }
 
   function update<K extends keyof ProductFormState>(key: K, value: ProductFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
+
+  const existingImage = product?.imageUrl ?? null;
 
   return (
     <AnimatePresence>
@@ -120,68 +158,87 @@ export default function ProductModal({ open, product, onClose, onSave }: Product
                   value={form.name}
                   onChange={(e) => update("name", e.target.value)}
                   placeholder="Nomi"
+                  aria-label="Nomi"
                   className={inputClasses}
                   required
                 />
-                <input
-                  value={form.sku}
-                  onChange={(e) => update("sku", e.target.value)}
-                  placeholder="SKU"
-                  className={inputClasses}
-                  required
-                />
+
+                <div className="grid grid-cols-2 gap-2 bg-elevated rounded-xl p-1">
+                  {(["PRODUCT", "SERVICE"] as ProductTypeValue[]).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => update("type", value)}
+                      className={`h-9 rounded-lg text-sm font-medium transition-colors ${
+                        form.type === value ? "bg-primary text-white" : "text-ink-muted hover:text-ink"
+                      }`}
+                    >
+                      {value === "PRODUCT" ? "Mahsulot" : "Xizmat"}
+                    </button>
+                  ))}
+                </div>
+
                 <select
-                  value={form.category}
-                  onChange={(e) => update("category", e.target.value)}
+                  value={form.categoryId}
+                  onChange={(e) => update("categoryId", e.target.value)}
+                  aria-label="Turkum"
                   className={`${inputClasses} appearance-none`}
                 >
-                  {PRODUCT_CATEGORIES.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
+                  <option value="">Turkumsiz</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {localizedName(category, lang)}
                     </option>
                   ))}
                 </select>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    value={form.price}
-                    onChange={(e) => update("price", e.target.value)}
-                    placeholder="Narxi (so'm)"
-                    type="number"
-                    min="0"
-                    className={inputClasses}
-                  />
-                  <input
-                    value={form.quantity}
-                    onChange={(e) => update("quantity", e.target.value)}
-                    placeholder="Soni"
-                    type="number"
-                    min="0"
-                    className={inputClasses}
-                  />
-                </div>
 
-                {/* No upload endpoint yet — this only proves out the UI. */}
-                <button
-                  type="button"
-                  className="h-12 border border-dashed border-white/[0.15] rounded-xl flex items-center justify-center gap-2 text-sm text-ink-muted hover:text-ink hover:border-white/[0.25] transition-colors"
-                >
-                  <ImagePlus size={16} />
-                  Rasm tanlash
-                </button>
+                <input
+                  value={form.price}
+                  onChange={(e) => update("price", e.target.value)}
+                  placeholder="Narxi (so'm)"
+                  aria-label="Narxi (so'm)"
+                  type="number"
+                  min="0"
+                  className={inputClasses}
+                  required
+                />
+
+                <div className="flex items-center gap-3">
+                  {(previewUrl || existingImage) && (
+                    <img
+                      src={previewUrl ?? existingImage ?? undefined}
+                      alt=""
+                      className="size-14 rounded-lg object-cover border border-white/[0.10] shrink-0"
+                    />
+                  )}
+                  <label className="h-12 flex-1 border border-dashed border-white/[0.15] rounded-xl flex items-center justify-center gap-2 text-sm text-ink-muted hover:text-ink hover:border-white/[0.25] transition-colors cursor-pointer">
+                    <ImagePlus size={16} />
+                    {photo ? photo.name : "Rasm tanlash"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+                    />
+                  </label>
+                </div>
 
                 <textarea
                   value={form.description}
                   onChange={(e) => update("description", e.target.value)}
                   placeholder="Tavsif"
+                  aria-label="Tavsif"
                   rows={2}
                   className="bg-elevated border border-white/[0.10] rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted outline-none focus:border-primary/50"
                 />
 
+                {error && <p className="text-sm text-danger">{error}</p>}
+
                 <div className="flex gap-2 mt-2">
-                  <Button type="submit" variant="primary" size="lg" className="flex-1">
-                    Saqlash
+                  <Button type="submit" variant="primary" size="lg" className="flex-1" disabled={saving}>
+                    {saving ? "Saqlanmoqda..." : "Saqlash"}
                   </Button>
-                  <Button type="button" variant="ghost" size="lg" onClick={onClose}>
+                  <Button type="button" variant="ghost" size="lg" disabled={saving} onClick={onClose}>
                     Bekor qilish
                   </Button>
                 </div>

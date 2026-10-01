@@ -416,6 +416,10 @@ const uz = {
   "businessClaim.statusRejected": "Rad etilgan",
   "businessClaim.myClaimsTitle": "Mening da'volarim",
   "businessClaim.errorConflict": "Bu biznes allaqachon egalik qilingan yoki sizda u uchun ko'rib chiqilayotgan da'vo bor.",
+
+  "common.retry": "Qayta urinish",
+  "menuLoadFailed": "Menyuni yuklab bo'lmadi",
+  "menuLoadFailedBody": "Ulanishda muammo bo'ldi. Qayta urinib ko'ring.",
 } as const;
 
 export default uz;

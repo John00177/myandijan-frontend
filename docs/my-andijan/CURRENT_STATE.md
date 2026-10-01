@@ -80,7 +80,7 @@ Established in the prior session's production verification (recovered, not re-ru
 | --- | --- | --- |
 | **OTP signup end-to-end** | Code generated, stored hashed, rate-limited, verified; account created; JWT issued | **No SMS is delivered** — `ESKIZ_*` unset on Railway, so `SmsService` logs instead of sending. The endpoint still returns success. |
 | **Admin dashboard** | 8 of 10 views read real data | `AdminReviewsView` is mock (no `GET` review-list endpoint exists); `AdminSettingsView` is a local-state-only form that persists nothing |
-| **Owner dashboard** | Businesses, stats, reviews, events are real | `InventoryView` is mock **even though a real products/menu API exists**; `AdsView` is an honest "coming soon" empty state; `SettingsView` hours form is local-state only and does not save |
+| **Owner dashboard** | Businesses, stats, reviews, events are real; ✅ **`InventoryView` real since Phase 10 (2026-10-01)** — product/service catalog CRUD + publish/hide via `GET /me/businesses/:id/menu`, `POST/PATCH/DELETE`; see `ARCHITECTURE.md` §27 | `AdsView` is an honest "coming soon" empty state; `SettingsView` hours form is local-state only and does not save |
 | **Password reset** | All three backend endpoints exist and are wired in `api.ts` | The reset code is **logged, not sent** (`auth.service.ts:347` — `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`) |
 | **Sitemaps** | `sitemap-pages.xml` (9), `sitemap-categories.xml` (24), `sitemap-locations.xml` (42 as of Phase 7 — city URLs removed since no `/:lang/city/:slug` route exists; see `DECISIONS.md` D-56) all populated, and category/location URLs now resolve to real Phase 7 landing pages instead of the generic search page | **`sitemap-businesses.xml` contains zero URLs** — the highest-SEO-value file is empty |
 | **Business claim** | 8-screen flow complete, submits to `POST /businesses` | Screen 3 is specced as "address (optional)" but `CreateBusinessDto` hard-requires `address` (min 5) and `districtId`, so it had to be made required — a known spec/implementation divergence |
@@ -99,7 +99,7 @@ Established in the prior session's production verification (recovered, not re-ru
 2. **SMS delivery.** Unconfigured. OTP and password reset are both non-functional for real users.
 3. **Payments.** No provider integrated. Every price, tier and payment-method chip in the UI is presentational.
 4. **`AdminSettingsView` and dashboard `SettingsView`** accept input and show a saved state but write nothing anywhere.
-5. **Products/inventory in the owner dashboard** shows mock rows labelled "Demo" while a working menu API sits unused.
+5. ~~**Products/inventory in the owner dashboard** shows mock rows labelled "Demo" while a working menu API sits unused.~~ **RESOLVED Phase 10 (2026-10-01)** — `InventoryView` runs on the real catalog API; mock data deleted; "Inventory" = catalog, no SKU/stock (D-61).
 6. **Social-link previews.** Because the app is SPA-only, Facebook/Telegram/X/WhatsApp scrapers see only the static `index.html` — every shared link previews with the generic site title and no per-page OG image.
 7. **`GET /admin/reviews`** does not exist (only `POST /admin/reviews/:id/hide` and `/restore`), so there is no way to list reviews for moderation.
 8. **No `/health` endpoint** on the API. It never existed; deploy checklists that expect one will 404.
@@ -132,9 +132,9 @@ Ordered by impact. All are verified in code, not speculative.
 | 4 | Medium | **Empty `sitemap-businesses.xml`** submitted via `sitemap.xml` index — crawlers are pointed at an empty file. | `public/sitemap-businesses.xml`: 0 `<url>` entries |
 | 5 | Medium | **Stale sitemap `lastmod` dates** — all four sub-sitemaps say `2026-08-13`. | `public/sitemap.xml` |
 | 6 | Medium | **Two settings forms silently discard input.** | `AdminSettingsView.tsx`, `pages/dashboard/views/SettingsView.tsx` |
-| 7 | Medium | **Inventory shows mock data while a real API exists.** | `pages/dashboard/mockData.ts` header comment vs `products.controller.ts` |
+| 7 | ~~Medium~~ | ~~**Inventory shows mock data while a real API exists.**~~ ✅ **Fixed Phase 10** — also fixed: public `GET /businesses/:id/menu` served catalogs of non-APPROVED businesses (now 404, D-62); `MenuSection` showed "no menu" when the request had actually failed (now an error state with retry). | `mockData.ts` deleted; `products.service.ts` |
 | 8 | Low | **Hardcoded weather placeholder on the home hero.** | `src/pages/home/HeroSection.tsx:30` — `// TODO: Replace with real weather API` |
-| 9 | Low | **`SUPPORT` role outranks `BUSINESS_OWNER`** in the hierarchy (3 > 2), so any `@Roles(BUSINESS_OWNER)` route — e.g. `POST /events`, `POST /reviews/:id/reply` — is also open to `SUPPORT`. May be intended; it is not stated anywhere. | `role-hierarchy.ts`, `roles.guard.ts` |
+| 9 | Low | **`SUPPORT` role outranks `BUSINESS_OWNER`** in the hierarchy (3 > 2), so any `@Roles(BUSINESS_OWNER)` route — e.g. `POST /events`, `POST /reviews/:id/reply` — is also open to `SUPPORT`. May be intended; it is not stated anywhere. **Phase 10 note:** catalog writes are still safe — `SUPPORT` clears the role floor but `ProductsService.assertCanManage` requires owner or ≥ `MODERATOR` (pinned by `catalog.authorization.spec.ts`). Hierarchy left unchanged (app-wide impact). | `role-hierarchy.ts`, `roles.guard.ts` |
 
 ### Stale comments that will actively mislead the next reader
 
@@ -144,7 +144,7 @@ These are documentation bugs, and they matter because the codebase's comments ar
 - **`src/lib/api.ts`** says business creation is *"Confirmed absent… POST /businesses … 404"*. **It exists** (the session later found it had become `401`, i.e. present).
 - **`src/lib/api.ts`** says *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)"*. `/admin/audit` exists (the path probed was wrong); review hide/restore exist.
 - **`src/contexts/AuthContext.tsx`** says *"the backend has no profile-update endpoint or age/gender columns yet"*. **`PATCH /users/me` exists and `age`/`gender`/`avatarId` were added in migration `20260815150053_add_profile_fields`.**
-- **`src/pages/dashboard/mockData.ts`** says *"Products/inventory have no backend at all (no /me/products, no catalog endpoint)"*. A products API exists at `/businesses/:id/menu` and `/menu/:id`.
+- ~~**`src/pages/dashboard/mockData.ts`** says *"Products/inventory have no backend at all"*.~~ File deleted in Phase 10.
 - **`docs/SSG.md`** says *"the API returns zero businesses"*. It now returns 4.
 
 ---
@@ -158,7 +158,7 @@ These are documentation bugs, and they matter because the codebase's comments ar
 | **CORS wide open** | `app.enableCors()` with no origin allow-list. |
 | **No rate limiting** | Only OTP requests are throttled, and that is hand-rolled in the service. No `@nestjs/throttler`; login, register and password-reset are unthrottled. |
 | **Swagger public in production** | `/docs` returns 200 on the live API, publishing the full 118-route surface. |
-| **Mock data still shipped** | Three mock modules remain in the bundle: `src/lib/restaurantMock.ts` (deliberate — deterministic display data for fields the API lacks), `src/pages/admin/adminMockData.ts`, `src/pages/dashboard/mockData.ts`. |
+| **Mock data still shipped** | Three mock modules remain in the bundle: `src/lib/restaurantMock.ts` (deliberate — deterministic display data for fields the API lacks), `src/pages/admin/adminMockData.ts` (deleted Phase 6), `src/pages/dashboard/mockData.ts` (deleted Phase 10). Only `restaurantMock.ts` remains. |
 | **Deterministic fake display data** | `restaurantMock.ts` derives cuisine, price bucket, tags and delivery time from `Math.sin(id * k)`. It is stable and honest in intent, but restaurant cards in production show **invented** cuisine/price/delivery information. |
 | **Frontend/backend shape mismatch** | `Business`/`Branch` are not localized server-side but the frontend types assume they are, requiring a `normalizeBusiness`/`normalizeBranch` adapter layer. Sustainable, but it is a permanent tax. |
 | **Deprecated table** | `SearchQueryLog` superseded by `SearchAnalytics`; retained intentionally, not yet dropped. |

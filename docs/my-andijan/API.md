@@ -189,19 +189,27 @@ Class-level 🔒 `JwtAuthGuard`.
 
 ---
 
-## 9. Products / "menu" — `/businesses/:id/menu` + `/menu` (4 routes)
+## 9. Products / "menu" — catalog (5 routes; Phase 10)
 
-`ProductsController` is declared on **two** base paths.
+Three controllers in `src/products/`: `BusinessMenuController` (`/businesses/:id/menu`), `OwnerMenuController` (`/me/businesses/:id/menu`, **added Phase 10**) and `MenuItemController` (`/menu/:id`). Backed by the `Product` model — there is deliberately no separate `MenuItem`.
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| GET | `/businesses/:id/menu` | — | List a business's products | ✅ |
-| POST | `/businesses/:id/menu` | 🔒 `BUSINESS_OWNER` | Create an item | ✅ |
-| PATCH | `/menu/:id` | 🔒 `BUSINESS_OWNER` | Update an item | ✅ |
-| DELETE | `/menu/:id` | 🔒 `BUSINESS_OWNER` | Delete an item | ✅ |
+| GET | `/businesses/:id/menu` | — | **Public** catalog: active items of an **APPROVED** business | ✅ `MenuSection` |
+| GET | `/me/businesses/:id/menu` | 🔒 `BUSINESS_OWNER`+ | **Owner** catalog: all non-deleted items incl. deactivated, any business status | ✅ `InventoryView` |
+| POST | `/businesses/:id/menu` | 🔒 `BUSINESS_OWNER`+ | Create an item | ✅ |
+| PATCH | `/menu/:id` | 🔒 `BUSINESS_OWNER`+ | Update an item (partial) | ✅ |
+| DELETE | `/menu/:id` | 🔒 `BUSINESS_OWNER`+ | Soft-delete an item (`deletedAt`) | ✅ |
 
-> **Stale comment alert:** `src/pages/dashboard/mockData.ts` says *"Products/inventory have no backend at all (no /me/products, no catalog endpoint) — this stays mock."* This API exists and `api.ts` already wraps it. `InventoryView` should be switched off mock data.
-> Backed by the `Product` model — there is deliberately no separate `MenuItem`.
+**Authorization (two layers).** `RolesGuard` is a role *floor*; the real boundary is `ProductsService.assertCanManage`: caller must be the business's `ownerId` **or** `MODERATOR`/`ADMIN`/`SUPER_ADMIN`. A `BUSINESS_OWNER` touching another owner's business/item gets **403**; an unknown or soft-deleted business/item gets **404**; anonymous gets **401**. `SUPPORT` passes the role floor (hierarchy quirk, CURRENT_STATE bug #9) but is rejected with 403 by the service check.
+
+**Public list behaviour (changed Phase 10).** `GET /businesses/:id/menu` now 404s for any business that is not `APPROVED` (DRAFT/PENDING/REJECTED/SUSPENDED/HIDDEN), matching `GET /businesses/:id`. Before Phase 10 it served the catalog of unpublished businesses. Items filtered: `isActive = true`, `deletedAt IS NULL`; ordered `sortOrder, createdAt`.
+
+**`POST` body (`CreateMenuItemDto`):** `name` (required, ≤200 chars), `price` (required, **integer** so'm ≥ 0), `description?`, `photo?` (URL ≤500 chars — stored as `imageUrl`), `type?` (`PRODUCT` \| `SERVICE`, **Phase 10**; DB default `PRODUCT`), `categoryId?` (**Phase 10**; must reference a non-deleted category, else 404). The slug is server-generated and unique per business (`osh`, `osh-2`, …).
+
+**`PATCH` body (`UpdateMenuItemDto`):** every create field optional, plus `isAvailable?` (soft "sold out" flag, item stays listed) and `isActive?` (**Phase 10** — the publish switch; `false` hides the item from the public catalog, from `GET /businesses/:id`, and from product full-text search). Absent fields are left untouched. Unknown fields (e.g. `businessId`, `ownerId`) are rejected with 400 by the global `forbidNonWhitelisted` ValidationPipe, so an item cannot be moved to another business.
+
+Not editable through this API (no columns or deliberately server-owned): SKU, stock quantity (do not exist — D-61), `slug`, `sortOrder`, `priceMax`, `currency`, `unit`.
 
 ---
 
@@ -405,7 +413,7 @@ Verified by comparing every path in `src/` against the route list.
 | Advertisements (any path) | **Not built.** Deferred to Phase 2 with Click payments. |
 | Payments / subscriptions | **Not built.** No provider, no billing model. |
 | Telegram / Google OAuth | **Not built.** Signup shows the buttons. |
-| `/me/products` | Never existed — the real path is `/businesses/:id/menu`. |
+| `/me/products` | Never existed — the real paths are `/businesses/:id/menu` (public) and `/me/businesses/:id/menu` (owner, Phase 10). |
 
 ---
 

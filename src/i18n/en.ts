@@ -418,6 +418,10 @@ const en: Record<keyof typeof uz, string> = {
   "businessClaim.statusRejected": "Rejected",
   "businessClaim.myClaimsTitle": "My claims",
   "businessClaim.errorConflict": "This business is already claimed, or you already have a pending claim for it.",
+
+  "common.retry": "Try again",
+  "menuLoadFailed": "Could not load the menu",
+  "menuLoadFailedBody": "There was a connection problem. Please try again.",
 };
 
 export default en;

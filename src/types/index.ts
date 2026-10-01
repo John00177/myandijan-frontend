@@ -104,14 +104,43 @@ export interface Review {
   reply?: ReviewReply | null;
 }
 
+export type ProductTypeValue = "PRODUCT" | "SERVICE";
+
+/**
+ * A catalog item. Backed by the `Product` table (there is no separate MenuItem
+ * model — "menu" is just the catalog view of it), and ProductsService returns
+ * every scalar column, so these are real fields rather than a guessed subset.
+ *
+ * `isActive` vs `isAvailable`: isActive is the publish switch — false hides the
+ * item from GET /businesses/:id/menu and from GET /search?type=product
+ * entirely. isAvailable is the softer "temporarily sold out" flag and leaves
+ * the item listed. Only the owner catalog view ever sees isActive: false items.
+ */
 export interface MenuItem {
   id: number;
   businessId: number;
+  categoryId?: number | null;
+  type?: ProductTypeValue;
   name: string;
+  slug?: string;
   description?: string | null;
   imageUrl?: string | null;
   price?: number | string | null;
+  currency?: string;
+  unit?: string;
   isAvailable?: boolean;
+  isActive?: boolean;
+  sortOrder?: number;
+}
+
+/** Shared by POST /businesses/:id/menu and PATCH /menu/:id (all optional there). */
+export interface MenuItemPayload {
+  name: string;
+  price: number;
+  description?: string;
+  photo?: string;
+  type?: ProductTypeValue;
+  categoryId?: number;
 }
 
 export interface Business {

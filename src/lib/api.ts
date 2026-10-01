@@ -21,6 +21,7 @@ import type {
   Lang,
   LoginPayload,
   MenuItem,
+  MenuItemPayload,
   MyClaim,
   MyBranch,
   MyBranchHour,
@@ -311,22 +312,32 @@ export function updateBusinessHours(
   return authedPutJson<MyBranchHour[]>(`/businesses/${id}/hours`, hours);
 }
 
-// MENU  (Product under the hood — see the backend's products module for why
-// there's no separate MenuItem model.)
+// CATALOG / MENU  (Product under the hood — see the backend's products module
+// for why there's no separate MenuItem model.)
+
+/** PUBLIC: active items of an APPROVED business. Used by the business page. */
 export function getBusinessMenu(businessId: number): Promise<MenuItem[]> {
   return request<MenuItem[]>(`/businesses/${businessId}/menu`);
 }
 
-export function createMenuItem(
-  businessId: number,
-  payload: { name: string; price: number; description?: string; photo?: string },
-): Promise<MenuItem> {
+/**
+ * OWNER: the management view of the same catalog. Distinct from
+ * getBusinessMenu because it also returns deactivated (isActive: false) items —
+ * without those, a deactivated item would vanish from the owner's own list and
+ * could never be switched back on — and it works for a business that is still
+ * PENDING approval. Ownership is enforced server-side (403 otherwise).
+ */
+export function getMyBusinessMenu(businessId: number): Promise<MenuItem[]> {
+  return request<MenuItem[]>(`/me/businesses/${businessId}/menu`);
+}
+
+export function createMenuItem(businessId: number, payload: MenuItemPayload): Promise<MenuItem> {
   return authedPostJson<MenuItem>(`/businesses/${businessId}/menu`, payload);
 }
 
 export function updateMenuItem(
   id: number,
-  payload: { name?: string; price?: number; description?: string; photo?: string; isAvailable?: boolean },
+  payload: Partial<MenuItemPayload> & { isAvailable?: boolean; isActive?: boolean },
 ): Promise<MenuItem> {
   return authedPatchJson<MenuItem>(`/menu/${id}`, payload);
 }

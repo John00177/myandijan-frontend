@@ -418,6 +418,10 @@ const ru: Record<keyof typeof uz, string> = {
   "businessClaim.statusRejected": "Отклонено",
   "businessClaim.myClaimsTitle": "Мои заявки",
   "businessClaim.errorConflict": "Этот бизнес уже закреплён за владельцем, или у вас уже есть заявка на рассмотрении.",
+
+  "common.retry": "Повторить",
+  "menuLoadFailed": "Не удалось загрузить меню",
+  "menuLoadFailedBody": "Проблема с подключением. Попробуйте снова.",
 };
 
 export default ru;

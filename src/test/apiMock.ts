@@ -6,6 +6,7 @@ import type {
   Category,
   District,
   EventDetail,
+  MenuItem,
   MyClaim,
   PaginatedResponse,
   Region,
@@ -164,6 +165,36 @@ export const mockMyClaim: MyClaim = {
   business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar" },
   reviewedBy: null,
 };
+
+export const mockMenuItem: MenuItem = {
+  id: 1,
+  businessId: 1,
+  categoryId: 1,
+  type: "PRODUCT",
+  name: "Osh",
+  description: "Milliy taom",
+  imageUrl: null,
+  price: "25000",
+  currency: "UZS",
+  unit: "PCS",
+  isAvailable: true,
+  isActive: true,
+};
+
+export const mockMyBusiness = {
+  id: 1,
+  slug: "soy-milliy-taomlar",
+  name: "Soy milliy taomlar",
+  status: "APPROVED" as const,
+};
+
+export const getBusinessMenu = vi.fn().mockResolvedValue([]);
+export const getMyBusinessMenu = vi.fn().mockResolvedValue([]);
+export const getMyBusinesses = vi.fn().mockResolvedValue([mockMyBusiness]);
+export const createMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
+export const updateMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
+export const deleteMenuItem = vi.fn().mockResolvedValue(undefined);
+export const uploadImage = vi.fn().mockResolvedValue({ url: "https://example.test/photo.jpg" });
 
 export const createClaim = vi.fn().mockResolvedValue(mockMyClaim);
 export const getMyClaims = vi

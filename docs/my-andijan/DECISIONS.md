@@ -293,9 +293,9 @@
 **Rationale.** The generator fetches live data from the production API (`VITE_API_URL`/`SITE_URL` env-driven). Wiring it into `npm run build` would make every build — including the Phase 3 CI workflow's `npm run build` step on every push/PR — depend on a network call to production. That's a behavior change to CI (an external dependency, and a flaky-network failure mode) that wasn't asked for and wasn't evaluated for safety.
 **Consequence.** The file will go stale again as new businesses are added. Revisit by adding a scheduled job (cron, GitHub Actions on a schedule, or a manual step in the deploy checklist) — deliberately not decided here.
 
-### D-54 · What "Inventory" means for `InventoryView` ⚠️ NEEDS DECISION
+### D-54 · What "Inventory" means for `InventoryView` ✅ RESOLVED in Phase 10 → D-61
 **Tension found.** The owner dashboard's mock `Product` type has `sku` and `quantity` (stock-keeping). The real backend catalog (`GET/POST /businesses/:id/menu`) has neither — it's `name`/`description`/`price`/`imageUrl`/`isAvailable` only, matching a restaurant-menu use case, not a warehouse.
-**Not decided.** Whether "Inventory" should become the existing menu/catalog concept (drop SKU/quantity from the UI) or gain real stock-tracking fields (a schema change). Implementing either without an answer would either silently narrow the feature or add columns nobody asked for.
+**Resolution (2026-10-01).** "Inventory" is the existing product & service **catalog**, not stock tracking. SKU/quantity are dropped from the UI; no schema change. See D-61.
 
 ---
 
@@ -345,6 +345,22 @@
 
 ---
 
+## Phase 10 — Product & service catalog integration (2026-10-01)
+
+### D-61 · "Inventory" is the product/service catalog; no SKU or stock quantity 🔒 LOCKED
+**Decision.** Resolves D-54. `InventoryView` manages the existing `Product` catalog — name, type (`PRODUCT`/`SERVICE`), category, price, description, photo, published (`isActive`). The mock SKU and quantity fields, the low-stock KPI and `mockData.ts` were removed. No migration.
+**Rationale.** Phase 10's scope settled the question: *"manage price/name/description/category/image fields only where supported by the current schema/API"* and *"Do NOT invent new product fields."* `Product` has no stock columns; keeping SKU/quantity inputs would have meant a form whose values are silently discarded on save.
+**Why locked.** `ProductModal`/`ProductRow`/`InventoryView`, their tests, and the DTOs all depend on this exact field set.
+**Revisit when.** Real stock tracking is requested. It belongs behind the existing Phase-2 `BusinessType.inventoryEnabled`/`warehouseEnabled` flags (capability rows, D-07), as new schema, not as columns bolted onto `Product`.
+
+### D-62 · Public catalog is APPROVED-only; owners read through a separate `/me` endpoint 🔒 LOCKED
+**Decision.** `GET /businesses/:id/menu` (public) now 404s unless the business is `APPROVED`, and still lists only `isActive` items. A new `GET /me/businesses/:id/menu` (owner-or-MODERATOR+, any business status, includes deactivated items) backs the owner dashboard. `PATCH /menu/:id` now accepts `isActive`, `type`, `categoryId`; `POST` accepts `type`, `categoryId` (validated against non-deleted categories).
+**Rationale.** (1) The public route served catalogs of DRAFT/PENDING/SUSPENDED/HIDDEN businesses, the one part of an unpublished listing the rest of the public API withheld (`GET /businesses/:id` already 404s for them). (2) Once owners can deactivate items, a public-only list would hide them from their own owner forever — a management read is needed. It is not a duplicate endpoint: different audience, filters and authorization. It lives under `/me` alongside `/me/businesses`, `/me/claims`, etc.
+**Why locked.** `InventoryView` calls the `/me` route; `products.service.spec.ts` and `catalog.authorization.spec.ts` assert both visibility rules.
+**Left as-is (noted).** `GET /businesses/:id` additionally gates its embedded `products` on `BusinessType.catalogEnabled`; the menu endpoint does not. Aligning them would visibly hide existing catalogs and was outside Phase 10's scope.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
@@ -361,5 +377,5 @@ Listed because their absence is itself the finding, and because each will otherw
 | ⚠️ 8 | **Why is analytics ingestion unwired?** | 3 endpoints exist, nothing calls them, and no comment or note explains whether this was deferred or forgotten |
 | ⚠️ 9 | **What happens to `Notification` and `PlatformSetting`?** | Both tables exist and are entirely unused; `AdminSettingsView` is the missing consumer of the latter |
 | ⚠️ 10 | **Is `restaurantMock` acceptable in production?** | Users currently see invented cuisine/price/delivery data (D-24) |
-| ⚠️ 11 | **What does "Inventory" mean for `InventoryView`?** | Mock UI assumes stock/SKU tracking; the real backend catalog has neither (D-54) |
+| ✅ 11 | ~~**What does "Inventory" mean for `InventoryView`?**~~ | **Resolved Phase 10:** it is the product/service catalog; no SKU/stock (D-54 → D-61) |
 | ⚠️ 12 | **Should the claim flow create real `BusinessClaim` records?** | No endpoint anywhere creates one today, so `GET /me/claims`/`GET /admin/claims` can never show data (Phase 4/5 audits) |

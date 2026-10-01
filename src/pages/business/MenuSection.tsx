@@ -1,4 +1,4 @@
-import { Plus, Trash2, UtensilsCrossed } from "lucide-react";
+import { Plus, Trash2, TriangleAlert, UtensilsCrossed } from "lucide-react";
 import { useEffect, useState } from "react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
@@ -159,6 +159,8 @@ export default function MenuSection({ businessId, canManage }: MenuSectionProps)
   const { t } = useLanguage();
   const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -166,13 +168,17 @@ export default function MenuSection({ businessId, canManage }: MenuSectionProps)
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setLoadFailed(false);
     getBusinessMenu(businessId)
       .then((data) => {
         if (!cancelled) setItems(data);
       })
       .catch(() => {
-        // Empty menu reads the same as a failed fetch here — either way
-        // there's nothing to show, and the page shouldn't hard-fail over it.
+        // A failed fetch is NOT the same as an empty menu: showing "no menu
+        // yet" for a request that never succeeded tells the customer this
+        // business has nothing to sell, which may be false. Report it and
+        // offer a retry instead.
+        if (!cancelled) setLoadFailed(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -180,7 +186,7 @@ export default function MenuSection({ businessId, canManage }: MenuSectionProps)
     return () => {
       cancelled = true;
     };
-  }, [businessId]);
+  }, [businessId, reloadKey]);
 
   async function handleAdd(form: AddItemFormState, photo: File | null) {
     setAddError(null);
@@ -241,7 +247,15 @@ export default function MenuSection({ businessId, canManage }: MenuSectionProps)
         </div>
       )}
 
-      {items.length === 0 ? (
+      {loadFailed ? (
+        <EmptyState
+          icon={TriangleAlert}
+          title={t("menuLoadFailed")}
+          body={t("menuLoadFailedBody")}
+          actionLabel={t("common.retry")}
+          onAction={() => setReloadKey((n) => n + 1)}
+        />
+      ) : items.length === 0 ? (
         <EmptyState icon={UtensilsCrossed} title={t("noMenuYet")} body={t("noMenuDescription")} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

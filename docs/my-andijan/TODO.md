@@ -76,7 +76,7 @@
 ### Fake / non-persisting implementations
 - [ ] **`AdminSettingsView`** — platform name, contact email, Telegram, default language, maintenance toggle all in `useState`; **saves nothing**, shows success **[REVIEW]**
 - [ ] **dashboard `SettingsView`** — 7-day hours form persists nothing, while `PUT /businesses/:id/hours` exists and works **[REVIEW]**
-- [ ] **`InventoryView`** — mock rows labelled "Demo" while `/businesses/:id/menu` + `/menu/:id` exist and `api.ts` already wraps them **[REVIEW]**
+- [x] **`InventoryView`** — **done, Phase 10.** Real product/service catalog (create/edit/publish-hide/delete) on `GET /me/businesses/:id/menu` + `POST/PATCH/DELETE`; `mockData.ts` deleted; SKU/quantity dropped (D-61) **[REVIEW]**
 - [x] **`AdminReviewsView`** — **done, Phase 6.** Real list + hide/restore, mock data (`adminMockData.ts`) deleted **[REVIEW]**
 - [ ] **`restaurantMock.ts`** — production restaurant cards show cuisine, price bucket, tags and delivery time derived from `Math.sin(id * k)`. Deterministic, honestly labelled in code, **invented** **[REVIEW]**
 - [ ] **Home hero weather is a placeholder** — `src/pages/home/HeroSection.tsx:30` `// TODO: Replace with real weather API` **[CODE]**
@@ -96,7 +96,13 @@
 - [ ] `src/lib/api.ts` — *"Business creation. Confirmed absent … POST /businesses … 404."* **It exists** **[REVIEW]**
 - [x] `src/lib/api.ts` — *"genuinely absent → /admin/reviews, /admin/audit-logs, /admin/settings (404)."* Corrected: `/admin/audit` exists; review hide/restore/list all exist (Phase 6); only `/admin/settings` is genuinely absent **[REVIEW]**
 - [ ] `src/contexts/AuthContext.tsx` — *"the backend has no profile-update endpoint or age/gender columns yet."* **`PATCH /users/me` exists; the columns were added in `20260815150053_add_profile_fields`** **[REVIEW]**
-- [ ] `src/pages/dashboard/mockData.ts` — *"Products/inventory have no backend at all."* **It has one** **[REVIEW]**
+- [x] `src/pages/dashboard/mockData.ts` — *"Products/inventory have no backend at all."* **File deleted, Phase 10** **[REVIEW]**
+
+### Catalog follow-ups (found in Phase 10, not in its scope)
+- [ ] **`catalogEnabled` inconsistency** — `GET /businesses/:id` hides embedded products when `BusinessType.catalogEnabled = false`; `GET /businesses/:id/menu` ignores the flag. Needs a product decision before aligning (would hide existing catalogs) **[REVIEW]**
+- [ ] **Owner UI for `isAvailable` ("sold out"), `sortOrder` (reordering), `priceMax`/`unit`** — schema + PATCH support exist, no controls **[REVIEW]**
+- [ ] **Inline `MenuSection` owner controls** offer add/delete only (no edit/hide) — full management is in the dashboard; consider linking there instead **[REVIEW]**
+- [ ] **Product hits in the public search UI** — still deferred from Phase 8 **[REVIEW]**
 - [ ] `docs/SSG.md` — *"the API returns zero businesses."* **It returns 4** **[REVIEW]**
 
 ---

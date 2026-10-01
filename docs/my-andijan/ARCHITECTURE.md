@@ -202,7 +202,7 @@ Each feature module follows the same shape: `*.module.ts`, `*.controller.ts`, `*
 | Reviews | 6 | `/reviews/*` |
 | Geography | 5 | `/geography/*` |
 | Events | 4 | `/events/*` |
-| Products | 4 | `/businesses/:id/menu`, `/menu/:id` |
+| Products | 5 | `/businesses/:id/menu`, `/me/businesses/:id/menu` (Phase 10), `/menu/:id` |
 | Categories | 3 | `/categories/*` |
 | Favorites | 3 | `/favorites/*` |
 | Health Score | 3 | `/me/health-score*`, `/admin/health-scores/recalculate` |
@@ -590,7 +590,7 @@ A full route-by-route audit compared all 118 backend HTTP routes against `myandi
 - **~42 of 118 routes are called from the frontend** (up from ~38 — see Phase 4 connections below); ~76 have no frontend caller.
 - **Controllers with zero frontend usage:** `command-center` (9 routes), `health-score` (3 routes), `search` (`GET /search`), most of `geography` beyond `regions`, most of `categories` beyond the tree (until Phase 4 added `/categories/homepage`), and the standalone `reviews.controller.ts` routes (the app instead goes through `/businesses/:id/reviews` and `/me/reviews`).
 - **No route in the frontend calls a backend path that doesn't exist** — `lib/api.ts` is fully consistent with the live route table (two stale 2026-08-13 code comments claim otherwise; the routes they reference now exist).
-- **Dead code in `lib/api.ts`:** `register` (signup uses OTP instead), `getUserAnalytics`, `updateAdminBusiness`, `updateMenuItem`, `replyToReview`'s underlying `POST /reviews/:id/reply` (the PATCH alias is what's actually called) are exported but never imported anywhere.
+- **Dead code in `lib/api.ts`:** `register` (signup uses OTP instead), `getUserAnalytics`, `updateAdminBusiness`, `updateMenuItem` (now used by `InventoryView` since Phase 10), `replyToReview`'s underlying `POST /reviews/:id/reply` (the PATCH alias is what's actually called) are exported but never imported anywhere.
 
 ### Phase 4 connections (implemented this pass)
 
@@ -615,7 +615,7 @@ A 20-capability MVP gap matrix (geography through audit logging) was built again
 
 ### Evaluated and explicitly NOT implemented (require a product decision)
 
-- **Owner "Inventory" management (`InventoryView`).** The mock `Product` type carries `sku` and `quantity` (stock-keeping fields); the real backend's menu/catalog model (`GET/POST /businesses/:id/menu`) has neither — it's a simple name/description/price/photo/availability catalog, with no stock concept at all. Wiring `InventoryView` to the real API as-is would silently drop SKU/quantity from the UI, reframing "inventory management" as "menu management." Building stock tracking for real would need new schema fields. **This needs a decision: is "Inventory" meant to be warehouse/stock tracking (new schema work) or the existing menu/catalog concept (drop SKU/quantity from the UI)?** Not implemented either way.
+- **Owner "Inventory" management (`InventoryView`).** The mock `Product` type carries `sku` and `quantity` (stock-keeping fields); the real backend's menu/catalog model (`GET/POST /businesses/:id/menu`) has neither — it's a simple name/description/price/photo/availability catalog, with no stock concept at all. Wiring `InventoryView` to the real API as-is would silently drop SKU/quantity from the UI, reframing "inventory management" as "menu management." Building stock tracking for real would need new schema fields. ~~This needs a decision~~ — **resolved and implemented in Phase 10 as the catalog concept (D-61), see §27.**
 - **Admin review moderation (`GET /admin/reviews` doesn't exist).** Deprioritized in Phase 5 to keep that batch small; **implemented in Phase 6, see §23.**
 - **Admin claims moderation UI.** Skipped for the same reason as Phase 4: no endpoint anywhere creates a `BusinessClaim` row, so a moderation queue would always be empty.
 
@@ -791,3 +791,55 @@ Through the existing `AdminService.writeAudit` (`AuditLog`): approve writes `UPD
 - **Pending state on the business page after reload** — the CTA reappears (the page doesn't fetch the caller's claims); a resubmit returns the 409 conflict message. Status is authoritative on `ProfilePage`.
 - **Rejection reason on `ProfilePage`** — shown to admins, not yet to claimants.
 - **Owner-initiated verification workflow** (documents, SMS/call) — verification is admin-initiated only.
+
+## 27. Product & service catalog — 2026-10-01 (Phase 10)
+
+Owners manage a real catalog; customers see it on the business page. The backend CRUD already existed (Phase 3); the owner dashboard was 100 % mock. No migration — every field used already existed on `Product`.
+
+### Data model (unchanged)
+
+`Product`: `businessId`, `categoryId?`, `type` (`PRODUCT` \| `SERVICE`), `name`, `slug` (unique per business, server-generated), `description`, `imageUrl`, `price` (integer so'm), `priceMax`, `currency`, `unit`, `isAvailable`, `isActive`, `sortOrder`, `deletedAt`. Two flags with different meanings:
+
+- **`isActive`** — the **publish switch**. `false` removes the item from the public catalog, from `GET /businesses/:id`'s embedded `products`, and from product FTS (`SearchService` already filters `p.is_active = true`). Owner UI: "E'lon qilingan" / "Yashirilgan".
+- **`isAvailable`** — soft "sold out"; item stays listed. Settable via PATCH, not surfaced in the owner UI this phase.
+
+"Inventory" means this catalog — no SKU, no stock quantity (D-61, resolving D-54).
+
+### Endpoints
+
+| Route | Audience | Visibility |
+| --- | --- | --- |
+| `GET /businesses/:id/menu` | public | `APPROVED` business only (404 otherwise — **changed**); `isActive` items |
+| `GET /me/businesses/:id/menu` | owner / MODERATOR+ (**new**) | any business status; all non-deleted items incl. deactivated |
+| `POST /businesses/:id/menu` | owner / MODERATOR+ | + `type`, `categoryId` (**new**) |
+| `PATCH /menu/:id` | owner / MODERATOR+ | + `type`, `categoryId`, `isActive` (**new**) |
+| `DELETE /menu/:id` | owner / MODERATOR+ | soft delete |
+
+The owner endpoint is a separate read, not a duplicate: once deactivation is possible a public-only list would hide an item from its own owner, and a business at `PENDING` needs its catalog filled before approval (D-62).
+
+### Authorization
+
+Two layers. `RolesGuard` (`@Roles(BUSINESS_OWNER, MODERATOR, ADMIN, SUPER_ADMIN)`) is a floor: `CUSTOMER` and anonymous are rejected there. The boundary is `ProductsService.assertCanManage(business, user)`: `business.ownerId === user.id` **or** role ≥ `MODERATOR`. Every write resolves the target first — `getBusinessOrThrow` for create/owner-list, `getOwnedProduct` (product → its `business`) for update/delete — so an owner cannot read, edit or delete another owner's items (403), and an unknown/soft-deleted target is 404. DTOs contain no `businessId`, and the global `ValidationPipe({ whitelist, forbidNonWhitelisted })` rejects one if sent (400), so an item can't be re-parented. `categoryId` is validated against non-deleted categories (404). Known quirk: `SUPPORT` (rank 3) clears the `BUSINESS_OWNER` floor but is stopped by the service check — tests pin both halves.
+
+### Search compatibility
+
+Untouched: `product_search_doc`, `search_normalize`, product FTS indexes and `GET /search?type=product` have no changes. Setting `categoryId` makes an item match the product branch's category filter (`pc.slug`); deactivating removes it from product hits via the existing `is_active` filter.
+
+### Frontend
+
+- **`InventoryView`** (owner dashboard): `getMyBusinesses` → business picker (only shown with >1 business) → `useAdminResource(getMyBusinessMenu)`. KPIs: total / published / services. States: loading skeleton, no-business, empty, forbidden (403), error with retry. Create/edit through `ProductModal`; inline publish/hide toggle and two-step delete in `ProductRow`; photo uploads first via `uploadImage`, then the item is saved with the returned URL. Save errors stay inside the modal. Uzbek-only, like every other dashboard view.
+- **`ProductModal`/`ProductRow`** rebuilt on real fields — name, type, category (real `GET /categories`), price, description, photo, published.
+- **`MenuSection`** (business detail page, customer): already used the real public endpoint; now distinguishes a **failed** request (new `menuLoadFailed` error state + retry, localized uz/ru/en) from a genuinely **empty** menu, which it previously conflated.
+- `src/pages/dashboard/mockData.ts` deleted.
+
+### Tests
+
+- Backend: `products.service.spec.ts` (19 — public/owner visibility, cross-owner 403, MODERATOR allowed, SUPPORT non-owner 403, category validation, slug suffixing, partial PATCH, soft delete), `catalog.authorization.spec.ts` (32 — real decorator metadata, every role on every catalog route).
+- Frontend: `InventoryView.test.tsx` (16), `MenuSection.test.tsx` (8).
+
+### Deliberately not implemented
+
+- **`catalogEnabled` gate on the menu endpoint.** `GET /businesses/:id` hides embedded products when `BusinessType.catalogEnabled` is false; `GET /businesses/:id/menu` does not check it. Aligning them would visibly hide existing catalogs — left for a product decision.
+- **Reordering (`sortOrder`), `priceMax`/`unit`/`currency`, `isAvailable` toggle** in the owner UI — supported by the schema, not requested.
+- **Product hits in public search UI** — still deferred (Phase 8).
+- **Edit/hide in the inline `MenuSection` owner controls** — the business page keeps its existing add/delete shortcut; full management lives in the dashboard.
