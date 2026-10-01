@@ -328,17 +328,20 @@ Four sub-scores (profile, engagement, visibility, response) plus a weighted `ove
 
 ---
 
-## 15. Admin — `/admin` (34 routes; +3 in Phase 11)
+## 15. Admin — `/admin` (35 routes; +3 in Phase 11, +1 in Phase 14)
+
+> **Phase 14 (D-72/D-73).** `MODERATOR` now reaches `GET /admin/businesses` (owner returned as `{ id, fullName }`; `phone`/`email` only for ADMIN+), review list/hide/restore and report list/resolve (reporter returned as `{ id }`; name only for ADMIN+), in addition to business approve/reject. **New `PATCH /admin/businesses/:id/unhide`** (`SUPER_ADMIN`): only from `HIDDEN` (`409` otherwise); restores `statusBeforeHide` (recorded by `…/hide`) or `PENDING` if none. Approve/reject, review hide/restore, report resolve, hide and unhide are compare-and-set — `409` when another moderator acted first.
 
 Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route overrides in **both** directions. Every business operation below is pinned by `business-ops.authorization.spec.ts` (real decorator metadata, every role). All return `401` anonymous, `403` below the floor, `404` unknown/soft-deleted business, `409` when the business isn't in the state the operation needs.
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
 | GET | `/admin/stats` | `ADMIN` | Platform stats | ✅ |
-| GET | `/admin/businesses` | `ADMIN` | List businesses (paginated; `?status=` any `BusinessStatus`, `?district=`, `?search=`) | ✅ (status filter server-side since Phase 11) |
+| GET | `/admin/businesses` | **`MODERATOR`** ↓ (Phase 14; owner PII ADMIN+ only) | List businesses (paginated; `?status=` any `BusinessStatus`, `?district=`, `?search=`) | ✅ (status filter server-side since Phase 11) |
 | POST | `/admin/businesses/:id/approve` | **`MODERATOR`** ↓ | Approve | ✅ |
 | POST | `/admin/businesses/:id/reject` | **`MODERATOR`** ↓ | Reject — body `{ reason }` **required** (`@IsNotEmpty`) | ✅ |
-| PATCH | `/admin/businesses/:id/hide` | **`SUPER_ADMIN`** ↑ | Hide (any status → `HIDDEN`). **No unhide route** — the prior status isn't stored, so restoring needs a product decision (deferred, D-63) | **⭕** (deferred) |
+| PATCH | `/admin/businesses/:id/hide` | **`SUPER_ADMIN`** ↑ | Hide (any status → `HIDDEN`); records the prior status in `statusBeforeHide` (Phase 14) | ✅ **(Phase 14)** |
+| PATCH | `/admin/businesses/:id/unhide` | **`SUPER_ADMIN`** ↑ | **New Phase 14.** `HIDDEN` → recorded `statusBeforeHide`, else `PENDING`; clears the column; audited `RESTORE` | ✅ **(Phase 14)** |
 | PATCH | `/admin/businesses/:id` | `ADMIN` | Edit `name`/`description`/`categoryId` | ✅ |
 | PATCH | `/admin/businesses/:id/branch` | `ADMIN` | Edit the **primary** branch's `phone`/`address`/`districtId` | ✅ |
 | POST | `/admin/businesses/:id/verify` | `ADMIN` | Set `isVerified` (+ `verifiedAt`/`verifiedById`). `409` if already verified | ✅ **(Phase 11)** |
@@ -350,11 +353,11 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | GET | `/admin/claims` | `ADMIN` | List claims (paginated, `?status=PENDING\|APPROVED\|REJECTED`); each row includes evidence, contact, claimant and business — there is no separate detail endpoint | ✅ **(Phase 9)** |
 | POST | `/admin/claims/:id/approve` | `ADMIN` | Approve → atomically sets `Business.ownerId` (only if still null), promotes a `CUSTOMER` claimant to `BUSINESS_OWNER`, auto-rejects other pending claims on that business. `404` unknown claim, `409` already reviewed / business already owned / lost a concurrent race | ✅ **(Phase 9)** |
 | POST | `/admin/claims/:id/reject` | `ADMIN` | Reject with required `reason`; never touches ownership or roles. `409` if already reviewed | ✅ **(Phase 9)** |
-| GET | `/admin/reports` | `ADMIN` | List **review** reports (`ReviewReport`; no business-report model exists), paginated, `?status=PENDING\|RESOLVED\|DISMISSED`. Fed by `POST /reviews/:id/report` since Phase 12 | ✅ **(Phase 12)** `AdminReportsView` |
-| POST | `/admin/reports/:id/resolve` | `ADMIN` | Body `{ action: HIDE_REVIEW \| DISMISS, note? }`. `HIDE_REVIEW` → report `RESOLVED` + review hidden + aggregates recalculated; `DISMISS` → report **`DISMISSED`** (Phase 11 fix — was stored as `RESOLVED`). `409` if already handled | ✅ **(Phase 12)** |
-| GET | `/admin/reviews` | `ADMIN` | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |
-| POST | `/admin/reviews/:id/hide` | `ADMIN` | Hide a review | ✅ |
-| POST | `/admin/reviews/:id/restore` | `ADMIN` | Restore a review | ✅ |
+| GET | `/admin/reports` | **`MODERATOR`** ↓ (Phase 14; reporter name ADMIN+ only) | List **review** reports (`ReviewReport`; no business-report model exists), paginated, `?status=PENDING\|RESOLVED\|DISMISSED`. Fed by `POST /reviews/:id/report` since Phase 12 | ✅ **(Phase 12)** `AdminReportsView` |
+| POST | `/admin/reports/:id/resolve` | **`MODERATOR`** ↓ (Phase 14) | Body `{ action: HIDE_REVIEW \| DISMISS, note? }`. `HIDE_REVIEW` → report `RESOLVED` + review hidden + aggregates recalculated; `DISMISS` → report **`DISMISSED`** (Phase 11 fix — was stored as `RESOLVED`). `409` if already handled | ✅ **(Phase 12)** |
+| GET | `/admin/reviews` | **`MODERATOR`** ↓ (Phase 14) | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |
+| POST | `/admin/reviews/:id/hide` | **`MODERATOR`** ↓ (Phase 14) | Hide a review | ✅ |
+| POST | `/admin/reviews/:id/restore` | **`MODERATOR`** ↓ (Phase 14) | Restore a review | ✅ |
 | GET | `/admin/events` | `ADMIN` | List events | ✅ |
 | POST | `/admin/events/:id/approve` | `ADMIN` | Approve | **⭕** |
 | POST | `/admin/events/:id/reject` | `ADMIN` | Reject | **⭕** |

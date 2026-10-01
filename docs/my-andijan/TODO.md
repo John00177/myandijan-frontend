@@ -48,11 +48,11 @@
 - [ ] **Admin endpoints still without UI** — hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
 - [x] **Enable Railway auto-deploy (owner action)** — **done and verified 2026-10-01**: auto-deploy `enabled=true` + Wait for CI; push of `ded7b7a` auto-deployed as `6b81b152`. Original root cause (Phase 13): `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`. Connect a GitHub account with access to `John00177/my-andijan-api` to Railway, grant the Railway GitHub App access to the repo, turn Auto Deploy (+ Wait for CI) on, then verify with a harmless push. Exact steps: `ENVIRONMENT.md` → "Deployment pipeline" **[VERIFIED]**
 - [ ] **Gate Vercel production on CI** — Vercel deploys on push independently of GitHub Actions; configure Vercel Deployment Checks for `test-and-build` (couldn't be verified/changed via API: 403) **[REVIEW]**
-- [ ] **Business unhide** — needs a decision on which status a HIDDEN listing returns to; three concrete options listed in D-69 **[REVIEW]**
+- [x] **Business unhide** — **done, Phase 14**: restores the status recorded at hide time, else PENDING (D-73) **[REVIEW]**
 - [x] **User-side "report this review"** + admin reports queue — **done, Phase 12** (D-70) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**
 - [ ] **Expired promotions still sort first in `GET /businesses`** — `orderBy isPromoted desc` ignores `promotedUntil` (ranking change, out of Phase 11 scope) **[CODE]**
-- [ ] **MODERATOR can't use the admin UI** — the API grants MODERATOR business approve/reject but every admin read (businesses, stats, reviews, reports, claims) is ADMIN-only, so there is nothing to list. Needs the privilege decision in D-68 before any UI change **[REVIEW]**
+- [x] **MODERATOR admin access** — **done, Phase 14**: least-privilege moderation surface with owner/reporter PII redacted (D-72) **[REVIEW]**
 - [x] `GET /me/claims` — **done, Phase 9**: claim status on `ProfilePage`; `POST /me/claims` added so claims can actually be created **[REVIEW]**
 - [ ] **Claims follow-ups (non-blocking, Phase 9):** show the rejection reason to the claimant on `ProfilePage`; show "pending" on `BusinessDetailPage` after reload instead of the CTA; audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**

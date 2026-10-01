@@ -395,12 +395,12 @@
 **Decision.** Supersedes the "deferred" half of D-65. Any signed-in user (JwtAuthGuard, no role floor — the same model as writing a review) can report a review with one of the existing `ReportReason` values and an optional note. The target must be publicly visible (PUBLISHED, not deleted, on a live branch of an APPROVED business), otherwise `404`. The schema's `@@unique([reviewId, reporterId])` gives one report per user per review (`409` on repeat). `Review.reportCount` is incremented in the same transaction. The response never includes the reporter. ADMIN+ moderates the result in the new `AdminReportsView` with the two existing actions.
 **Not added (would be new rules).** No auto-hide threshold, no rate limiting beyond the unique constraint, and no ban on reporting one's own review — none exist in the current model.
 
-### D-68 · MODERATOR admin-panel access deferred — it needs a privilege decision ⚠️ NEEDS DECISION
+### D-68 · MODERATOR admin-panel access deferred — it needs a privilege decision ✅ RESOLVED in Phase 14 → D-72
 **Finding.** On the server, MODERATOR may only `POST /admin/businesses/:id/approve` and `/reject`. Every admin **read** — `GET /admin/businesses`, `/admin/stats`, `/admin/reviews`, `/admin/reports`, `/admin/claims` — is ADMIN-floor, and no other endpoint exposes PENDING businesses. A moderator therefore cannot discover what to approve, and every admin view would 403.
 **Decision.** Frontend gate left at ADMIN+ (now pinned by `AdminDashboard.access.test.tsx`) because exposing a panel whose every view fails is not "exposing what the backend permits", and widening reads was explicitly out of scope.
 **Decision needed.** Should MODERATOR get read access to `GET /admin/businesses` (it returns owner phone/email) and/or the review & report moderation routes (list + hide/restore/resolve)? Once decided, it is a per-route `@Roles` override plus showing the matching sidebar items to `MODERATOR`.
 
-### D-69 · Business unhide deferred — the restore target is a product rule ⚠️ NEEDS DECISION
+### D-69 · Business unhide deferred — the restore target is a product rule ✅ RESOLVED in Phase 14 → D-73
 **Finding.** `PATCH /admin/businesses/:id/hide` (SUPER_ADMIN) accepts **any** status (APPROVED, PENDING, REJECTED, SUSPENDED, DRAFT). `Business` has no previous-status column; the prior status survives only as JSON in the hide's `AuditLog.before` — a forensic record, not state, and absent for any status change made outside `hideBusiness`.
 **Decision.** Not implemented; the previous status is never guessed.
 **Decision needed.** When a SUPER_ADMIN unhides, should the listing (a) return to the status recorded in its hide audit entry, (b) always return to `PENDING` for re-review, or (c) return to `APPROVED` only if it was APPROVED when hidden (and otherwise to `PENDING`)? (b) and (c) are implementable without schema changes; (a) needs either reliance on the audit log or a new `statusBeforeHide` column.
@@ -413,6 +413,28 @@
 **Decision.** Both repos ship from `main`. Deployment is owned by each host's native GitHub integration (Vercel GitHub App for the frontend; Railway GitHub App for the backend, once authorized). `.github/workflows/ci.yml` stays validation-only (`npm ci`, test, build) — no deploy step, no deploy tokens in GitHub secrets.
 **Rationale.** Keeps deploy credentials out of GitHub and avoids a second, competing deploy path. Coupling to CI is done host-side: Railway's "Wait for CI" (recommended once auto-deploy is enabled) makes a red `test-and-build` block the deploy; Vercel builds on push independently of Actions; whether Vercel "Deployment Checks" are configured could not be verified (Vercel API access returned 403), so assume a commit that fails CI can still ship to the frontend — noted as a follow-up.
 **Not done.** No GitHub Actions → Railway deploy workflow was added as a workaround: it would need a Railway token in GitHub secrets and would bypass the real fix (authorizing the Railway GitHub App).
+
+---
+
+## Phase 14 — Moderator access & business restoration (2026-10-01)
+
+### D-72 · MODERATOR gets exactly the moderation surface, with owner/reporter PII redacted 🔒 LOCKED
+**Decision.** Resolves D-68 using the Phase 14 defaults (least privilege, no unnecessary PII, no SUPER_ADMIN or unrelated admin powers). Server floors on `AdminController`:
+
+| MODERATOR+ (new or unchanged) | Stays ADMIN+ | Stays SUPER_ADMIN |
+| --- | --- | --- |
+| `GET /admin/businesses` (**new**) · `POST …/approve`, `…/reject` (unchanged) · `GET /admin/reviews`, `POST /admin/reviews/:id/hide`, `…/restore` (**new**) · `GET /admin/reports`, `POST /admin/reports/:id/resolve` (**new**) | stats, business edit/branch/verify/unverify/suspend/unsuspend/promote/unpromote, claims, events, categories, geography, users, audit | `PATCH …/hide`, `PATCH …/unhide` |
+
+**PII shaping (server-side, by caller role):** `GET /admin/businesses` returns `owner { id, fullName }` to MODERATOR and `owner { id, fullName, phone, email }` to ADMIN+. `GET /admin/reports` returns `reporter { id }` to MODERATOR and `reporter { id, fullName }` to ADMIN+. Review authors (`{ id, fullName, avatarUrl }`) are already public and unchanged. The business's own contact fields (listing data) are returned to both.
+**Concurrency.** Because moderation is now shared, approve/reject business, hide/restore review and resolve report are compare-and-set (`updateMany` with the expected state; lost race → 409, nothing audited), as D-60.
+**Frontend.** `canModerate` (MODERATOR+) opens the panel; a MODERATOR sees only Bizneslar (approve/reject on PENDING rows, public link), Sharhlar and Shikoyatlar, lands on Bizneslar, and never renders ADMIN-only views. `SUPPORT` (rank 3) stays below the floor.
+**Why locked.** `business-ops.authorization.spec.ts` pins every floor in both directions (incl. MODERATOR denied stats/users/audit/events/categories/claims-adjacent business ops; SUPPORT and BUSINESS_OWNER denied everywhere); `admin.service.moderation.spec.ts` pins the redaction.
+
+### D-73 · Unhide restores the status recorded at hide time, else PENDING 🔒 LOCKED
+**Decision.** Resolves D-69 using the Phase 14 default rule. New nullable column `Business.statusBeforeHide` (migration `20261001120000_add_business_status_before_hide`, additive, no backfill). `PATCH …/hide` (SUPER_ADMIN) now writes the current status into it in the same compare-and-set update; new `PATCH …/unhide` (SUPER_ADMIN) only applies to HIDDEN (409 otherwise), restores `statusBeforeHide` if present, otherwise **PENDING** (re-review), clears the column, and audits `RESTORE` with `restoredFrom: statusBeforeHide | fallback:PENDING`.
+**Why a column, not the audit log.** The audit JSON does carry the prior status for hides made via `hideBusiness`, but it is a forensic record, not state, and businesses hidden any other way have none. Restoration never reads the audit log, never assumes APPROVED.
+**Safety basis.** No code path moves a business out of HIDDEN except unhide (approve/reject need PENDING, suspend needs APPROVED, unsuspend needs SUSPENDED), so the recorded status cannot go stale while hidden. Businesses hidden before this migration have `NULL` → restore to PENDING.
+**Why locked.** `admin.service.moderation.spec.ts` covers hide from every status, restore to every recorded status, the NULL and corrupt-`HIDDEN` fallbacks, non-hidden 409s and lost races.
 
 ---
 
@@ -433,6 +455,6 @@ Listed because their absence is itself the finding, and because each will otherw
 | ⚠️ 9 | **What happens to `Notification` and `PlatformSetting`?** | Both tables exist and are entirely unused; `AdminSettingsView` is the missing consumer of the latter |
 | ⚠️ 10 | **Is `restaurantMock` acceptable in production?** | Users currently see invented cuisine/price/delivery data (D-24) |
 | ✅ 11 | ~~**What does "Inventory" mean for `InventoryView`?**~~ | **Resolved Phase 10:** it is the product/service catalog; no SKU/stock (D-54 → D-61) |
-| ⚠️ 13 | **Should MODERATOR get admin read access?** | API lets MODERATOR approve/reject businesses but every admin list is ADMIN-only, so moderators can't use the panel (D-68) |
-| ⚠️ 14 | **What does unhide restore a HIDDEN business to?** | No previous-status column; hide accepts any status (D-69) |
+| ✅ 13 | ~~**Should MODERATOR get admin read access?**~~ | **Resolved Phase 14:** least-privilege moderation surface, owner/reporter PII redacted (D-72) |
+| ✅ 14 | ~~**What does unhide restore a HIDDEN business to?**~~ | **Resolved Phase 14:** the status recorded at hide time, else PENDING (D-73) |
 | ⚠️ 12 | **Should the claim flow create real `BusinessClaim` records?** | No endpoint anywhere creates one today, so `GET /me/claims`/`GET /admin/claims` can never show data (Phase 4/5 audits) |
