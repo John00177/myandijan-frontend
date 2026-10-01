@@ -389,6 +389,24 @@
 
 ---
 
+## Phase 12 — Moderation inputs & moderator access (2026-10-01)
+
+### D-70 · Customers report reviews via `POST /reviews/:id/report`; only visible reviews are reportable 🔒 LOCKED
+**Decision.** Supersedes the "deferred" half of D-65. Any signed-in user (JwtAuthGuard, no role floor — the same model as writing a review) can report a review with one of the existing `ReportReason` values and an optional note. The target must be publicly visible (PUBLISHED, not deleted, on a live branch of an APPROVED business), otherwise `404`. The schema's `@@unique([reviewId, reporterId])` gives one report per user per review (`409` on repeat). `Review.reportCount` is incremented in the same transaction. The response never includes the reporter. ADMIN+ moderates the result in the new `AdminReportsView` with the two existing actions.
+**Not added (would be new rules).** No auto-hide threshold, no rate limiting beyond the unique constraint, and no ban on reporting one's own review — none exist in the current model.
+
+### D-68 · MODERATOR admin-panel access deferred — it needs a privilege decision ⚠️ NEEDS DECISION
+**Finding.** On the server, MODERATOR may only `POST /admin/businesses/:id/approve` and `/reject`. Every admin **read** — `GET /admin/businesses`, `/admin/stats`, `/admin/reviews`, `/admin/reports`, `/admin/claims` — is ADMIN-floor, and no other endpoint exposes PENDING businesses. A moderator therefore cannot discover what to approve, and every admin view would 403.
+**Decision.** Frontend gate left at ADMIN+ (now pinned by `AdminDashboard.access.test.tsx`) because exposing a panel whose every view fails is not "exposing what the backend permits", and widening reads was explicitly out of scope.
+**Decision needed.** Should MODERATOR get read access to `GET /admin/businesses` (it returns owner phone/email) and/or the review & report moderation routes (list + hide/restore/resolve)? Once decided, it is a per-route `@Roles` override plus showing the matching sidebar items to `MODERATOR`.
+
+### D-69 · Business unhide deferred — the restore target is a product rule ⚠️ NEEDS DECISION
+**Finding.** `PATCH /admin/businesses/:id/hide` (SUPER_ADMIN) accepts **any** status (APPROVED, PENDING, REJECTED, SUSPENDED, DRAFT). `Business` has no previous-status column; the prior status survives only as JSON in the hide's `AuditLog.before` — a forensic record, not state, and absent for any status change made outside `hideBusiness`.
+**Decision.** Not implemented; the previous status is never guessed.
+**Decision needed.** When a SUPER_ADMIN unhides, should the listing (a) return to the status recorded in its hide audit entry, (b) always return to `PENDING` for re-review, or (c) return to `APPROVED` only if it was APPROVED when hidden (and otherwise to `PENDING`)? (b) and (c) are implementable without schema changes; (a) needs either reliance on the audit log or a new `statusBeforeHide` column.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
@@ -406,4 +424,6 @@ Listed because their absence is itself the finding, and because each will otherw
 | ⚠️ 9 | **What happens to `Notification` and `PlatformSetting`?** | Both tables exist and are entirely unused; `AdminSettingsView` is the missing consumer of the latter |
 | ⚠️ 10 | **Is `restaurantMock` acceptable in production?** | Users currently see invented cuisine/price/delivery data (D-24) |
 | ✅ 11 | ~~**What does "Inventory" mean for `InventoryView`?**~~ | **Resolved Phase 10:** it is the product/service catalog; no SKU/stock (D-54 → D-61) |
+| ⚠️ 13 | **Should MODERATOR get admin read access?** | API lets MODERATOR approve/reject businesses but every admin list is ADMIN-only, so moderators can't use the panel (D-68) |
+| ⚠️ 14 | **What does unhide restore a HIDDEN business to?** | No previous-status column; hide accepts any status (D-69) |
 | ⚠️ 12 | **Should the claim flow create real `BusinessClaim` records?** | No endpoint anywhere creates one today, so `GET /me/claims`/`GET /admin/claims` can never show data (Phase 4/5 audits) |

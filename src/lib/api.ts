@@ -5,6 +5,8 @@ import type {
   AdminClaim,
   AdminEvent,
   AdminReview,
+  AdminReviewReport,
+  ReportReasonValue,
   AdminListResult,
   AdminStats,
   AdminUser,
@@ -922,6 +924,32 @@ export async function getAdminReviews(params?: {
 }): Promise<AdminListResult<AdminReview>> {
   const raw = await request<unknown>("/admin/reviews", params);
   return normalizeAdminList<AdminReview>(raw);
+}
+
+// Review reports (Phase 12). Customers create them; ADMIN+ moderates them.
+export function reportReview(
+  reviewId: number,
+  payload: { reason: ReportReasonValue; note?: string },
+): Promise<{ id: number; reviewId: number; reason: ReportReasonValue; status: string }> {
+  return authedPostJson(`/reviews/${reviewId}/report`, payload);
+}
+
+export async function getAdminReports(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdminListResult<AdminReviewReport>> {
+  const raw = await request<unknown>("/admin/reports", params);
+  return normalizeAdminList<AdminReviewReport>(raw);
+}
+
+/** HIDE_REVIEW → report RESOLVED + review hidden; DISMISS → report DISMISSED. 409 if already handled. */
+export function resolveAdminReport(
+  id: number,
+  action: "HIDE_REVIEW" | "DISMISS",
+  note?: string,
+): Promise<AdminReviewReport> {
+  return authedPostJson<AdminReviewReport>(`/admin/reports/${id}/resolve`, note ? { action, note } : { action });
 }
 
 export function hideAdminReview(id: number): Promise<AdminReview> {

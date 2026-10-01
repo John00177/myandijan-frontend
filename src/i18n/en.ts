@@ -422,6 +422,21 @@ const en: Record<keyof typeof uz, string> = {
   "common.retry": "Try again",
   "menuLoadFailed": "Could not load the menu",
   "menuLoadFailedBody": "There was a connection problem. Please try again.",
+  "report.action": "Report",
+  "report.reasonLabel": "Reason for report",
+  "report.reason.SPAM": "Spam or advertising",
+  "report.reason.OFFENSIVE": "Offensive",
+  "report.reason.FAKE": "Fake review",
+  "report.reason.IRRELEVANT": "Off-topic",
+  "report.reason.PERSONAL_INFO": "Personal information",
+  "report.reason.OTHER": "Other",
+  "report.notePlaceholder": "Comment (optional)",
+  "report.submit": "Send report",
+  "report.cancel": "Cancel",
+  "report.success": "Thank you! Your report was sent to the moderators.",
+  "report.duplicate": "You have already reported this review.",
+  "report.notFound": "This review is no longer available.",
+  "report.error": "Could not send the report. Please try again.",
 };
 
 export default en;

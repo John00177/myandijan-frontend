@@ -45,13 +45,13 @@
 - [ ] **10 command-centre endpoints** — no UI at all **[REVIEW]**
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
-- [ ] **Admin endpoints still without UI** — reports ×2 (deferred: nothing creates reports, D-65), hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
+- [ ] **Admin endpoints still without UI** — hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
 - [ ] **Railway auto-deploy on push is broken** — source config loses its branch; every Phase 9–11 deploy needed a manual reconnect to `main`. Install/re-authorize the Railway GitHub App for `John00177/my-andijan-api` (owner action) **[REVIEW]**
-- [ ] **Business unhide** — needs a decision on which status a HIDDEN listing returns to (prior status isn't stored) (D-63) **[REVIEW]**
-- [ ] **User-side "report this review"** — `ReviewReport` admin list/resolve exist but nothing creates reports, so the moderation queue is permanently empty (D-65) **[REVIEW]**
+- [ ] **Business unhide** — needs a decision on which status a HIDDEN listing returns to; three concrete options listed in D-69 **[REVIEW]**
+- [x] **User-side "report this review"** + admin reports queue — **done, Phase 12** (D-70) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**
 - [ ] **Expired promotions still sort first in `GET /businesses`** — `orderBy isPromoted desc` ignores `promotedUntil` (ranking change, out of Phase 11 scope) **[CODE]**
-- [ ] **MODERATOR can't open the admin UI** — frontend `isAdmin` is ADMIN+, while the API grants MODERATOR business approve/reject **[REVIEW]**
+- [ ] **MODERATOR can't use the admin UI** — the API grants MODERATOR business approve/reject but every admin read (businesses, stats, reviews, reports, claims) is ADMIN-only, so there is nothing to list. Needs the privilege decision in D-68 before any UI change **[REVIEW]**
 - [x] `GET /me/claims` — **done, Phase 9**: claim status on `ProfilePage`; `POST /me/claims` added so claims can actually be created **[REVIEW]**
 - [ ] **Claims follow-ups (non-blocking, Phase 9):** show the rejection reason to the claimant on `ProfilePage`; show "pending" on `BusinessDetailPage` after reload instead of the CTA; audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**

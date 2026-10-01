@@ -420,6 +420,21 @@ const uz = {
   "common.retry": "Qayta urinish",
   "menuLoadFailed": "Menyuni yuklab bo'lmadi",
   "menuLoadFailedBody": "Ulanishda muammo bo'ldi. Qayta urinib ko'ring.",
+  "report.action": "Shikoyat qilish",
+  "report.reasonLabel": "Shikoyat sababi",
+  "report.reason.SPAM": "Spam yoki reklama",
+  "report.reason.OFFENSIVE": "Haqoratli",
+  "report.reason.FAKE": "Soxta sharh",
+  "report.reason.IRRELEVANT": "Mavzuga aloqasiz",
+  "report.reason.PERSONAL_INFO": "Shaxsiy ma'lumot",
+  "report.reason.OTHER": "Boshqa",
+  "report.notePlaceholder": "Izoh (ixtiyoriy)",
+  "report.submit": "Shikoyatni yuborish",
+  "report.cancel": "Bekor qilish",
+  "report.success": "Rahmat! Shikoyatingiz moderatorlarga yuborildi.",
+  "report.duplicate": "Siz bu sharh haqida allaqachon shikoyat qilgansiz.",
+  "report.notFound": "Bu sharh endi mavjud emas.",
+  "report.error": "Shikoyatni yuborib bo'lmadi. Qayta urinib ko'ring.",
 } as const;
 
 export default uz;

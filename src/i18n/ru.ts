@@ -422,6 +422,21 @@ const ru: Record<keyof typeof uz, string> = {
   "common.retry": "Повторить",
   "menuLoadFailed": "Не удалось загрузить меню",
   "menuLoadFailedBody": "Проблема с подключением. Попробуйте снова.",
+  "report.action": "Пожаловаться",
+  "report.reasonLabel": "Причина жалобы",
+  "report.reason.SPAM": "Спам или реклама",
+  "report.reason.OFFENSIVE": "Оскорбительный",
+  "report.reason.FAKE": "Фейковый отзыв",
+  "report.reason.IRRELEVANT": "Не по теме",
+  "report.reason.PERSONAL_INFO": "Личные данные",
+  "report.reason.OTHER": "Другое",
+  "report.notePlaceholder": "Комментарий (необязательно)",
+  "report.submit": "Отправить жалобу",
+  "report.cancel": "Отмена",
+  "report.success": "Спасибо! Жалоба отправлена модераторам.",
+  "report.duplicate": "Вы уже пожаловались на этот отзыв.",
+  "report.notFound": "Этот отзыв больше недоступен.",
+  "report.error": "Не удалось отправить жалобу. Попробуйте снова.",
 };
 
 export default ru;

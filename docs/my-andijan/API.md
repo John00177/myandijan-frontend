@@ -158,7 +158,7 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 
 ---
 
-## 7. Reviews — `/reviews` (6 routes)
+## 7. Reviews — `/reviews` (7 routes; +1 Phase 12)
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
@@ -168,6 +168,7 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 | DELETE | `/reviews/:id` | 🔒 | Delete own review | **⭕** |
 | POST | `/reviews/:id/reply` | 🔒 `BUSINESS_OWNER` | Create an owner reply | **⭕** |
 | PATCH | `/reviews/:id/reply` | 🔒 `BUSINESS_OWNER` | Edit an owner reply | ✅ |
+| POST | `/reviews/:id/report` | 🔒 any signed-in role | **New Phase 12.** Report a review. Body `{ reason: SPAM\|OFFENSIVE\|FAKE\|IRRELEVANT\|PERSONAL_INFO\|OTHER, note? ≤1000 }`. Only a publicly visible review (PUBLISHED, not deleted, live branch of an APPROVED business) → else `404`. One report per user per review (`@@unique`) → repeat `409`. Increments `Review.reportCount` in the same transaction. Response omits the reporter | ✅ `ReviewsSection` |
 
 The frontend writes reviews through `POST /businesses/:id/reviews` and replies through `POST /me/reviews/:id/reply`, so most of this controller is unused. **`api.ts`'s `replyToReview()` uses `PATCH /reviews/:id/reply`** — edit, not create — which will fail if no reply exists yet. Worth verifying.
 
@@ -349,8 +350,8 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | GET | `/admin/claims` | `ADMIN` | List claims (paginated, `?status=PENDING\|APPROVED\|REJECTED`); each row includes evidence, contact, claimant and business — there is no separate detail endpoint | ✅ **(Phase 9)** |
 | POST | `/admin/claims/:id/approve` | `ADMIN` | Approve → atomically sets `Business.ownerId` (only if still null), promotes a `CUSTOMER` claimant to `BUSINESS_OWNER`, auto-rejects other pending claims on that business. `404` unknown claim, `409` already reviewed / business already owned / lost a concurrent race | ✅ **(Phase 9)** |
 | POST | `/admin/claims/:id/reject` | `ADMIN` | Reject with required `reason`; never touches ownership or roles. `409` if already reviewed | ✅ **(Phase 9)** |
-| GET | `/admin/reports` | `ADMIN` | List **review** reports (`ReviewReport`; no business-report model exists). **Always empty today: no endpoint creates a report** | **⭕** (deferred) |
-| POST | `/admin/reports/:id/resolve` | `ADMIN` | Body `{ action: HIDE_REVIEW \| DISMISS, note? }`. `HIDE_REVIEW` → report `RESOLVED` + review hidden + aggregates recalculated; `DISMISS` → report **`DISMISSED`** (Phase 11 fix — was stored as `RESOLVED`). `409` if already handled | **⭕** (deferred) |
+| GET | `/admin/reports` | `ADMIN` | List **review** reports (`ReviewReport`; no business-report model exists), paginated, `?status=PENDING\|RESOLVED\|DISMISSED`. Fed by `POST /reviews/:id/report` since Phase 12 | ✅ **(Phase 12)** `AdminReportsView` |
+| POST | `/admin/reports/:id/resolve` | `ADMIN` | Body `{ action: HIDE_REVIEW \| DISMISS, note? }`. `HIDE_REVIEW` → report `RESOLVED` + review hidden + aggregates recalculated; `DISMISS` → report **`DISMISSED`** (Phase 11 fix — was stored as `RESOLVED`). `409` if already handled | ✅ **(Phase 12)** |
 | GET | `/admin/reviews` | `ADMIN` | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |
 | POST | `/admin/reviews/:id/hide` | `ADMIN` | Hide a review | ✅ |
 | POST | `/admin/reviews/:id/restore` | `ADMIN` | Restore a review | ✅ |

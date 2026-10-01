@@ -98,7 +98,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | One review per user per branch | **IMPLEMENTED** | DB-enforced `@@unique([branchId, userId])` |
 | Owner replies | **IMPLEMENTED** | `ReviewsView` → `POST /me/reviews/:id/reply` |
 | Edit / delete own review | **PARTIALLY IMPLEMENTED** | Endpoints exist; **no UI** |
-| Report a review | **PARTIALLY IMPLEMENTED** | `ReviewReport` model + admin resolve endpoint; **no report UI** |
+| Report a review | **IMPLEMENTED (Phase 12)** | "Shikoyat qilish" on each review → reason + optional note → `POST /reviews/:id/report`. Signed-out → login modal; 409 shown as "already reported"; uz/ru/en (D-70) |
 | "Helpful" voting | **PLANNED** | `helpfulCount` column exists; nothing increments it |
 | Review moderation queue | **IMPLEMENTED** | **Phase 6 (2026-09-29):** `GET /admin/reviews` added (paginated, `?status=` filter); `AdminReviewsView` now shows the real list with reviewer/business/rating/text/date/status, and hide/restore act on real reviews |
 | Rating range validation | **PARTIALLY IMPLEMENTED** | DTO-level only; no DB constraint |
@@ -195,7 +195,8 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | **Review moderation** | **IMPLEMENTED** | **Phase 6:** real list + hide/restore, replacing the mock |
 | **Admin settings** | **BROKEN** | Local state only; `/admin/settings` does not exist; `PlatformSetting` table unused |
 | **Claims moderation** | **IMPLEMENTED (Phase 9)** | `AdminClaimsView`: status filter, inline evidence/contact/claimant, approve, reject with reason; "pending claims" KPI on the admin home. Approval is atomic (D-60) |
-| Reports moderation | **PLANNED** | 2 endpoints exist; no UI — deliberately deferred in Phase 11 because **nothing creates reports**, so the queue is always empty. DISMISS now records `DISMISSED` (D-65) |
+| Reports moderation | **IMPLEMENTED (Phase 12)** | `AdminReportsView` ("Shikoyatlar"): pending queue by default + history filters; report/review/business context and report count; hide review (→ RESOLVED) or dismiss (→ DISMISSED) with optional note; 409 conflicts surfaced and refreshed. ADMIN+ only |
+| Moderator admin access | **NOT IMPLEMENTED** | Needs a privilege decision — every admin read is ADMIN-only (D-68) |
 | Verify / suspend / promote business | **PLANNED** | 3 endpoints exist; no UI |
 | Suspend / activate user | **PLANNED** | 2 endpoints exist; no UI |
 | **Command centre** (founder analytics) | **PLANNED** | **10 endpoints exist; no UI whatsoever** |
@@ -336,7 +337,7 @@ See `AI.md`.
 | Frontend route pages | **12** + 3 redirects |
 | Owner dashboard views | 8 (0 mock as of Phase 10 — Inventory now real; 1 non-persisting, 1 placeholder) |
 | Admin dashboard views | 10 (0 mock as of Phase 6 — Reviews now real; 1 non-persisting — Settings) |
-| i18n keys | **419 × 3 languages, full parity** (Phase 10) |
-| Tests | **367** (283 backend + 84 frontend, Phase 11) |
+| i18n keys | **434 × 3 languages, full parity** (Phase 12) |
+| Tests | **409** (299 backend + 110 frontend, Phase 12) |
 | AI features | **0** |
 | 3D / immersive features | **0** |

@@ -42,6 +42,19 @@ export function ReviewStatusBadge({ status }: { status: string | null | undefine
   return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
 }
 
+/** ReportStatus: RESOLVED = review hidden; DISMISSED = report rejected, review kept. */
+const REPORT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: "Kutilmoqda", tone: "amber" },
+  resolved: { label: "Sharh yashirildi", tone: "success" },
+  dismissed: { label: "Rad etilgan", tone: "neutral" },
+};
+
+export function ReportStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <Badge tone="neutral">—</Badge>;
+  const entry = REPORT_STATUS[status.toLowerCase()];
+  return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
+}
+
 const CLAIM_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Kutilmoqda", tone: "amber" },
   approved: { label: "Tasdiqlangan", tone: "success" },

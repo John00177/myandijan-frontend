@@ -1,4 +1,4 @@
-import { MessageSquare, Star, X } from "lucide-react";
+import { Flag, MessageSquare, Star, X } from "lucide-react";
 import { useState } from "react";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
@@ -6,9 +6,9 @@ import EmptyState from "../../components/ui/EmptyState";
 import ReviewForm from "../../components/business/ReviewForm";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
-import { ApiError, replyToReview } from "../../lib/api";
+import { ApiError, replyToReview, reportReview } from "../../lib/api";
 import { initials } from "../../lib/initials";
-import type { Review } from "../../types";
+import { REPORT_REASONS, type ReportReasonValue, type Review } from "../../types";
 
 interface ReviewsSectionProps {
   businessId: number;
@@ -86,6 +86,98 @@ function ReplyBox({ reviewId, onDone }: { reviewId: number; onDone: () => void }
       <Button size="sm" variant="primary" className="self-start" disabled={submitting} onClick={submit}>
         {submitting ? `${t("sending")}...` : t("send")}
       </Button>
+    </div>
+  );
+}
+
+type ReportOutcome = "success" | "duplicate" | "notFound" | "error";
+
+/**
+ * Inline "report this review" control → POST /reviews/:id/report, which feeds
+ * the admin moderation queue. Signed-out visitors get the shared auth modal,
+ * matching "write a review". A 409 (one report per user per review) is shown
+ * as "already reported" rather than as a failure.
+ */
+function ReportReview({ reviewId }: { reviewId: number }) {
+  const { token, openAuthModal } = useAuth();
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<ReportReasonValue>("SPAM");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [outcome, setOutcome] = useState<ReportOutcome | null>(null);
+
+  if (outcome === "success" || outcome === "duplicate") {
+    return (
+      <p role="status" className="mt-3 text-xs text-ink-muted">
+        {t(outcome === "success" ? "report.success" : "report.duplicate")}
+      </p>
+    );
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => (token ? setOpen(true) : openAuthModal())}
+        className="mt-3 inline-flex items-center gap-1 text-xs text-ink-muted hover:text-danger"
+      >
+        <Flag size={12} />
+        {t("report.action")}
+      </button>
+    );
+  }
+
+  async function submit() {
+    setSubmitting(true);
+    setOutcome(null);
+    try {
+      await reportReview(reviewId, { reason, note: note.trim() || undefined });
+      setOutcome("success");
+    } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      setOutcome(status === 409 ? "duplicate" : status === 404 ? "notFound" : "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 p-3 rounded-xl bg-elevated border border-white/[0.08] flex flex-col gap-2">
+      <select
+        value={reason}
+        onChange={(e) => setReason(e.target.value as ReportReasonValue)}
+        aria-label={t("report.reasonLabel")}
+        className="h-10 bg-card border border-white/[0.10] rounded-lg px-3 text-sm text-ink outline-none focus:border-primary/50"
+      >
+        {REPORT_REASONS.map((value) => (
+          <option key={value} value={value}>
+            {t(`report.reason.${value}`)}
+          </option>
+        ))}
+      </select>
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder={t("report.notePlaceholder")}
+        aria-label={t("report.notePlaceholder")}
+        maxLength={1000}
+        rows={2}
+        className="py-2 px-3 bg-card border border-white/[0.10] rounded-lg text-sm text-ink placeholder:text-ink-muted outline-none focus:border-primary/50 resize-none"
+      />
+      {outcome && (
+        <p role="alert" className="text-xs text-danger">
+          {t(outcome === "notFound" ? "report.notFound" : "report.error")}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button size="sm" variant="primary" disabled={submitting} onClick={submit}>
+          {submitting ? `${t("sending")}...` : t("report.submit")}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={submitting} onClick={() => setOpen(false)}>
+          {t("report.cancel")}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -194,6 +286,8 @@ export default function ReviewsSection({ businessId, ownerId, reviews, onChanged
                     </Button>
                   ))
                 )}
+
+                <ReportReview reviewId={review.id} />
               </Card>
             );
           })}

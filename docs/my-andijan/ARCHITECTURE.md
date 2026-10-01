@@ -903,3 +903,17 @@ Unchanged architecture: class-level `JwtAuthGuard + RolesGuard + @Roles(ADMIN)` 
 - Pushes still do **not** auto-deploy: Railway's source config keeps losing its branch, and each deploy was triggered by reconnecting the service to `main`. Installing/re-authorizing the Railway GitHub App for `my-andijan-api` is an outstanding owner action.
 - Frontend: Vercel serves `c23b8ef` (bundle `index-BYDIYvrS.js` identical to the local build).
 - Production smoke: every business-ops, claims and reports admin route returns `401` anonymously and with an invalid token; public endpoints (`/businesses`, `/businesses/promoted`, `/businesses/featured`, `/search`, `/categories`, `/geography/regions`, `/events`, public menu) unchanged; OpenAPI lists the three new routes. No production data was read or written through admin routes.
+
+## 29. Moderation inputs — review reports — 2026-10-01 (Phase 12)
+
+Closes the loop the Phase 11 audit found open: the admin report endpoints existed but nothing produced reports. No migration — `ReviewReport`, `ReportReason`, `ReportStatus` and `Review.reportCount` all already existed.
+
+**Flow.** Customer clicks "Shikoyat qilish" on a review (`ReviewsSection` → `ReportReview`) → signed-out: shared auth modal; signed-in: reason (`ReportReason`) + optional note → `POST /reviews/:id/report` → `ReviewReport{status: PENDING}` + `reportCount++` (one transaction) → appears in `AdminReportsView` (default filter PENDING) → ADMIN+ picks **hide review** (`HIDE_REVIEW` → report RESOLVED, review HIDDEN, aggregates recalculated) or **dismiss** (`DISMISS` → report DISMISSED), each with an optional note.
+
+**Rules (D-70).** Authenticated, no role floor (same as writing a review). Only publicly visible reviews are reportable (PUBLISHED, not deleted, live branch of an APPROVED business) → else 404. `@@unique([reviewId, reporterId])` → 409 on a repeat, which the UI shows as "already reported", not as an error. The reporter is never returned to the reporting client. Moderation stays ADMIN-floor; an already-handled report is 409 and the admin list refreshes.
+
+**Moderator access — deferred (D-68).** MODERATOR's only admin rights are business approve/reject; every admin list is ADMIN-only, so a moderator panel would have nothing to show. The frontend gate stays ADMIN+, now pinned by `AdminDashboard.access.test.tsx`; widening moderator reads needs a product decision.
+
+**Unhide — deferred (D-69).** Hide accepts any status and the prior status is only in audit-log JSON; three concrete restore rules are listed for decision.
+
+**Tests.** Backend `reviews.report.spec.ts` (16: creation + reportCount, response omits reporter, visibility filter, 404, 409 duplicate, unexpected-error rethrow, DTO validation for every reason/missing/unknown/note length, guard metadata = JwtAuthGuard only, no role floor). Report moderation authorization (ADMIN floor; MODERATOR/SUPPORT/BUSINESS_OWNER/CUSTOMER/anonymous denied) remains pinned by `business-ops.authorization.spec.ts`. Frontend: `ReviewReport.test.tsx` (9), `AdminReportsView.test.tsx` (11), `AdminDashboard.access.test.tsx` (6).

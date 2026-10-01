@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type {
   AdminBusiness,
   AdminClaim,
+  AdminReviewReport,
   AdminReview,
   Business,
   Category,
@@ -224,6 +225,41 @@ export const unpromoteAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusines
 export const updateAdminBusinessBranch = vi.fn().mockResolvedValue({});
 export const updateBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
 export const updateBusinessHours = vi.fn().mockResolvedValue([]);
+
+export const mockAdminReport: AdminReviewReport = {
+  id: 3,
+  reason: "SPAM",
+  note: "Reklama havolasi bor",
+  status: "PENDING",
+  createdAt: "2026-09-25T10:00:00.000Z",
+  resolvedAt: null,
+  resolutionNote: null,
+  reporter: { id: 8, fullName: "Dilnoza Karimova" },
+  review: {
+    id: 11,
+    rating: 1,
+    comment: "Eng zo'r narxlar bizning saytda!",
+    status: "PUBLISHED",
+    reportCount: 2,
+    user: { id: 9, fullName: "Spam Bot" },
+    branch: { id: 1, name: "Soy milliy taomlar", business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar" } },
+  },
+};
+
+export const reportReview = vi.fn().mockResolvedValue({ id: 1, reviewId: 11, reason: "SPAM", status: "PENDING" });
+export const getAdminReports = vi.fn().mockResolvedValue({ items: [mockAdminReport], total: 1 });
+export const resolveAdminReport = vi.fn().mockResolvedValue({ ...mockAdminReport, status: "RESOLVED" });
+export const getAdminStats = vi.fn().mockResolvedValue({
+  businessesByStatus: { APPROVED: 0, PENDING: 0 },
+  pendingClaims: 0,
+  pendingReviews: 0,
+  pendingEvents: 0,
+  openReports: 0,
+  usersByRole: {},
+  newSignups7d: 0,
+});
+export const getAdminAuditLogs = vi.fn().mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
+export const replyToReview = vi.fn().mockResolvedValue({});
 
 export const createClaim = vi.fn().mockResolvedValue(mockMyClaim);
 export const getMyClaims = vi

@@ -16,6 +16,7 @@ import AdminClaimsView from "./views/AdminClaimsView";
 import AdminEventsView from "./views/AdminEventsView";
 import AdminHomeView from "./views/AdminHomeView";
 import AdminRegionsView from "./views/AdminRegionsView";
+import AdminReportsView from "./views/AdminReportsView";
 import AdminReviewsView from "./views/AdminReviewsView";
 import AdminSettingsView from "./views/AdminSettingsView";
 import AdminUsersView from "./views/AdminUsersView";
@@ -85,6 +86,7 @@ export default function AdminDashboard() {
         {activeView === "categories" && <AdminCategoriesView />}
         {activeView === "users" && <AdminUsersView />}
         {activeView === "reviews" && <AdminReviewsView />}
+        {activeView === "reports" && <AdminReportsView />}
         {activeView === "claims" && <AdminClaimsView />}
         {activeView === "events" && <AdminEventsView />}
         {activeView === "regions" && <AdminRegionsView />}

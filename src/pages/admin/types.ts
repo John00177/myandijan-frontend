@@ -5,6 +5,7 @@ export type AdminView =
   | "categories"
   | "users"
   | "reviews"
+  | "reports"
   | "claims"
   | "events"
   | "regions"

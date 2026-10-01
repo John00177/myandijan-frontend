@@ -104,6 +104,31 @@ export interface Review {
   reply?: ReviewReply | null;
 }
 
+/** Prisma ReportReason enum — the reasons a customer can pick when reporting a review. */
+export const REPORT_REASONS = ["SPAM", "OFFENSIVE", "FAKE", "IRRELEVANT", "PERSONAL_INFO", "OTHER"] as const;
+export type ReportReasonValue = (typeof REPORT_REASONS)[number];
+
+/** Matches GET /admin/reports (AdminService.findReports). */
+export interface AdminReviewReport {
+  id: number;
+  reason: ReportReasonValue;
+  note: string | null;
+  status: "PENDING" | "RESOLVED" | "DISMISSED";
+  createdAt: string;
+  resolvedAt?: string | null;
+  resolutionNote?: string | null;
+  reporter: { id: number; fullName: string | null } | null;
+  review: {
+    id: number;
+    rating: number;
+    comment: string | null;
+    status: string;
+    reportCount: number;
+    user: { id: number; fullName: string | null } | null;
+    branch: { id: number; name: string; business: { id: number; slug: string; name: string } | null } | null;
+  } | null;
+}
+
 export type ProductTypeValue = "PRODUCT" | "SERVICE";
 
 /**
