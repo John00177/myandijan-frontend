@@ -39,6 +39,18 @@ export function ReviewStatusBadge({ status }: { status: string | null | undefine
   return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
 }
 
+const CLAIM_STATUS: Record<string, { label: string; tone: Tone }> = {
+  pending: { label: "Kutilmoqda", tone: "amber" },
+  approved: { label: "Tasdiqlangan", tone: "success" },
+  rejected: { label: "Rad etilgan", tone: "danger" },
+};
+
+export function ClaimStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <Badge tone="neutral">—</Badge>;
+  const entry = CLAIM_STATUS[status.toLowerCase()];
+  return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
+}
+
 const ROLE_LABELS: Record<UserRole, { label: string; tone: Tone }> = {
   CUSTOMER: { label: "Mijoz", tone: "blue" },
   BUSINESS_OWNER: { label: "Biznes egasi", tone: "amber" },

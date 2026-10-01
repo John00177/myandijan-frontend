@@ -401,6 +401,23 @@ const en: Record<keyof typeof uz, string> = {
   "claim.errorAuthRequired": "Sign in to continue",
   "claim.errorDuplicate": "That business already exists",
   "claim.errorNetwork": "Connection problem. Please try again.",
+
+  "businessClaim.ctaTitle": "Is this your business?",
+  "businessClaim.ctaBody": "If you own or represent this business, you can claim it and start managing it.",
+  "businessClaim.ctaButton": "Claim this business",
+  "businessClaim.evidenceLabel": "Evidence / notes (optional)",
+  "businessClaim.evidencePlaceholder": "E.g. I am the owner of this business...",
+  "businessClaim.contactPhoneLabel": "Contact phone (optional)",
+  "businessClaim.contactNoteLabel": "Additional notes (optional)",
+  "businessClaim.submit": "Submit",
+  "businessClaim.cancel": "Cancel",
+  "businessClaim.submittedTitle": "Claim submitted",
+  "businessClaim.submittedBody": "Once an admin reviews it, you'll be granted business-owner access.",
+  "businessClaim.statusPending": "Pending",
+  "businessClaim.statusApproved": "Approved",
+  "businessClaim.statusRejected": "Rejected",
+  "businessClaim.myClaimsTitle": "My claims",
+  "businessClaim.errorConflict": "This business is already claimed, or you already have a pending claim for it.",
 };
 
 export default en;

@@ -732,3 +732,62 @@ No new indexes needed — the four GIN indexes from migration `20260810160018_ad
 - **FTS for `CategorySearchPage`** (the food-category specialized restaurant search, D-21/D-23). It fetches up to 100 matching businesses and filters/sorts/paginates client-side by design (D-23, revisitable) with no text-search input at all today — out of scope for this phase, which targeted the generic `SearchPage` only.
 - **Retrofitting i18n onto pre-existing `SearchPage`/`SearchHeader` strings.** Several UI strings (search placeholder/button, filter labels, empty-state text, the "N ta natija topildi" result count) are hardcoded Uzbek predating this phase — `search.placeholder`/`search.button` i18n keys already exist in `i18n/*.ts` but were never wired in. This is real, pre-existing tech debt (documented in `TODO.md`), not something Phase 8 introduced, and a full retrofit was judged to be "redesigning the SearchPage" rather than "integrating advanced search" — deferred rather than expanded into scope.
 - **Category+district combination as a dedicated discovery surface.** `GET /search` already accepts `category`, `district`, and `city` together (all three are applied to whichever CTE is active), so this is already available through the existing generic search page's filters — no separate "combo" endpoint or page was needed or built.
+
+---
+
+## 26. Business claims & verification — 2026-10-01 (Phase 9)
+
+Completed the claim lifecycle on top of a data model that already existed end-to-end: the `BusinessClaim` model + `ClaimStatus` enum (`PENDING`/`APPROVED`/`REJECTED`) were in the initial migration, and `GET /admin/claims`, `POST /admin/claims/:id/approve|reject` and `GET /me/claims` were already implemented. What was missing was any way to **create** a claim, any UI, and atomicity on approval. **No migration was needed.**
+
+### Two things called "claim"
+
+`/uz/claim` (`ClaimPage` / `useClaimFlow`, Phase 1) is a misnomer: it submits a **brand-new** listing through `POST /businesses`, owned by its submitter from creation (`OwnerService.createMyBusiness` sets `ownerId = user.id`). It never touches `BusinessClaim`. Phase 9's claim is the other case — a representative claiming an **existing** listing that has `ownerId = null` (seeded or admin-added). The two are deliberately kept separate, including in i18n (`claim.*` vs `businessClaim.*`, D-59).
+
+### Lifecycle
+
+1. **Create** — `POST /me/claims` → `OwnerService.createClaim`. Any authenticated user. Rejects: missing/deleted business (404), business not `APPROVED` (400), business already owned (409), caller already has a `PENDING` claim on it (409). Persists `status = PENDING`.
+2. **Status** — `GET /me/claims` (scoped to `claimantId = caller`), shown on `ProfilePage`.
+3. **Approve** — `AdminService.approveClaim`, one interactive transaction:
+   - `business.updateMany({ where: { id, ownerId: null }, data: { ownerId: claimantId } })` — `count === 0` → 409, nothing else happens.
+   - claim `PENDING → APPROVED` via a conditional `updateMany({ where: { id, status: PENDING } })` — `count === 0` → 409.
+   - `CUSTOMER` claimant → `BUSINESS_OWNER` (higher roles untouched).
+   - every other `PENDING` claim on that business → `REJECTED` (also conditional).
+4. **Reject** — `AdminService.rejectClaim`: conditional `PENDING → REJECTED` with required reason; never touches `Business` or `User`.
+
+### Concurrency (the Phase 9 audit's critical finding)
+
+Approval originally read `business.ownerId`, checked it, then wrote — two concurrent approvals of different claims on the same business could both pass the check and the later write would win. Every state change is now a **compare-and-set** (`updateMany` with the expected current value in `WHERE`). Under Postgres, a concurrent `UPDATE` of the same row blocks on the row lock and then re-evaluates its `WHERE` against the committed row, so exactly one approval can match `ownerId IS NULL`, and exactly one approve/reject can match `status = PENDING`. Any lost race throws inside the interactive transaction, which **rolls back everything** — ownership is never assigned without the claim being `APPROVED`, and vice versa. The same mechanism closes the approve-vs-reject race on a single claim (which previously could leave a claim `REJECTED` while ownership had been granted). Ownership is assigned *before* the claim transition so the conflict most likely to occur is detected first.
+
+### Authorization
+
+- `OwnerController` (all `/me/*`): class-level `JwtAuthGuard` → unauthenticated `401`.
+- `AdminController`: class-level `JwtAuthGuard` + `RolesGuard` + `@Roles(ADMIN)`; the claim routes have no lower override, so only `ADMIN`/`SUPER_ADMIN` pass (hierarchy floor). `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER`, `CUSTOMER` → `403`. Asserted against the **real** decorator metadata in `claims.authorization.spec.ts`.
+- `JwtStrategy.validate` reloads the user's role from the DB on every request, so a claimant promoted on approval gets owner access on their very next request — no stale-token window.
+
+### Claimed ≠ verified (D-58)
+
+Approval sets `ownerId` only. It never touches `isVerified`/`verifiedAt`/`verifiedById`; verification remains the separate admin action `POST /admin/businesses/:id/verify`, and the public "verified" badge reads `isVerified`. Owning a listing and having it vetted by the platform are different trust signals.
+
+### Audit logging
+
+Through the existing `AdminService.writeAudit` (`AuditLog`): approve writes `UPDATE Business` (ownerId), `APPROVE BusinessClaim`, `ROLE_CHANGE User` (when promoted) and `REJECT BusinessClaim` for each auto-rejected sibling; reject writes `REJECT BusinessClaim`. Claim **creation** is not audited — consistent with every other user self-service write in the codebase (e.g. `POST /businesses`); the claim row itself (`createdAt`, `claimantId`) is the record.
+
+### Frontend
+
+- `pages/business/ClaimBusinessSection.tsx` on `BusinessDetailPage`, rendered only when `ownerId` is null. Unauthenticated → opens the shared auth modal. States: idle, form, submitting (button disabled), submitted ("pending review"), error (`401` / `409` → `businessClaim.errorConflict` / network).
+- `ProfilePage` "Mening da'volarim" via `useMyClaims` — per-claim `PENDING`/`APPROVED`/`REJECTED` badge; hidden when the user has no claims.
+- `pages/admin/views/AdminClaimsView.tsx` — status filter, inline details, approve, reject with `window.prompt` reason (the existing `AdminBusinessesView` pattern), loading/empty/forbidden/error states, plus a "pending claims" KPI on `AdminHomeView` (from the already-existing `AdminStats.pendingClaims`). Admin views stay Uzbek-only, matching every other admin view.
+
+### Tests
+
+- Backend: `owner.service.spec.ts` (5), `owner.controller.spec.ts` (1), `admin.service.claims.spec.ts` (12 — includes the ownership-conflict and lost-race paths), `claims.authorization.spec.ts` (23 — real metadata, every role on every admin claim route).
+- Frontend: `ClaimBusinessSection.test.tsx` (6), `AdminClaimsView.test.tsx` (10), `ProfilePage.test.tsx` (+2).
+
+### Deliberately not implemented (non-blocking)
+
+- **Duplicate-submission race** — `createClaim`'s "no PENDING claim by this user" check is check-then-insert; two simultaneous submissions could create two `PENDING` rows. Bounded: approving either auto-rejects the other. A partial unique index (`TODO.md`) would close it at the DB level.
+- **Claim-creation audit entry** — see above.
+- **`GET /admin/claims/:id`** — the list already returns full detail.
+- **Pending state on the business page after reload** — the CTA reappears (the page doesn't fetch the caller's claims); a resubmit returns the 409 conflict message. Status is authoritative on `ProfilePage`.
+- **Rejection reason on `ProfilePage`** — shown to admins, not yet to claimants.
+- **Owner-initiated verification workflow** (documents, SMS/call) — verification is admin-initiated only.

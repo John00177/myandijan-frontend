@@ -2,6 +2,7 @@ import type {
   AdminAuditLog,
   AdminBusiness,
   AdminCategoryPayload,
+  AdminClaim,
   AdminEvent,
   AdminReview,
   AdminListResult,
@@ -20,6 +21,7 @@ import type {
   Lang,
   LoginPayload,
   MenuItem,
+  MyClaim,
   MyBranch,
   MyBranchHour,
   MyBusiness,
@@ -732,6 +734,42 @@ export function updateProfile(payload: Partial<AuthUser>): Promise<AuthUser> {
 
 export function createBusiness(payload: CreateBusinessPayload): Promise<Business> {
   return authedPostJson<Business>("/businesses", payload);
+}
+
+// ---- Claims ---------------------------------------------------------------
+// "Claiming" is distinct from createBusiness() above: a claim establishes
+// ownership of an EXISTING, unowned (ownerId null) directory listing, while
+// createBusiness() submits a brand-new listing that is already owned by its
+// submitter. See docs/my-andijan/ARCHITECTURE.md's claims section.
+
+export function createClaim(payload: {
+  businessId: number;
+  evidence?: string;
+  contactPhone?: string;
+  contactNote?: string;
+}): Promise<MyClaim> {
+  return authedPostJson<MyClaim>("/me/claims", payload);
+}
+
+export function getMyClaims(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<MyClaim>> {
+  return request<PaginatedResponse<MyClaim>>("/me/claims", params);
+}
+
+export async function getAdminClaims(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdminListResult<AdminClaim>> {
+  const raw = await request<unknown>("/admin/claims", params);
+  return normalizeAdminList<AdminClaim>(raw);
+}
+
+export function approveAdminClaim(id: number): Promise<AdminClaim> {
+  return authedPostJson<AdminClaim>(`/admin/claims/${id}/approve`, {});
+}
+
+export function rejectAdminClaim(id: number, reason: string): Promise<AdminClaim> {
+  return authedPostJson<AdminClaim>(`/admin/claims/${id}/reject`, { reason });
 }
 
 // GET /favorites requires auth and returns `{favoritedAt, business}[]`, not

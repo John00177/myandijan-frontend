@@ -12,6 +12,7 @@ import { localizedDescription, localizedName } from "../lib/localize";
 import ActionButtons from "./business/ActionButtons";
 import BranchesSection from "./business/BranchesSection";
 import BusinessInfoHeader from "./business/BusinessInfoHeader";
+import ClaimBusinessSection from "./business/ClaimBusinessSection";
 import ContactCTA from "./business/ContactCTA";
 import DescriptionSection from "./business/DescriptionSection";
 import HeroImage from "./business/HeroImage";
@@ -100,6 +101,7 @@ export default function BusinessDetailPage() {
           <BusinessInfoHeader business={business} onViewReviews={() => setActiveTab("reviews")} />
           <ContactCTA business={business} />
           <ActionButtons business={business} />
+          <ClaimBusinessSection business={business} />
           {(business.instagram || business.telegram || business.website) && (
             <div className="mt-6">
               <SocialLinks instagram={business.instagram} telegram={business.telegram} website={business.website} />

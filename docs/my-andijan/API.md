@@ -252,10 +252,23 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 | POST | `/me/events` | Create an event | **⭕** |
 | PATCH | `/me/events/:id` | Update an event | **⭕** |
 | DELETE | `/me/events/:id` | Delete an event | **⭕** |
-| GET | `/me/claims` | My submitted claims | **⭕** |
+| GET | `/me/claims` | My submitted claims (paginated, own claims only) | ✅ **(Phase 9)** |
+| POST | `/me/claims` | Claim an existing, unowned business | ✅ **(Phase 9)** |
 
 > `GET /me/businesses` returns a lean shape without description or branch phone/address/district — which is why `GET /me/businesses/:id` exists and why the edit modal opens with real data rather than a partially blank form.
-> **`GET /me/claims` being unused matters:** an owner who submits a claim through `/uz/claim` has no way to see its status.
+
+**`POST /me/claims` (`CreateClaimDto`) — added Phase 9.** Any authenticated user (class-level `JwtAuthGuard`; no role floor — a claim is how an unverified representative first establishes a relationship to a listing). Body: `businessId` (int, required), `evidence?` (≤2000), `contactPhone?` (≤20), `contactNote?` (≤1000). Response: the new `BusinessClaim` (`status: "PENDING"`) with `business: {id, slug, name}`.
+
+| Status | When |
+| --- | --- |
+| `201` | Claim created, `status = PENDING` |
+| `400` | Validation failure, or the business is not `APPROVED` (draft/pending/rejected/suspended/hidden listings can't be claimed) |
+| `401` | No/invalid token |
+| `404` | Business doesn't exist or is soft-deleted |
+| `409` | Business already has an owner (`ownerId` set), **or** this user already has a `PENDING` claim on it |
+
+> **Not the same as `/uz/claim`.** Despite its name, that 8-screen frontend flow submits a brand-new listing via `POST /businesses` (owned by its submitter from creation). `POST /me/claims` is for an *existing* listing with `ownerId = null`. See `ARCHITECTURE.md` §26.
+> `GET /me/claims` is scoped server-side to `claimantId = <caller>` — no cross-user visibility. The frontend reads it on `ProfilePage` ("Mening da'volarim").
 
 ---
 
@@ -322,9 +335,9 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | POST | `/admin/businesses/:id/verify` | `ADMIN` | Set verified | **⭕** |
 | POST | `/admin/businesses/:id/suspend` | `ADMIN` | Suspend | **⭕** |
 | POST | `/admin/businesses/:id/promote` | `ADMIN` | Set promoted/featured — **the only way promotion is granted today** | **⭕** |
-| GET | `/admin/claims` | `ADMIN` | List claims | **⭕** |
-| POST | `/admin/claims/:id/approve` | `ADMIN` | Approve → sets `Business.ownerId` | **⭕** |
-| POST | `/admin/claims/:id/reject` | `ADMIN` | Reject | **⭕** |
+| GET | `/admin/claims` | `ADMIN` | List claims (paginated, `?status=PENDING\|APPROVED\|REJECTED`); each row includes evidence, contact, claimant and business — there is no separate detail endpoint | ✅ **(Phase 9)** |
+| POST | `/admin/claims/:id/approve` | `ADMIN` | Approve → atomically sets `Business.ownerId` (only if still null), promotes a `CUSTOMER` claimant to `BUSINESS_OWNER`, auto-rejects other pending claims on that business. `404` unknown claim, `409` already reviewed / business already owned / lost a concurrent race | ✅ **(Phase 9)** |
+| POST | `/admin/claims/:id/reject` | `ADMIN` | Reject with required `reason`; never touches ownership or roles. `409` if already reviewed | ✅ **(Phase 9)** |
 | GET | `/admin/reports` | `ADMIN` | List review reports | **⭕** |
 | POST | `/admin/reports/:id/resolve` | `ADMIN` | Resolve/dismiss | **⭕** |
 | GET | `/admin/reviews` | `ADMIN` | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |

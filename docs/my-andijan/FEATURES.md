@@ -160,8 +160,10 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
 | Reviews + reply | **IMPLEMENTED** | |
 | My events (list) | **IMPLEMENTED** | **Phase 5:** create wired — a "Yangi tadbir" modal (business picker + title/description/dates/venue) now calls `POST /me/events`, replacing the previously dead button. **Edit and delete endpoints still have no UI** — deprioritized this phase for scope, not blocked |
-| **Business claim flow** | **IMPLEMENTED** | 8 screens, live preview; submits to `POST /businesses` |
-| Claim status visibility | **PLANNED** | `GET /me/claims` exists; nothing calls it — an owner cannot see what happened to their claim. **Evaluated for Phase 4, not wired:** no endpoint anywhere in the backend ever creates a `BusinessClaim` row — the existing "claim flow" (`ClaimPage`/`useClaimFlow`) submits a new `Business` via `POST /businesses`, not a claim against an existing one. Wiring this UI today would always show an empty list; fixing it needs a product decision on whether/how the claim flow should create `BusinessClaim` records. Reported, not implemented. |
+| **Business claim flow** (`/uz/claim`) | **IMPLEMENTED** | 8 screens, live preview; submits a **new** listing to `POST /businesses` — despite the name, not a claim on an existing listing (see next row) |
+| **Claim an existing business** | **IMPLEMENTED (Phase 9)** | "Bu sizning biznesingizmi?" card on `BusinessDetailPage` for listings with `ownerId = null` → `POST /me/claims` (`PENDING`). Login-gated; 409 conflict message for already-owned / already-pending. See `ARCHITECTURE.md` §26 |
+| Claim status visibility | **IMPLEMENTED (Phase 9)** | `ProfilePage` "Mening da'volarim" via `GET /me/claims` — per-claim pending/approved/rejected badge. Rejection reason not yet shown to the claimant |
+| Owner access after approval | **IMPLEMENTED (Phase 9)** | Approval sets `ownerId` and promotes a `CUSTOMER` to `BUSINESS_OWNER`; effective on the next request (role is reloaded from the DB per request). Claimed ≠ verified (D-58) |
 | Add business (3-step) | **IMPLEMENTED** | `AddBusinessPage` |
 | Multi-branch management | **PARTIALLY IMPLEMENTED** | `POST /me/businesses/:id/branches` + `PATCH /me/branches/:id` exist; branch **creation** has no UI |
 | Menu / product management | **PARTIALLY IMPLEMENTED** | API + `api.ts` wrappers + `ProductModal` exist; **`InventoryView` still renders mock data** |
@@ -186,7 +188,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Regions view | **PARTIALLY IMPLEMENTED** | Reads the **public** geography endpoint; district/city edit endpoints unused |
 | **Review moderation** | **IMPLEMENTED** | **Phase 6:** real list + hide/restore, replacing the mock |
 | **Admin settings** | **BROKEN** | Local state only; `/admin/settings` does not exist; `PlatformSetting` table unused |
-| Claims moderation | **PLANNED** | 3 endpoints exist; no UI |
+| **Claims moderation** | **IMPLEMENTED (Phase 9)** | `AdminClaimsView`: status filter, inline evidence/contact/claimant, approve, reject with reason; "pending claims" KPI on the admin home. Approval is atomic (D-60) |
 | Reports moderation | **PLANNED** | 2 endpoints exist; no UI |
 | Verify / suspend / promote business | **PLANNED** | 3 endpoints exist; no UI |
 | Suspend / activate user | **PLANNED** | 2 endpoints exist; no UI |

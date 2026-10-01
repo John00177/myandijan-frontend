@@ -401,6 +401,23 @@ const ru: Record<keyof typeof uz, string> = {
   "claim.errorAuthRequired": "Войдите, чтобы продолжить",
   "claim.errorDuplicate": "Такой бизнес уже существует",
   "claim.errorNetwork": "Проблема с подключением. Попробуйте снова.",
+
+  "businessClaim.ctaTitle": "Это ваш бизнес?",
+  "businessClaim.ctaBody": "Если вы владелец или представитель этого бизнеса, вы можете заявить права на него и начать управлять им.",
+  "businessClaim.ctaButton": "Заявить права",
+  "businessClaim.evidenceLabel": "Доказательство / комментарий (необязательно)",
+  "businessClaim.evidencePlaceholder": "Например: я являюсь владельцем этого бизнеса...",
+  "businessClaim.contactPhoneLabel": "Телефон для связи (необязательно)",
+  "businessClaim.contactNoteLabel": "Дополнительный комментарий (необязательно)",
+  "businessClaim.submit": "Отправить",
+  "businessClaim.cancel": "Отмена",
+  "businessClaim.submittedTitle": "Заявка отправлена",
+  "businessClaim.submittedBody": "После проверки администратором вам будут предоставлены права владельца бизнеса.",
+  "businessClaim.statusPending": "На рассмотрении",
+  "businessClaim.statusApproved": "Одобрено",
+  "businessClaim.statusRejected": "Отклонено",
+  "businessClaim.myClaimsTitle": "Мои заявки",
+  "businessClaim.errorConflict": "Этот бизнес уже закреплён за владельцем, или у вас уже есть заявка на рассмотрении.",
 };
 
 export default ru;

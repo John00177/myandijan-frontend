@@ -1,4 +1,4 @@
-import { Building2, Calendar, Clock, History, MessageSquare, Plus, Users } from "lucide-react";
+import { Building2, Calendar, ClipboardCheck, Clock, History, MessageSquare, Plus, Users } from "lucide-react";
 import { useCallback } from "react";
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
@@ -54,6 +54,7 @@ export default function AdminHomeView({ onSelectView }: AdminHomeViewProps) {
         />
         <KpiCard icon={Users} label="Foydalanuvchilar" value={statValue(totalUsers, loading)} />
         <KpiCard icon={MessageSquare} label="Kutilayotgan sharhlar" value={statValue(data?.pendingReviews, loading)} />
+        <KpiCard icon={ClipboardCheck} label="Kutilayotgan da'volar" value={statValue(data?.pendingClaims, loading)} />
         <KpiCard icon={Calendar} label="Kutilayotgan tadbirlar" value={statValue(data?.pendingEvents, loading)} />
         <KpiCard icon={Plus} label="Yangi ro'yxatdan o'tganlar (7 kun)" value={statValue(data?.newSignups7d, loading)} />
       </div>

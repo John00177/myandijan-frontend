@@ -10,6 +10,7 @@ import { fieldInputClasses } from "./dashboard/addBusiness/FormField";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useFavorites } from "../hooks/useFavorites";
+import { useMyClaims } from "../hooks/useMyClaims";
 import { useRegions } from "../hooks/useRegions";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import { ApiError, updateProfile } from "../lib/api";
@@ -48,6 +49,7 @@ export default function ProfilePage() {
   const { user, isOwner, logout, updateUser } = useAuth();
   const { token } = useRequireAuth();
   const { favorites, loading: favoritesLoading } = useFavorites(lang, token);
+  const { claims } = useMyClaims(token);
   const { regions } = useRegions(lang);
   const districts = regions[0]?.districts ?? [];
 
@@ -278,6 +280,31 @@ export default function ProfilePage() {
             <div className="text-xs text-ink-muted mt-1">Bizneslar</div>
           </div>
         </div>
+
+        {claims.length > 0 && (
+          <div className="bg-card border border-white/[0.08] rounded-2xl p-6 mt-6">
+            <h2 className="text-lg font-bold text-ink">{t("businessClaim.myClaimsTitle")}</h2>
+            <div className="h-px bg-white/[0.08] my-4" />
+            <div className="flex flex-col gap-3">
+              {claims.map((myClaim) => {
+                const statusKey =
+                  myClaim.status === "APPROVED"
+                    ? "businessClaim.statusApproved"
+                    : myClaim.status === "REJECTED"
+                      ? "businessClaim.statusRejected"
+                      : "businessClaim.statusPending";
+                const statusTone =
+                  myClaim.status === "APPROVED" ? "success" : myClaim.status === "REJECTED" ? "danger" : "amber";
+                return (
+                  <div key={myClaim.id} className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-ink truncate">{myClaim.business?.name ?? "—"}</span>
+                    <Badge tone={statusTone}>{t(statusKey)}</Badge>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 space-y-2">
           {menuItems.map((item, i) => (

@@ -1,5 +1,15 @@
 import { vi } from "vitest";
-import type { AdminReview, Business, Category, District, EventDetail, PaginatedResponse, Region } from "../types";
+import type {
+  AdminClaim,
+  AdminReview,
+  Business,
+  Category,
+  District,
+  EventDetail,
+  MyClaim,
+  PaginatedResponse,
+  Region,
+} from "../types";
 
 // Central set of sensible empty defaults for every lib/api export a page
 // component's hooks might call. Individual tests override just the calls
@@ -130,6 +140,38 @@ export const mockAdminReview: AdminReview = {
 export const getAdminReviews = vi.fn().mockResolvedValue({ items: [mockAdminReview], total: 1 });
 export const hideAdminReview = vi.fn().mockResolvedValue({ ...mockAdminReview, status: "HIDDEN" });
 export const restoreAdminReview = vi.fn().mockResolvedValue({ ...mockAdminReview, status: "PUBLISHED" });
+
+export const mockAdminClaim: AdminClaim = {
+  id: 1,
+  status: "PENDING",
+  evidence: "Men ushbu biznesning egasiman",
+  contactPhone: "+998901234567",
+  contactNote: null,
+  rejectionReason: null,
+  createdAt: "2026-09-20T10:00:00.000Z",
+  reviewedAt: null,
+  business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar", ownerId: null },
+  claimant: { id: 7, fullName: "Sardor Aliyev", phone: "+998901234567", email: null, role: "CUSTOMER" },
+  reviewedBy: null,
+};
+
+export const mockMyClaim: MyClaim = {
+  id: 1,
+  status: "PENDING",
+  rejectionReason: null,
+  createdAt: "2026-09-20T10:00:00.000Z",
+  reviewedAt: null,
+  business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar" },
+  reviewedBy: null,
+};
+
+export const createClaim = vi.fn().mockResolvedValue(mockMyClaim);
+export const getMyClaims = vi
+  .fn()
+  .mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
+export const getAdminClaims = vi.fn().mockResolvedValue({ items: [mockAdminClaim], total: 1 });
+export const approveAdminClaim = vi.fn().mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
+export const rejectAdminClaim = vi.fn().mockResolvedValue({ ...mockAdminClaim, status: "REJECTED" });
 export const recordBusinessView = vi.fn();
 export const recordBusinessClick = vi.fn();
 export const recordSearch = vi.fn();

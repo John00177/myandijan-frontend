@@ -325,6 +325,26 @@
 
 ---
 
+## Phase 9 — Business claims & verification (2026-10-01)
+
+### D-58 · A claimed/owned business is not a verified business 🔒 LOCKED
+**Decision.** Approving a claim sets `Business.ownerId` (and promotes a `CUSTOMER` claimant to `BUSINESS_OWNER`) and nothing else. It never sets `isVerified`/`verifiedAt`/`verifiedById`. Verification stays the separate, admin-initiated `POST /admin/businesses/:id/verify`, and the public "verified" badge reads `isVerified` only.
+**Rationale.** The schema already models them as independent fields, and they answer different questions: "who manages this listing" vs "has the platform vetted this business". Conflating them would make every approved claimant instantly display a trust badge the platform never actually checked.
+**Why locked.** `AdminService.approveClaim`, the badge rendering, and `ARCHITECTURE.md` §26 all depend on the two staying separate.
+**Deferred.** An owner-initiated verification workflow (documents, SMS/call) does not exist; verification is admin-only.
+
+### D-59 · New `businessClaim.*` i18n namespace, separate from `claim.*` 🔒 LOCKED
+**Decision.** All strings for claiming an existing listing use `businessClaim.*`. The existing `claim.*` namespace is left untouched.
+**Rationale.** `claim.*` (56 keys) already belongs to the Phase 1 `/uz/claim` flow, which — despite the name — submits a **new** business via `POST /businesses`. Reusing it would have mixed two unrelated features under one prefix; reusing specific keys was actively wrong (e.g. `claim.errorDuplicate` = "This business already exists" does not describe a claim conflict, so `businessClaim.errorConflict` was added instead).
+**Why locked.** `ClaimBusinessSection`, `ProfilePage`, and the frontend tests reference these exact keys; `TranslationKey` parity across uz/ru/en is compiler-enforced.
+
+### D-60 · Claim approval/rejection are compare-and-set, not read-then-write 🔒 LOCKED
+**Decision.** In `AdminService`, ownership assignment is `business.updateMany({ where: { id, ownerId: null } })` and every claim status change is `businessClaim.updateMany({ where: { id, status: PENDING } })`; `count === 0` throws `409` inside the interactive transaction, rolling everything back.
+**Rationale.** Closes the audit's critical race where two concurrent approvals could both pass a read-then-check and yield two successive owners, and the related approve-vs-reject race on one claim. Uses only Prisma + Postgres row-level locking semantics — no schema change, no advisory locks.
+**Why locked.** Reverting to `update` after a read reintroduces the race silently; `admin.service.claims.spec.ts` asserts the conditional `WHERE` clauses.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

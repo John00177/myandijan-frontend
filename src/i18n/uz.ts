@@ -399,6 +399,23 @@ const uz = {
   "claim.errorAuthRequired": "Davom etish uchun tizimga kiring",
   "claim.errorDuplicate": "Bunday biznes allaqachon mavjud",
   "claim.errorNetwork": "Internetga ulanishda muammo. Qayta urinib ko'ring.",
+
+  "businessClaim.ctaTitle": "Bu sizning biznesingizmi?",
+  "businessClaim.ctaBody": "Agar bu biznesning egasi yoki vakili bo'lsangiz, uni da'vo qilib, boshqarishni boshlashingiz mumkin.",
+  "businessClaim.ctaButton": "Egalik qilish",
+  "businessClaim.evidenceLabel": "Dalil / izoh (ixtiyoriy)",
+  "businessClaim.evidencePlaceholder": "Masalan: men ushbu biznesning egasiman...",
+  "businessClaim.contactPhoneLabel": "Aloqa uchun telefon (ixtiyoriy)",
+  "businessClaim.contactNoteLabel": "Qo'shimcha izoh (ixtiyoriy)",
+  "businessClaim.submit": "Yuborish",
+  "businessClaim.cancel": "Bekor qilish",
+  "businessClaim.submittedTitle": "Da'vo yuborildi",
+  "businessClaim.submittedBody": "Admin ko'rib chiqqach, sizga biznes egasi huquqi beriladi.",
+  "businessClaim.statusPending": "Kutilmoqda",
+  "businessClaim.statusApproved": "Tasdiqlangan",
+  "businessClaim.statusRejected": "Rad etilgan",
+  "businessClaim.myClaimsTitle": "Mening da'volarim",
+  "businessClaim.errorConflict": "Bu biznes allaqachon egalik qilingan yoki sizda u uchun ko'rib chiqilayotgan da'vo bor.",
 } as const;
 
 export default uz;

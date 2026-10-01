@@ -45,8 +45,9 @@
 - [ ] **10 command-centre endpoints** — no UI at all **[REVIEW]**
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
-- [ ] **19 of 31 admin endpoints** — no UI (claims ×3, reports ×2, verify, suspend, promote, events approve/reject, category delete + reorder, district/city edit, user suspend/activate) **[REVIEW]**. Review hide/restore: **done — Phase 6 (2026-09-29)**, now reachable via `AdminReviewsView`
-- [ ] `GET /me/claims` — owners cannot see their claim's status **[REVIEW]**
+- [ ] **16 of 31 admin endpoints** — no UI (reports ×2, verify, suspend, promote, events approve/reject, category delete + reorder, district/city edit, user suspend/activate) **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**, via `AdminClaimsView`
+- [x] `GET /me/claims` — **done, Phase 9**: claim status on `ProfilePage`; `POST /me/claims` added so claims can actually be created **[REVIEW]**
+- [ ] **Claims follow-ups (non-blocking, Phase 9):** show the rejection reason to the claimant on `ProfilePage`; show "pending" on `BusinessDetailPage` after reload instead of the CTA; audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**
 - [ ] `GET /events/:slug`, `POST /events/:slug/attend` — no detail page, no RSVP **[REVIEW]**
 - [ ] `GET /businesses/promoted`, `GET /categories/homepage`, `GET /categories/:slug`, 4 `/geography/*` routes — unused **[REVIEW]**
@@ -102,7 +103,7 @@
 
 ## Database
 
-- [ ] **Add a partial unique index for one PENDING claim per business.** The schema states this *"cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer"* — so it is application-discipline-only today **[CODE]**
+- [ ] **Add a partial unique index for one PENDING claim per business.** The schema states this *"cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer"* — so it is application-discipline-only today. Since Phase 9 this is the only remaining claim race: approval is now compare-and-set (D-60), but `createClaim`'s duplicate check is still check-then-insert, so two simultaneous submissions by one user can create two `PENDING` rows (bounded — approving one auto-rejects the other) **[CODE]**
 - [ ] **Drop `SearchQueryLog`** after confirming the backfill into `SearchAnalytics` — *"safe to drop once you've confirmed the backfill"* **[CODE]**
 - [ ] **Consolidate three overlapping cover-image fields** on `Business`: `logoUrl`, `coverUrl`, `coverPhoto` (the last two duplicate each other and the frontend falls back between them) **[REVIEW]**
 - [ ] Add DB constraints: `Review.rating` 1–5, `Event.endAt > startAt`, `isFree`/`price` consistency **[REVIEW]**

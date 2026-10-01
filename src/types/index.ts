@@ -373,6 +373,34 @@ export interface AdminReview {
   reply: { id: number; body: string; createdAt: string } | null;
 }
 
+export type ClaimStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+/** Matches GET /admin/claims (see AdminService.findClaims). */
+export interface AdminClaim {
+  id: number;
+  status: ClaimStatus;
+  evidence: string | null;
+  contactPhone: string | null;
+  contactNote: string | null;
+  rejectionReason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  business: { id: number; slug: string; name: string; ownerId: number | null } | null;
+  claimant: { id: number; fullName: string; phone: string; email: string | null; role: string } | null;
+  reviewedBy: { id: number; fullName: string } | null;
+}
+
+/** Matches GET /me/claims and the response of POST /me/claims (see OwnerService). */
+export interface MyClaim {
+  id: number;
+  status: ClaimStatus;
+  rejectionReason: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  business: { id: number; slug: string; name: string } | null;
+  reviewedBy: { id: number; fullName: string } | null;
+}
+
 /**
  * Matches the live GET /admin/stats response exactly (confirmed 2026-08-15,
  * not guessed) — it does NOT have flat `businesses`/`users`/`reviews`/`events`

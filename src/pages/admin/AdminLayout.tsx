@@ -11,6 +11,7 @@ const VIEW_TITLES: Record<AdminView, string> = {
   categories: "Turkumlar",
   users: "Foydalanuvchilar",
   reviews: "Sharhlar",
+  claims: "Da'volar",
   events: "Tadbirlar",
   regions: "Viloyatlar",
   audit: "Audit jurnali",
