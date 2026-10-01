@@ -438,6 +438,22 @@
 
 ---
 
+## Phase 15 — Authorization & governance (2026-10-01)
+
+Phase 15A audited the role model; Phase 15C designed and the owner approved the target architecture: **two planes** — a governance plane (PLATFORM_OWNER, a separate principal, *not* a role and *not* rank 7) and an operational plane (SUPER_ADMIN … CUSTOMER), with explicit capabilities replacing rank floors. Phase 15B implements only the stabilization slice below.
+
+### D-74 · Business content is owner-only; account status follows an explicit table; no API changes a staff role 🔒 LOCKED
+**Decision (Phase 15B).**
+1. **Ownership, not rank, governs business content.** `PATCH /businesses/:id`, `PUT /businesses/:id/hours`, `POST /businesses/:id/menu`, `GET /me/businesses/:id/menu`, `PATCH`/`DELETE /menu/:id`, `POST /events`, `POST`/`PATCH /reviews/:id/reply`: `JwtAuthGuard` only, **no `@Roles`**, and the service requires `ownerId === user.id`. The "owner OR rank ≥ MODERATOR" bypasses in `BusinessesService`, `ProductsService` and `ReviewsService.reply` are deleted. Resolves open question ⚠️ 2: **SUPPORT inherits nothing from BUSINESS_OWNER** — and neither does any other role; any account manages exactly the businesses it owns.
+2. **Staff cross-business edits go through `/admin` only, with a reason.** `PATCH /admin/businesses/:id` (now also carries cover photo, delivery and social/website fields the admin modal saves), `PATCH …/branch` and new `PUT /admin/businesses/:id/hours` — ADMIN floor, required `reason` (stored as the audit `note`), before/after of exactly the fields sent. MODERATOR has no business-edit route. **ADMIN has no cross-business catalog route** (deferred, 15C open decision #9). No staff route replies as a business.
+3. **Account status (`POST /admin/users/:id/suspend|activate`) follows `user-status.policy.ts`**, not rank: nobody acts on themselves; nobody suspends or reinstates a SUPER_ADMIN; ADMIN → CUSTOMER/BUSINESS_OWNER; SUPER_ADMIN → also MODERATOR/SUPPORT, and may **emergency-freeze** an ADMIN, which **no role can lift** (reserved for PLATFORM_OWNER governance). Required `reason`; compare-and-set on status **and** role; the target's sessions are revoked in the same transaction (refresh tokens + `session_version`). Replaces the old rule that blocked only `target.role === ADMIN` and so let an ADMIN suspend the SUPER_ADMIN.
+4. **No API grants or changes a staff role** until the governance plane exists. The only `users.role` writes are CUSTOMER (OTP sign-up / registration default) and the CUSTOMER→BUSINESS_OWNER auto-promotion on business/claim approval. SUPER_ADMIN therefore cannot appoint, promote, demote or remove an ADMIN or SUPER_ADMIN.
+5. **Supporting controls:** password reset and suspension revoke all sessions (`users.session_version`, carried as `sv`); audit rows record actor role, request id, edge-reported IP and user agent; `/auth/*` is rate limited per address and per phone; CORS is an allowlist.
+**Deliberately not done here (later phases):** PLATFORM_OWNER model/`platform_governance`, ownership transfer, appoint/remove SUPER_ADMIN or ADMIN, lifting an emergency freeze, governance audit and hash chain, step-up re-authentication, the capability map and default-deny guard, the SUPPORT lookup desk, external immutable audit storage.
+**Why locked.** `ownership.authorization.spec.ts` (all six roles × own/other business for profile, hours and reply; route metadata), `catalog.authorization.spec.ts` + `products.service.spec.ts` (catalog), `user-status.authorization.spec.ts` (full actor × target matrix for suspend and reinstate, self, freeze, lost race), `role-write-inventory.spec.ts` (source scan of every role write; no body accepts `role`), `session-security.spec.ts` (suspension and reset kill old access and refresh tokens end-to-end).
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
@@ -445,7 +461,7 @@ Listed because their absence is itself the finding, and because each will otherw
 | # | Open question | Why it matters |
 | --- | --- | --- |
 | ⚠️ 1 | **Which brand palette wins** — shipped blue/cyan, or the specced navy/green? | Both exist as tokens; the app is visually inconsistent with its own spec (D-32) |
-| ⚠️ 2 | **Should `SUPPORT` outrank `BUSINESS_OWNER`?** | It currently does, granting support staff business-write access (D-17) |
+| ✅ 2 | ~~**Should `SUPPORT` outrank `BUSINESS_OWNER`?**~~ | **Resolved Phase 15B:** business content is ownership-only, so no role — SUPPORT included — inherits owner powers by rank (D-74). The numeric ranking itself remains for the other `@Roles` floors until the capability phase |
 | ⚠️ 3 | **Is Uzbek data *residency* a requirement, or only portability?** | Today's hosting (Railway + Supabase) satisfies portability but not residency (D-04) |
 | ⚠️ 4 | **Testing strategy** | Zero tests, no runner, no `test` script, across 118 routes and 132 components |
 | ⚠️ 5 | **Monorepo or shared types?** | Two repos hand-maintain parallel type definitions with different TypeScript majors |

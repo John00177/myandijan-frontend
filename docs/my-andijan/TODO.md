@@ -47,7 +47,7 @@
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
 - [ ] **Admin endpoints still without UI** — hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
 - [x] **Enable Railway auto-deploy (owner action)** — **done and verified 2026-10-01**: auto-deploy `enabled=true` + Wait for CI; push of `ded7b7a` auto-deployed as `6b81b152`. Original root cause (Phase 13): `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`. Connect a GitHub account with access to `John00177/my-andijan-api` to Railway, grant the Railway GitHub App access to the repo, turn Auto Deploy (+ Wait for CI) on, then verify with a harmless push. Exact steps: `ENVIRONMENT.md` → "Deployment pipeline" **[VERIFIED]**
-- [ ] **Gate Vercel production on CI** — Vercel deploys on push independently of GitHub Actions; configure Vercel Deployment Checks for `test-and-build` (couldn't be verified/changed via API: 403) **[REVIEW]**
+- [ ] **Gate Vercel production on CI** — Vercel deploys on push independently of GitHub Actions (Phase 15A measured production READY 23 s before CI finished). **Owner action (dashboard):** Vercel → `myandijan-frontend` → Settings → Deployment Checks → require `test-and-build` for Production; optionally GitHub branch protection on `main` **[REVIEW]**
 - [x] **Business unhide** — **done, Phase 14**: restores the status recorded at hide time, else PENDING (D-73) **[REVIEW]**
 - [x] **User-side "report this review"** + admin reports queue — **done, Phase 12** (D-70) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**
@@ -200,9 +200,10 @@
 
 > Full ranked analysis in `SECURITY.md`. Highest-severity items are under **Critical bugs** above.
 
-- [ ] **Restrict CORS** — `app.enableCors()` has no origin allow-list **[REVIEW]**
+- [x] **Restrict CORS** — allowlist since Phase 15B (`src/common/cors.ts`) **[REVIEW]**
 - [ ] **Gate or disable `/docs` in production** — returns 200, publishing all 118 routes and every DTO **[REVIEW]**
-- [ ] **Add `@nestjs/throttler`** — the only rate limit is the hand-rolled OTP cap; login is brute-forceable and bcrypt-12 makes each attempt a CPU cost **[REVIEW]**
+- [x] **Add `@nestjs/throttler`** — Phase 15B: `/auth/*` per-address + per-phone **[REVIEW]**
+  - [ ] Extend throttling to `/analytics/*`, `/search`, `/upload/*`, `POST /businesses`
 - [ ] **Throttle or authenticate `POST /analytics/*`** — unauthenticated writes that poison analytics and grow tables without bound **[REVIEW]**
 - [ ] **Add `helmet`** **[REVIEW]**
 - [ ] **Verify `JWT_ACCESS_SECRET` is set on Railway** — no default, no boot validation **[REVIEW]**
@@ -211,7 +212,8 @@
 - [ ] **Add an image deletion / orphan-cleanup path** — uploads are public and permanent **[REVIEW]**
 - [ ] **Add account lockout** after N failed logins **[REVIEW]**
 - [ ] **Add a self-service account-deletion / anonymisation path** — `UserStatus.DELETED` exists, no endpoint **[REVIEW]**
-- [ ] **⚠️ Decide whether `SUPPORT` should outrank `BUSINESS_OWNER`** — it does (3 > 2), so support staff can write business content. Never stated as intended **[REVIEW]**
+- [x] **Decide whether `SUPPORT` should outrank `BUSINESS_OWNER`** — Phase 15B (D-74): owner routes are ownership-only, no role inherits by rank **[REVIEW]**
+- [ ] **Phase 15B follow-ups:** send the password-reset code via `SmsService` and stop logging it (+ `crypto.randomInt`) — SECURITY §13 #3a; capability map + default-deny guard (replace remaining `@Roles` floors, SECURITY §3 #1a); PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
 - [ ] **Remove the dead `JWT_REFRESH_SECRET`** from `.env`/`.env.example` — nothing reads it, and it implies refresh tokens are signed JWTs (they are opaque random bytes) **[REVIEW]**
 - [ ] **Add the seven missing variables to `.env.example`** — `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`, `ESKIZ_BASE_URL` (+ remove `SUPABASE_ANON_KEY` if unneeded). Onboarding from it currently yields an API that will not boot **[REVIEW]**
 - [ ] **Run `npm audit`; enable Dependabot; remove the undeclared `sonner`** **[REVIEW]**

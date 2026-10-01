@@ -81,9 +81,9 @@ The generator is correct and fetches live data — it was simply last run when t
 
 ### 9. Lock down the API surface · **[OBSERVED]** · security
 Four changes, all small, all high-value:
-- **Restrict CORS** from `app.enableCors()` to the known origins
+- ~~**Restrict CORS** from `app.enableCors()` to the known origins~~ — ✅ **DONE, Phase 15B**
 - **Gate or disable `/docs` in production** — it currently publishes all 118 routes and every DTO
-- **Add `@nestjs/throttler`** — the only rate limit today is the hand-rolled OTP cap, so login is brute-forceable and bcrypt-12 makes each attempt a CPU cost
+- ~~**Add `@nestjs/throttler`**~~ — ✅ **DONE for `/auth/*`, Phase 15B** (per-address + per-phone). Still open: `/analytics/*`, `/search`, `/upload/*`, `POST /businesses`
 - **Throttle or authenticate `POST /analytics/*`** — unauthenticated writes that can poison analytics and grow tables without bound
 
 See `SECURITY.md` for the full ranked list.
@@ -141,7 +141,7 @@ Free-text queries on `SearchPage` now use `GET /search?type=business`, so "osh" 
 
 ### 21. Resolve the two open design questions · **[EXPLICIT]**
 - **Which brand palette wins** — shipped blue/cyan (`primary #3B82F6`) or the specced navy/green (`#1A3A5C` / `#2E7D32`)? Both exist as tokens.
-- **Should `SUPPORT` outrank `BUSINESS_OWNER`?** It does today (3 > 2), so support staff can write business content. Never stated as intended.
+- ~~**Should `SUPPORT` outrank `BUSINESS_OWNER`?**~~ — ✅ **Resolved Phase 15B (D-74):** business content is ownership-only; no role inherits owner powers by rank.
 
 ---
 

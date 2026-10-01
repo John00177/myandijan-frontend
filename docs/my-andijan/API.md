@@ -37,6 +37,8 @@
 
 ## 1. Auth — `/auth` (10 routes)
 
+> **Phase 15B.** Every credential / SMS-code route is rate limited per client address (per minute) and per `body.phone` (per 15 min) — exceeding either returns **`429`** (limits in `src/auth/auth-throttle.ts`; `/auth/refresh` is address-only; `/auth/logout` and `/auth/profile` are exempt). Access tokens carry `sv` (the user's `session_version`); a password reset or suspension invalidates every earlier access and refresh token (`401 Session has been revoked`). CORS is an allowlist (`myandijan.uz`, `www.myandijan.uz`, `FRONTEND_URL`, optional `CORS_ORIGINS`; localhost outside production). Every response carries `X-Request-Id`.
+
 `src/auth/auth.controller.ts`
 
 | Method | Path | Auth | Purpose | Request | FE |
@@ -112,8 +114,8 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 | --- | --- | --- | --- | --- |
 | POST | `/businesses` | 🔒 `CUSTOMER` | Create a business (any authenticated user) | ✅ |
 | DELETE | `/businesses/:id` | 🔒 **`SUPER_ADMIN`** | Delete a business | **⭕** |
-| PATCH | `/businesses/:id` | 🔒 `BUSINESS_OWNER` | Update — the one general-purpose path `EditBusinessModal` saves through, from either owner or admin context | ✅ |
-| PUT | `/businesses/:id/hours` | 🔒 `BUSINESS_OWNER` | Replace the **primary branch's** 7-day hours wholesale | ✅ |
+| PATCH | `/businesses/:id` | 🔒 **owner only** (Phase 15B — any role, must own it; no staff bypass) | Update — the owner dashboard's `EditBusinessModal` save path. Staff use `PATCH /admin/businesses/:id` | ✅ |
+| PUT | `/businesses/:id/hours` | 🔒 **owner only** (Phase 15B) | Replace the **primary branch's** 7-day hours wholesale. Staff use `PUT /admin/businesses/:id/hours` | ✅ |
 | GET | `/businesses/featured` | — | `isFeatured` businesses | ✅ |
 | GET | `/businesses/promoted` | — | `isPromoted` businesses | **⭕** |
 | GET | `/businesses` | — | **List + filter + paginate** (name `contains`, no ranking) — used for category/district-only browsing | ✅ |
@@ -166,8 +168,8 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 | GET | `/reviews/:id` | — | One review | **⭕** |
 | PATCH | `/reviews/:id` | 🔒 | Edit own review | **⭕** |
 | DELETE | `/reviews/:id` | 🔒 | Delete own review | **⭕** |
-| POST | `/reviews/:id/reply` | 🔒 `BUSINESS_OWNER` | Create an owner reply | **⭕** |
-| PATCH | `/reviews/:id/reply` | 🔒 `BUSINESS_OWNER` | Edit an owner reply | ✅ |
+| POST | `/reviews/:id/reply` | 🔒 **owner of the reviewed business** (Phase 15B; no staff bypass) | Create an owner reply | **⭕** |
+| PATCH | `/reviews/:id/reply` | 🔒 **owner of the reviewed business** (Phase 15B) | Edit an owner reply | ✅ |
 | POST | `/reviews/:id/report` | 🔒 any signed-in role | **New Phase 12.** Report a review. Body `{ reason: SPAM\|OFFENSIVE\|FAKE\|IRRELEVANT\|PERSONAL_INFO\|OTHER, note? ≤1000 }`. Only a publicly visible review (PUBLISHED, not deleted, live branch of an APPROVED business) → else `404`. One report per user per review (`@@unique`) → repeat `409`. Increments `Review.reportCount` in the same transaction. Response omits the reporter | ✅ `ReviewsSection` |
 
 The frontend writes reviews through `POST /businesses/:id/reviews` and replies through `POST /me/reviews/:id/reply`, so most of this controller is unused. **`api.ts`'s `replyToReview()` uses `PATCH /reviews/:id/reply`** — edit, not create — which will fail if no reply exists yet. Worth verifying.
@@ -197,10 +199,10 @@ Three controllers in `src/products/`: `BusinessMenuController` (`/businesses/:id
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
 | GET | `/businesses/:id/menu` | — | **Public** catalog: active items of an **APPROVED** business | ✅ `MenuSection` |
-| GET | `/me/businesses/:id/menu` | 🔒 `BUSINESS_OWNER`+ | **Owner** catalog: all non-deleted items incl. deactivated, any business status | ✅ `InventoryView` |
-| POST | `/businesses/:id/menu` | 🔒 `BUSINESS_OWNER`+ | Create an item | ✅ |
-| PATCH | `/menu/:id` | 🔒 `BUSINESS_OWNER`+ | Update an item (partial) | ✅ |
-| DELETE | `/menu/:id` | 🔒 `BUSINESS_OWNER`+ | Soft-delete an item (`deletedAt`) | ✅ |
+| GET | `/me/businesses/:id/menu` | 🔒 **owner only** (Phase 15B) | **Owner** catalog: all non-deleted items incl. deactivated, any business status | ✅ `InventoryView` |
+| POST | `/businesses/:id/menu` | 🔒 **owner only** (Phase 15B) | Create an item | ✅ |
+| PATCH | `/menu/:id` | 🔒 **owner only** (Phase 15B) | Update an item (partial) | ✅ |
+| DELETE | `/menu/:id` | 🔒 **owner only** (Phase 15B) | Soft-delete an item (`deletedAt`) | ✅ |
 
 **Authorization (two layers).** `RolesGuard` is a role *floor*; the real boundary is `ProductsService.assertCanManage`: caller must be the business's `ownerId` **or** `MODERATOR`/`ADMIN`/`SUPER_ADMIN`. A `BUSINESS_OWNER` touching another owner's business/item gets **403**; an unknown or soft-deleted business/item gets **404**; anonymous gets **401**. `SUPPORT` passes the role floor (hierarchy quirk, CURRENT_STATE bug #9) but is rejected with 403 by the service check.
 
@@ -219,7 +221,7 @@ Not editable through this API (no columns or deliberately server-owned): SKU, st
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
 | GET | `/events` | — | Paginated list | ✅ |
-| POST | `/events` | 🔒 `BUSINESS_OWNER` | Create an event | **⭕** |
+| POST | `/events` | 🔒 **owner of `businessId`** (Phase 15B; no role floor) | Create an event | **⭕** |
 | GET | `/events/:slug` | — | Detail by slug | **⭕** |
 | POST | `/events/:slug/attend` | 🔒 | RSVP (`EventAttendee`) | **⭕** |
 
@@ -328,7 +330,9 @@ Four sub-scores (profile, engagement, visibility, response) plus a weighted `ove
 
 ---
 
-## 15. Admin — `/admin` (35 routes; +3 in Phase 11, +1 in Phase 14)
+## 15. Admin — `/admin` (36 routes; +3 in Phase 11, +1 in Phase 14, +1 in Phase 15B)
+
+> **Phase 15B (D-74).** Staff edits of a business someone else owns happen **only** here, each with a required `reason` (recorded as the audit note): `PATCH /admin/businesses/:id` (now also `coverPhoto`, `hasDelivery`, `deliveryFee`, `deliveryTime`, `website`, `telegram`, `instagram`), `PATCH …/branch`, and **new `PUT /admin/businesses/:id/hours`** (`{ reason, hours: [...] }`). `POST /admin/users/:id/suspend|activate` now require `{ reason }` and follow an explicit actor→target table: never yourself, never a `SUPER_ADMIN`; `ADMIN` → `CUSTOMER`/`BUSINESS_OWNER`; `SUPER_ADMIN` → also `MODERATOR`/`SUPPORT` and an emergency freeze of an `ADMIN` that no role can reinstate (`403` otherwise; `409` on a wrong current status or a lost race). Suspension revokes all of the target's sessions. There is **no** role-change endpoint. Every admin audit row now records actor role, request id, IP and user agent.
 
 > **Phase 14 (D-72/D-73).** `MODERATOR` now reaches `GET /admin/businesses` (owner returned as `{ id, fullName }`; `phone`/`email` only for ADMIN+), review list/hide/restore and report list/resolve (reporter returned as `{ id }`; name only for ADMIN+), in addition to business approve/reject. **New `PATCH /admin/businesses/:id/unhide`** (`SUPER_ADMIN`): only from `HIDDEN` (`409` otherwise); restores `statusBeforeHide` (recorded by `…/hide`) or `PENDING` if none. Approve/reject, review hide/restore, report resolve, hide and unhide are compare-and-set — `409` when another moderator acted first.
 
@@ -343,7 +347,8 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | PATCH | `/admin/businesses/:id/hide` | **`SUPER_ADMIN`** ↑ | Hide (any status → `HIDDEN`); records the prior status in `statusBeforeHide` (Phase 14) | ✅ **(Phase 14)** |
 | PATCH | `/admin/businesses/:id/unhide` | **`SUPER_ADMIN`** ↑ | **New Phase 14.** `HIDDEN` → recorded `statusBeforeHide`, else `PENDING`; clears the column; audited `RESTORE` | ✅ **(Phase 14)** |
 | PATCH | `/admin/businesses/:id` | `ADMIN` | Edit `name`/`description`/`categoryId` | ✅ |
-| PATCH | `/admin/businesses/:id/branch` | `ADMIN` | Edit the **primary** branch's `phone`/`address`/`districtId` | ✅ |
+| PATCH | `/admin/businesses/:id/branch` | `ADMIN` | Edit the **primary** branch's `phone`/`address`/`districtId`; **`reason` required** (Phase 15B) | ✅ |
+| PUT | `/admin/businesses/:id/hours` | `ADMIN` | **New Phase 15B.** Body `{ reason, hours: BusinessHourInput[] }` — replace the primary branch's hours; audited `BranchHours` before/after | ✅ **(Phase 15B)** admin edit modal |
 | POST | `/admin/businesses/:id/verify` | `ADMIN` | Set `isVerified` (+ `verifiedAt`/`verifiedById`). `409` if already verified | ✅ **(Phase 11)** |
 | POST | `/admin/businesses/:id/unverify` | `ADMIN` | **New Phase 11.** Clear `isVerified` only (`verifiedAt`/`verifiedById` kept — they double as the approval record). `409` if not verified | ✅ **(Phase 11)** |
 | POST | `/admin/businesses/:id/suspend` | `ADMIN` | `APPROVED` → `SUSPENDED`, body `{ reason }` required (stored in `rejectionReason`). **Phase 11: `409` unless currently `APPROVED`** (previously any status); compare-and-set update | ✅ **(Phase 11)** |
@@ -369,8 +374,8 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | PATCH | `/admin/districts/:id` | `ADMIN` | Edit a district | **⭕** |
 | PATCH | `/admin/cities/:id` | `ADMIN` | Edit a city | **⭕** |
 | GET | `/admin/users` | `ADMIN` | List users | ✅ |
-| POST | `/admin/users/:id/suspend` | `ADMIN` | Suspend | **⭕** |
-| POST | `/admin/users/:id/activate` | `ADMIN` | Reactivate | **⭕** |
+| POST | `/admin/users/:id/suspend` | `ADMIN` floor + target table (Phase 15B) | Suspend. Body `{ reason }`. Revokes the target's sessions | **⭕** |
+| POST | `/admin/users/:id/activate` | `ADMIN` floor + target table (Phase 15B) | Reactivate. Body `{ reason }`. No role can reinstate an `ADMIN` (emergency freeze) or a `SUPER_ADMIN` | **⭕** |
 | GET | `/admin/audit` | `ADMIN` | Audit log (paginated) | ✅ |
 
 > **⚠ Route-ordering hazard:** `PATCH /admin/categories/reorder` is declared **before** `PATCH /admin/categories/:id`, which is what makes `reorder` reachable rather than being swallowed as `:id = "reorder"`. **Do not reorder these declarations.**

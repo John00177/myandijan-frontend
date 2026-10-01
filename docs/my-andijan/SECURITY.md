@@ -94,7 +94,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 
 | # | Severity | Finding |
 | --- | --- | --- |
-| 1 | **High** | **No rate limiting on `/auth/login`, `/auth/register`, or `/auth/forgot-password`.** Only OTP *requests* are throttled, by hand in the service. Password brute-forcing is unthrottled, and bcrypt cost 12 makes each attempt expensive **for the server** — so this is also a cheap CPU-exhaustion vector. `@nestjs/throttler` is not installed. |
+| 1 | 🟢 **RESOLVED — Phase 15B** | ~~No rate limiting on `/auth/login`, `/auth/register`, or `/auth/forgot-password`.~~ Every credential and SMS-code route on `AuthController` now has two `@nestjs/throttler` buckets (`src/auth/auth-throttle.ts`): **per client address per minute** (generous — Uzbek mobile CGNAT) and **per target phone per 15 minutes** (login 10, SMS request 5, code verification 10, reset 5, register 5). Exceeding either → `429`. In-process memory storage: correct for the single Railway replica, resets on redeploy; a second replica would need a shared store (Redis). The DB-counted OTP-send cap stays as the durable second line. Pinned over real HTTP by `auth-throttle.spec.ts`. |
 | 2 | **High** | **`JWT_ACCESS_SECRET` has no default and no startup validation.** If unset, `JwtModule.register({ secret: undefined })` proceeds. There is no `@nestjs/config` schema and no boot check. **Verify it is set on Railway.** |
 | 3 | Medium | **No account lockout** after repeated failed logins. |
 | 4 | Medium | **`userAgent` / `ipAddress` columns on `RefreshToken` are never populated** by `issueTokens()`. The device-attribution capability exists and is unused, so "sign out other devices" and anomaly detection are not possible. |
@@ -115,15 +115,23 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 - **`getAllAndOverride`** across handler and class, so method-level `@Roles` correctly overrides controller-level. `AdminController` uses this in **both** directions: down to `MODERATOR` for approve/reject, **up to `SUPER_ADMIN` for `businesses/:id/hide`**.
 - **Destructive actions are gated highest:** `DELETE /businesses/:id` and `PATCH /admin/businesses/:id/hide` (and since Phase 14 its reversal `…/unhide`) require `SUPER_ADMIN`.
 - **Moderator least privilege (Phase 14, D-72).** `MODERATOR` reaches only the moderation surface: `GET /admin/businesses`, business approve/reject, review list/hide/restore, report list/resolve. Everything else under `/admin` stays `ADMIN`+ (stats, claims, users, audit, events, categories, geography, business edit/verify/suspend/promote) or `SUPER_ADMIN` (hide/unhide). **PII is shaped server-side by caller role:** a `MODERATOR` gets business owners as `{ id, fullName }` (no phone/email) and report reporters as `{ id }` (no name); `ADMIN`+ get the full records. Shared moderation actions are compare-and-set, so concurrent moderators get a `409` instead of a double transition. Pinned by `business-ops.authorization.spec.ts` (every route × every role) and `admin.service.moderation.spec.ts` (redaction). The frontend panel gate (`canModerate`) and per-view/per-action visibility mirror these floors but are not the control.
+- **Authorization stabilization (Phase 15B, D-74).**
+  - **Business content is owner-only.** The "owner OR rank ≥ MODERATOR" bypass is gone from `BusinessesService`, `ProductsService` and `ReviewsService.reply`; `PATCH /businesses/:id`, `PUT /businesses/:id/hours`, the four catalog routes, `POST /events` and both reply routes carry **no `@Roles` floor** — `JwtAuthGuard` authenticates and the service checks `ownerId === user.id`. So **MODERATOR and SUPPORT cannot edit any business, catalog or reply as a business**, and no rank admits anyone. Any account (any role) manages exactly the businesses it owns.
+  - **Staff cross-business edits exist only on the audited `/admin` routes** (`PATCH /admin/businesses/:id`, `…/branch`, new `PUT …/hours`; ADMIN floor), each requiring a **`reason`** stored as the audit note with before/after of exactly the fields sent. ADMIN has **no** cross-business catalog path (15C open decision #9).
+  - **Account status changes follow an explicit table** (`src/admin/user-status.policy.ts`, never rank arithmetic): nobody acts on themselves; nobody can suspend or reinstate a `SUPER_ADMIN` (the founder holds it — this is what keeps the future PLATFORM_OWNER out of operational reach); ADMIN → CUSTOMER/BUSINESS_OWNER only; SUPER_ADMIN → also MODERATOR/SUPPORT, plus an **emergency freeze** of an ADMIN that **no role can lift** (reserved for PLATFORM_OWNER governance). Reason required; compare-and-set on status **and** role; suspension revokes every session in the same transaction.
+  - **No API changes any staff role.** `role-write-inventory.spec.ts` scans the source and fails if a new code path writes `users.role` (today: four writes, all CUSTOMER/BUSINESS_OWNER) or if any request body accepts a `role`.
+  - **PII shaping** uses an explicit `{ADMIN, SUPER_ADMIN}` set instead of `rank >= ADMIN`.
+- **Session revocation (Phase 15B).** `users.session_version` is stamped into access tokens as `sv`; `JwtStrategy` rejects a mismatch on the next request. Password reset and suspension bump it **and** revoke every refresh token, so neither the old access token nor the old refresh token works afterwards — and reinstating a suspended account does not revive its old sessions. Tokens minted before 15B (no `sv`) count as version 0, so the deploy logged nobody out. Pinned end-to-end by `session-security.spec.ts`.
 - **Privilege escalation via registration is blocked.** The schema demands it (*"the public /auth/register endpoint MUST reject role=ADMIN"*) and `RegisterDto` enforces it with `@IsIn([CUSTOMER, BUSINESS_OWNER])`. **Verified — the requirement and the implementation match.**
 - **Ownership scoping** is done in `OwnerService` by `ownerId` rather than trusting a client-supplied id.
-- **Complete audit trail** for privileged actions: `AuditLog` with `before`/`after` JSON, actor, IP and user agent. The schema's rationale — *"cheap now, unbackfillable later"* — is correct.
+- **Audit trail** for privileged actions: `AuditLog` with `before`/`after` JSON and actor. **Before Phase 15B the IP and user-agent columns existed but were never written.** Since 15B every admin-service audit row (and business delete, and password reset) also records the actor's **role** as loaded for that request, a **server-generated request id** (returned as `X-Request-Id`), the **client address** and the **user agent**, from an AsyncLocalStorage request context (`src/common/request-context`). The address is Railway's edge-set `X-Real-IP` **only when running on Railway**; `X-Forwarded-For` is never read; anywhere else it is the TCP peer. Reasons go in `note`.
 
 ### Weaknesses
 
 | # | Severity | Finding |
 | --- | --- | --- |
-| 1 | Medium | **`SUPPORT` (3) outranks `BUSINESS_OWNER` (2)**, so every `@Roles(BUSINESS_OWNER)` route is also open to support staff — including `POST /events`, `POST /reviews/:id/reply`, `PATCH /businesses/:id`, `PUT /businesses/:id/hours`, and all four `/menu` write routes. Under floor semantics this is inevitable for any role placed above `BUSINESS_OWNER`. **It may be intended; it is documented nowhere.** If support staff should *not* write business content, `SUPPORT` must be re-positioned or those routes must use an explicit-set check instead of a floor. |
+| 1 | 🟢 **RESOLVED — Phase 15B (D-74)** | ~~`SUPPORT` (3) outranks `BUSINESS_OWNER` (2), so every `@Roles(BUSINESS_OWNER)` route is also open to support staff.~~ Phase 15A established that the service-level ownership checks had in fact already blocked SUPPORT from *other* businesses; the real hole was **MODERATOR** (rank 4) clearing the "owner OR rank ≥ MODERATOR" bypass on every business, catalog and reply. Both are closed: those routes have no role floor and are owner-only. SUPPORT now has no privilege from its role at all (a support desk is a later, capability-phase feature). |
+| 1a | Low | **Remaining rank-based authorization (to be replaced by the capability phase, 15C):** `RolesGuard` floor semantics for every other `@Roles` route — `/admin/*` (class floor ADMIN, per-route MODERATOR/SUPER_ADMIN overrides), `/admin/command-center/*`, `/admin/health-scores/*`, `/admin/analytics/*` (SUPER_ADMIN), `DELETE /businesses/:id` (SUPER_ADMIN), and the CUSTOMER floors on `POST /businesses` and `POST /businesses/:id/reviews` (which admit every account). None of these is a known vulnerability; they are floors where the 15C target wants explicit capabilities. The frontend's `isAdmin`/`isSuperAdmin`/`canModerate` booleans likewise mirror floors. |
 | 2 | Medium | **`POST /businesses` requires only `@Roles(CUSTOMER)`** — i.e. any authenticated user. Correct for the claim flow, but it means **any account can create unlimited business records**, and there is no rate limit. Combined with `status` defaulting to `DRAFT`/`PENDING` this is a moderation-queue flooding vector rather than a direct breach. |
 | 3 | Medium | **`RolesGuard` returns `false` (→ 403) when `request.user` is absent** rather than distinguishing unauthenticated. Minor information-hygiene point; not exploitable. |
 | 4 | Low | **Ownership checks live in services, not in a guard**, so a new owner-scoped route can silently omit the check. A `@Roles`-style ownership guard would make this structural. |
@@ -239,19 +247,20 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 
 **Recommendation:** install `@nestjs/throttler`, apply a conservative global default, then tighten `/auth/*`, `/analytics/*`, `/search` and `/upload/*`. This is the single highest-value infrastructure fix available.
 
+> **Phase 15B update:** `@nestjs/throttler` is installed and applied to **every `/auth/*` credential and SMS-code route** (per-address and per-phone buckets — see §2 #1); `/auth/login` and `/auth/register` are no longer unprotected. **Still unthrottled:** `/analytics/*` writes, `POST /businesses`, `POST /upload/image`, `GET /search` and the rest — deliberately left for a follow-up so the auth limits could ship without risking public browsing. The client address used as the bucket key is the same edge-set value the audit log records, so forged `X-Forwarded-For`/`X-Real-IP` headers cannot open a fresh bucket.
+
 ---
 
 ## 9. CORS
 
-`main.ts`: `app.enableCors();` — no options object. Reflects any origin, allows credentials per Nest/Express defaults.
+🟢 **RESOLVED — Phase 15B.** Was `app.enableCors()` (any origin). Now `app.enableCors(buildCorsOptions())` (`src/common/cors.ts`):
 
-**Recommended shape:**
-```
-origin: ['https://myandijan.uz', 'http://localhost:5180', 'http://localhost:5173']
-methods: ['GET','POST','PATCH','PUT','DELETE']
-credentials: false   // tokens are bearer, not cookies
-```
-Note that preview deploys get generated Vercel URLs, so either add a pattern for them or accept that previews cannot call the production API.
+- **Always allowed:** `https://myandijan.uz`, `https://www.myandijan.uz` — hard-coded so a stale or missing variable can never take the live site down.
+- **Added from env:** the existing Railway variable `FRONTEND_URL`, plus an optional comma-separated `CORS_ORIGINS` (not set; nothing in production had to change). Each entry is normalised to a bare origin; non-http(s) values are dropped.
+- **Outside production only:** `http://localhost:5173`, `http://127.0.0.1:5173`, `http://localhost:4173`.
+- `credentials: false` (Bearer tokens, not cookies); methods `GET/POST/PUT/PATCH/DELETE/OPTIONS`; headers `Authorization, Content-Type, Accept, Accept-Language`; exposes `X-Request-Id`, `Retry-After`.
+- A disallowed origin simply gets no `Access-Control-Allow-Origin` (the browser blocks it); requests **without** an `Origin` (curl, server-to-server, native apps) are unaffected — CORS is not authentication.
+- **Vercel preview deployments cannot call the production API** unless their URL is added to `CORS_ORIGINS`. Accepted: previews are SSO-protected and should not hit production data anyway.
 
 ---
 
@@ -309,12 +318,12 @@ Note that preview deploys get generated Vercel URLs, so either add a pattern for
 | **SSRF** | ✅ No user-supplied URL is fetched server-side. `Business.website` is stored and rendered, never requested. |
 | **Insecure deserialization** | ✅ JSON only. |
 | **Open redirect** | ✅ Redirects are internal route constants. |
-| **Brute force** | 🔴 **Present** — no login throttling or lockout. |
+| **Brute force** | 🟡 **Mitigated (Phase 15B)** — per-phone and per-address throttling on login, SMS-code and reset-code routes. No account lockout yet. |
 | **DoS** | 🔴 **Present** — no rate limiting; unauthenticated analytics writes; unthrottled FTS; bcrypt-12 CPU amplification on login. |
 | **Information disclosure** | 🔴 **Present** — public Swagger at `/docs`; Supabase error messages forwarded. |
 | **Dependency vulnerabilities** | ❓ **UNKNOWN.** No `npm audit` run, no Dependabot, no lockfile-verifying CI. `sonner` is installed in the frontend's `node_modules` but absent from `package.json` — an undeclared dependency, which is itself a supply-chain hygiene issue. |
-| **Security misconfiguration** | 🔴 Open CORS, public docs, no helmet, no throttler. |
-| **Broken access control** | ✅ Guards are consistently applied; the `SUPPORT` ranking is the one open question. |
+| **Security misconfiguration** | 🟠 Public docs, no helmet. (CORS allowlist and auth throttling fixed in Phase 15B.) |
+| **Broken access control** | ✅ Guards are consistently applied. The MODERATOR business-edit bypass and SUPPORT's rank inheritance were closed in Phase 15B (D-74); account-status changes follow an explicit table. Remaining rank floors are listed in §3 #1a. |
 
 ---
 
@@ -323,8 +332,10 @@ Note that preview deploys get generated Vercel URLs, so either add a pattern for
 | # | Severity | Action | Effort |
 | --- | --- | --- | --- |
 | 1 | ✅ **DONE 2026-09-28** | Rotated all six role accounts to a 192-bit random secret held in Railway's `SEED_ROLE_PASSWORD`; script parameterized to `process.env` with no default; `console.log` removed; literal purged from history before the first push | — |
-| 2 | 🔴 High | **Install `@nestjs/throttler`** — global default, tight buckets on `/auth/*`, `/analytics/*`, `/search`, `/upload/*` | Low |
-| 3 | 🔴 High | **Restrict CORS** to known origins | Trivial |
+| 2 | 🟡 **PARTLY DONE — Phase 15B** | ~~Install `@nestjs/throttler`~~ — installed; `/auth/*` throttled. **Still to do:** `/analytics/*`, `/search`, `/upload/*`, `POST /businesses` | Low |
+| 3 | ✅ **DONE — Phase 15B** | ~~Restrict CORS to known origins~~ | — |
+| 3a | 🔴 High (found in 15B, not fixed — out of scope) | **`forgotPassword` prints the reset code to stdout** (`console.log('[DEV] Reset code …')`, marked "must not ship") and generates it with `Math.random()`. Anyone with Railway log access can reset any account's password. Send it through `SmsService` like login OTPs, and use `crypto.randomInt`. | Low |
+| 3b | 🟠 Medium | **Vercel production does not wait for CI** (Phase 15A measured a promotion 23 s before `test-and-build` finished). Enable Vercel **Deployment Checks** requiring `test-and-build` — a dashboard setting for the owner (see ARCHITECTURE §31). | Trivial |
 | 4 | 🔴 High | **Gate or disable `/docs` in production** | Trivial |
 | 5 | 🔴 High | **Authenticate or throttle the three `/analytics/*` write endpoints** | Low |
 | 6 | 🟠 Medium | **Verify `JWT_ACCESS_SECRET` is set on Railway**; add `@nestjs/config` with a validation schema so a missing required variable fails at boot | Low |
@@ -334,8 +345,8 @@ Note that preview deploys get generated Vercel URLs, so either add a pattern for
 | 10 | 🟠 Medium | **Add a global exception filter** that normalises errors and stops forwarding third-party messages | Low |
 | 11 | 🟠 Medium | **Audit `AuditLog.before`/`after` for sensitive fields** (especially `passwordHash`) | Low |
 | 12 | 🟠 Medium | **Add the partial unique index** for one pending claim per business | Low |
-| 13 | 🟠 Medium | **Decide and document the `SUPPORT` vs `BUSINESS_OWNER` ranking** | Trivial |
-| 14 | 🟡 Low | **Populate `RefreshToken.userAgent`/`ipAddress`** to enable session management | Low |
+| 13 | ✅ **DONE — Phase 15B (D-74)** | ~~Decide and document the `SUPPORT` vs `BUSINESS_OWNER` ranking~~ — SUPPORT inherits nothing; owner routes are ownership-only | — |
+| 14 | 🟡 Low | **Populate `RefreshToken.userAgent`/`ipAddress`** to enable session management. (`AuditLog` IP/user agent are populated since Phase 15B; refresh tokens still are not.) | Low |
 | 15 | 🟡 Low | **Add an upload quota per user** | Low |
 | 16 | 🟡 Low | **Add an image-deletion / orphan-cleanup path** | Medium |
 | 17 | 🟡 Low | **Run `npm audit`, enable Dependabot, remove the undeclared `sonner`** | Low |
