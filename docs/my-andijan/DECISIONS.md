@@ -378,6 +378,11 @@
 **Decision.** Fixed the status bug (backend only). Did **not** build an admin reports view — it would always be empty — nor a user-facing "report this review" flow, which would be a new reporting system (out of Phase 11's scope).
 **Revisit when.** User-side review reporting is scoped; the admin list/resolve endpoints are ready for it.
 
+### D-67 · Railway builds install devDependencies explicitly (`nixpacks.toml`) 🔒 LOCKED
+**Incident.** The first two Railway deployments of `337fd6e` failed at `BUILD_IMAGE`: `sh: 1: nest: not found`. The service sets `NODE_ENV=production`, under which `npm ci` omits devDependencies (incl. `@nestjs/cli`); the last good build had silently relied on the builder setting npm `production=false` (its log shows `npm warn config production`, 689 packages), which stopped being applied (218 packages). Reproduced locally in a scratch clone.
+**Decision.** Added `nixpacks.toml` pinning the install phase to `npm ci --include=dev` (commit `ce7ec66`), reproducing the previous successful image exactly. Chosen over adding a Railway variable (`NPM_CONFIG_PRODUCTION=false`) because it changes no production configuration, is versioned and reviewable.
+**Why locked.** Removing it reintroduces a build that depends on an implicit builder default.
+
 ### D-66 · `isFeatured` stays without an admin control 🔓 REVISITABLE
 **Finding.** "Editor's Pick" (`GET /businesses/featured`) reads `isFeatured`/`featuredUntil`, but no admin route sets them; `POST …/promote` sets `isPromoted` only (the API doc previously said "promoted/featured").
 **Decision.** Not added — it would be a new endpoint for a placement capability, which Phase 11 explicitly excluded.

@@ -46,6 +46,7 @@
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
 - [ ] **Admin endpoints still without UI** — reports ×2 (deferred: nothing creates reports, D-65), hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
+- [ ] **Railway auto-deploy on push is broken** — source config loses its branch; every Phase 9–11 deploy needed a manual reconnect to `main`. Install/re-authorize the Railway GitHub App for `John00177/my-andijan-api` (owner action) **[REVIEW]**
 - [ ] **Business unhide** — needs a decision on which status a HIDDEN listing returns to (prior status isn't stored) (D-63) **[REVIEW]**
 - [ ] **User-side "report this review"** — `ReviewReport` admin list/resolve exist but nothing creates reports, so the moderation queue is permanently empty (D-65) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**

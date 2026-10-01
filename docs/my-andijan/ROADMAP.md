@@ -99,12 +99,12 @@ The file asserts that password reset, `POST /businesses`, `/admin/audit-logs` an
 ### 13. ~~Add claim-status visibility~~ — ✅ DONE 2026-10-01 (Phase 9, production-verified) · **[REQUIRED]**
 Claims can now actually be created (`POST /me/claims`, for existing unowned listings — the 8-step `/uz/claim` flow is a *new-listing* flow and never created claims) and their status is shown on `ProfilePage` via `GET /me/claims`. Deployed in backend `0d73c60` / frontend `ec40b51`. See `ARCHITECTURE.md` §26.
 
-### 14. Build the admin moderation UI · **[REQUIRED]**
-**20 of 31 admin endpoints have no UI.** In rough value order:
+### 14. Build the admin moderation UI · **[REQUIRED]** — business operations ✅ DONE 2026-10-01 (Phase 11, production-verified)
+**Remaining admin endpoints without UI are listed below.** In rough value order:
 - ~~**Claims** — approve/reject (3 endpoints)~~ — ✅ **DONE, Phase 9** (`AdminClaimsView`; approval is atomic, D-60)
 - ~~**Review moderation**~~ — ✅ **DONE, Phase 6** (`GET /admin/reviews` added; `AdminReviewsView` is real)
-- **Reports** — list + resolve (2 endpoints)
-- **Business actions** — verify, suspend, promote (3). `promote` is currently the *only* way promotion is granted.
+- ~~**Business actions** — verify, suspend, promote (3)~~ — ✅ **DONE, Phase 11**: grant/revoke verification, suspend (APPROVED only)/restore, promote/end promotion in `AdminBusinessesView`; new `unverify`/`unsuspend`/`unpromote` routes (D-63, D-64). Deployed backend `337fd6e` + build fix `ce7ec66`, frontend `c23b8ef`. See `ARCHITECTURE.md` §28. Hide/unhide deferred (D-63); `isFeatured` control not built (D-66).
+- **Reports** — list + resolve (2 endpoints). **Blocked by a missing producer:** nothing creates `ReviewReport`s, so the UI would always be empty. Needs a user-side "report review" flow first (D-65).
 - **Users** — suspend, activate (2)
 - **Events** — approve/reject (2)
 - **Taxonomy** — category delete + reorder, district/city edit (4)

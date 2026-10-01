@@ -896,3 +896,10 @@ Unchanged architecture: class-level `JwtAuthGuard + RolesGuard + @Roles(ADMIN)` 
 - **Expired promotions still sort first in `GET /businesses`** (`orderBy isPromoted desc` ignores `promotedUntil`, unlike `/businesses/promoted`). A ranking change — out of scope; `unpromote` lets an admin clear a stale flag.
 - **MODERATOR access to the admin UI** — the backend lets MODERATOR approve/reject businesses, but the frontend admin shell is ADMIN-only (pre-existing).
 - **User suspend/activate UI** — endpoints exist; user operations were not in Phase 11's business scope.
+
+### Deployment (2026-10-01)
+
+- Backend: Railway deployment `f0361a31-0d78-4660-84a8-204700eeeac0` serving `ce7ec66` (= `337fd6e` + the `nixpacks.toml` build fix, D-67). Two earlier attempts at `337fd6e` (`e8ec6579`, `a8d0d6f8`) failed at image build with `nest: not found`; production stayed on the previous image throughout.
+- Pushes still do **not** auto-deploy: Railway's source config keeps losing its branch, and each deploy was triggered by reconnecting the service to `main`. Installing/re-authorizing the Railway GitHub App for `my-andijan-api` is an outstanding owner action.
+- Frontend: Vercel serves `c23b8ef` (bundle `index-BYDIYvrS.js` identical to the local build).
+- Production smoke: every business-ops, claims and reports admin route returns `401` anonymously and with an invalid token; public endpoints (`/businesses`, `/businesses/promoted`, `/businesses/featured`, `/search`, `/categories`, `/geography/regions`, `/events`, public menu) unchanged; OpenAPI lists the three new routes. No production data was read or written through admin routes.
