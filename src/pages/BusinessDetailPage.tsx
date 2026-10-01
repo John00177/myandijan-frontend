@@ -9,6 +9,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useBusiness } from "../hooks/useBusiness";
 import { localizedDescription, localizedName } from "../lib/localize";
+import { ownsBusiness } from "../lib/ownership";
 import ActionButtons from "./business/ActionButtons";
 import BranchesSection from "./business/BranchesSection";
 import BusinessInfoHeader from "./business/BusinessInfoHeader";
@@ -57,8 +58,9 @@ export default function BusinessDetailPage() {
   const branch = business.primaryBranch ?? business.branches?.[0] ?? null;
   const locality = business.city ? localizedName(business.city, lang) : business.district ? localizedName(business.district, lang) : null;
 
-  const canManage =
-    !!user && (user.id === business.ownerId || user.role === "ADMIN" || user.role === "SUPER_ADMIN" || user.role === "MODERATOR");
+  // Catalog management on the public page is the owner's alone (Phase 15B,
+  // D-74); staff edit through the admin panel. Server-enforced as well.
+  const canManage = ownsBusiness(user, business.ownerId);
 
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "about", label: t("description") },

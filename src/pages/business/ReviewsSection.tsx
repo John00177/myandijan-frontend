@@ -8,6 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { ApiError, replyToReview, reportReview } from "../../lib/api";
 import { initials } from "../../lib/initials";
+import { ownsBusiness } from "../../lib/ownership";
 import { REPORT_REASONS, type ReportReasonValue, type Review } from "../../types";
 
 interface ReviewsSectionProps {
@@ -189,7 +190,9 @@ export default function ReviewsSection({ businessId, ownerId, reviews, onChanged
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
 
-  const canManage = !!user && (user.id === ownerId || user.role === "ADMIN" || user.role === "SUPER_ADMIN" || user.role === "MODERATOR");
+  // A reply speaks as the business, so only its owner gets the reply control
+  // (Phase 15B, D-74) — staff roles no longer do. Server-enforced as well.
+  const canManage = ownsBusiness(user, ownerId);
 
   return (
     <section id="reviews" className="mt-10">

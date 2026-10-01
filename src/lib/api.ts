@@ -283,10 +283,9 @@ export function getBusinessById(id: number): Promise<BusinessEditDetail> {
   return request<BusinessEditDetail>(`/businesses/${id}`);
 }
 
-// PATCH /businesses/:id — owner or ADMIN/MODERATOR/SUPER_ADMIN (enforced
-// server-side). Distinct from updateMyBusiness/updateAdminBusiness: this is
-// the one general-purpose path EditBusinessModal saves through regardless of
-// which context (owner or admin) opened it.
+// PATCH /businesses/:id — OWNER ONLY since Phase 15B (D-74; enforced
+// server-side, no staff bypass). The owner dashboard's EditBusinessModal
+// saves through here; the admin panel uses updateAdminBusiness instead.
 export function updateBusiness(
   id: number,
   payload: {
@@ -306,7 +305,8 @@ export function updateBusiness(
 }
 
 // PUT /businesses/:id/hours — replaces the business's primary-branch hours
-// wholesale from the 7-day grid in EditBusinessModal.
+// wholesale from the 7-day grid in EditBusinessModal. Owner only (Phase 15B);
+// the admin panel uses updateAdminBusinessHours.
 export function updateBusinessHours(
   id: number,
   hours: Array<{ dayOfWeek: number; openTime?: string; closeTime?: string; isClosed?: boolean; is24Hours?: boolean }>,
@@ -899,11 +899,37 @@ export function unhideAdminBusiness(id: number): Promise<AdminBusiness> {
   return authedPatchJson<AdminBusiness>(`/admin/businesses/${id}/unhide`, {});
 }
 
+// Staff (ADMIN/SUPER_ADMIN) edits of a business they don't own go through the
+// /admin routes only, each with a required reason that is recorded in the
+// audit log (Phase 15B, D-74).
+export interface AdminBusinessEditPayload {
+  name?: string;
+  description?: string;
+  categoryId?: number;
+  coverPhoto?: string;
+  hasDelivery?: boolean;
+  deliveryFee?: number;
+  deliveryTime?: string;
+  instagram?: string;
+  telegram?: string;
+  website?: string;
+}
+
 export function updateAdminBusiness(
   id: number,
-  payload: { name?: string; description?: string; categoryId?: number },
+  payload: AdminBusinessEditPayload & { reason: string },
 ): Promise<AdminBusiness> {
   return authedPatchJson<AdminBusiness>(`/admin/businesses/${id}`, payload);
+}
+
+export function updateAdminBusinessHours(
+  id: number,
+  payload: {
+    reason: string;
+    hours: Array<{ dayOfWeek: number; openTime?: string; closeTime?: string; isClosed?: boolean; is24Hours?: boolean }>;
+  },
+): Promise<MyBranchHour[]> {
+  return authedPutJson<MyBranchHour[]>(`/admin/businesses/${id}/hours`, payload);
 }
 
 // Targets the business's primary branch server-side — there's no branch id
@@ -912,7 +938,7 @@ export function updateAdminBusiness(
 // might (see UpdateBusinessBranchDto on the backend).
 export function updateAdminBusinessBranch(
   id: number,
-  payload: { phone?: string; address?: string; districtId?: number },
+  payload: { reason: string; phone?: string; address?: string; districtId?: number },
 ): Promise<{ id: number; phone: string; address: string; districtId: number }> {
   return authedPatchJson(`/admin/businesses/${id}/branch`, payload);
 }

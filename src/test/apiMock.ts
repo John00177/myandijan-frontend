@@ -225,7 +225,16 @@ export const unpromoteAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusines
 export const hideAdminBusiness = vi.fn().mockResolvedValue({ ...mockAdminBusiness, status: "HIDDEN" });
 export const unhideAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
 export const updateAdminBusinessBranch = vi.fn().mockResolvedValue({});
+export const updateAdminBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+export const updateAdminBusinessHours = vi.fn().mockResolvedValue([]);
 export const updateBusiness = vi.fn().mockResolvedValue(mockAdminBusiness);
+// EditBusinessModal pre-fills from this; a minimal edit detail is enough.
+export const getBusinessById = vi.fn().mockResolvedValue({
+  id: mockAdminBusiness.id,
+  slug: mockAdminBusiness.slug,
+  name: mockAdminBusiness.name,
+  branches: [],
+});
 export const updateBusinessHours = vi.fn().mockResolvedValue([]);
 
 export const mockAdminReport: AdminReviewReport = {

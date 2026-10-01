@@ -20,6 +20,10 @@ import {
   unpromoteAdminBusiness,
   unsuspendAdminBusiness,
   unverifyAdminBusiness,
+  updateAdminBusiness,
+  updateAdminBusinessHours,
+  updateBusiness,
+  updateBusinessHours,
   verifyAdminBusiness,
 } from "../../../../test/apiMock";
 
@@ -346,5 +350,49 @@ describe("AdminBusinessesView — business operations", () => {
 
     await waitFor(() => expect(unpromoteAdminBusiness).toHaveBeenCalledWith(mockAdminBusiness.id));
     expect(await screen.findByText("Reklama to'xtatildi")).toBeInTheDocument();
+  });
+
+  // ---- staff edit path (Phase 15B, D-74) ---------------------------------------
+  // Staff edit someone else's business only through the audited /admin routes,
+  // with a reason — never through the owner-only PATCH /businesses/:id.
+
+  async function openEditAndSave() {
+    renderView("ADMIN");
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: /Tahrirlash/ })[0]);
+    // Save stays disabled while the modal pre-fills from getBusinessById.
+    const save = await screen.findByRole("button", { name: "Saqlash" });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+  }
+
+  it("saves an admin edit through the /admin endpoints with the entered reason", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("  Egasi telefon orqali so'radi  ");
+
+    await openEditAndSave();
+
+    await waitFor(() =>
+      expect(updateAdminBusiness).toHaveBeenCalledWith(
+        mockAdminBusiness.id,
+        expect.objectContaining({ reason: "Egasi telefon orqali so'radi" }),
+      ),
+    );
+    expect(updateAdminBusinessHours).toHaveBeenCalledWith(mockAdminBusiness.id, {
+      reason: "Egasi telefon orqali so'radi",
+      hours: expect.any(Array),
+    });
+    expect(updateBusiness).not.toHaveBeenCalled();
+    expect(updateBusinessHours).not.toHaveBeenCalled();
+  });
+
+  it("does not save anything when the reason prompt is cancelled", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue(null);
+
+    await openEditAndSave();
+
+    expect(window.prompt).toHaveBeenCalledWith("Tahrirlash sababi:");
+    expect(updateAdminBusiness).not.toHaveBeenCalled();
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
+    expect(updateBusiness).not.toHaveBeenCalled();
   });
 });

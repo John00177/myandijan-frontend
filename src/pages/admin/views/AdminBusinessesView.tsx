@@ -29,9 +29,9 @@ import {
   unpromoteAdminBusiness,
   unsuspendAdminBusiness,
   unverifyAdminBusiness,
+  updateAdminBusiness,
   updateAdminBusinessBranch,
-  updateBusiness,
-  updateBusinessHours,
+  updateAdminBusinessHours,
   verifyAdminBusiness,
 } from "../../../lib/api";
 import { localizedName } from "../../../lib/localize";
@@ -241,11 +241,19 @@ export default function AdminBusinessesView() {
 
   async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null }) {
     if (!editingBusiness) return;
+    // Staff editing someone else's business goes through the audited /admin
+    // routes, which require a reason (Phase 15B, D-74) — asked once, recorded
+    // on every resulting audit entry.
+    const input = window.prompt("Tahrirlash sababi:");
+    if (!input || !input.trim()) return;
+    const reason = input.trim();
+
     setEditSaving(true);
     setEditError(null);
 
     try {
-      await updateBusiness(editingBusiness.id, {
+      await updateAdminBusiness(editingBusiness.id, {
+        reason,
         name: form.name.trim(),
         description: form.description.trim() || undefined,
         categoryId: form.categoryId ? Number(form.categoryId) : undefined,
@@ -258,15 +266,15 @@ export default function AdminBusinessesView() {
         website: form.website.trim() || undefined,
       });
 
-      await updateBusinessHours(
-        editingBusiness.id,
-        form.hours.map((row) => ({
+      await updateAdminBusinessHours(editingBusiness.id, {
+        reason,
+        hours: form.hours.map((row) => ({
           dayOfWeek: row.dayOfWeek,
           openTime: row.isClosed ? undefined : row.openTime,
           closeTime: row.isClosed ? undefined : row.closeTime,
           isClosed: row.isClosed,
         })),
-      );
+      });
 
       // Branch fields (phone/address/district) are a separate resource on
       // the backend — only worth the extra call if there's a branch to
@@ -274,6 +282,7 @@ export default function AdminBusinessesView() {
       const branchId = meta.branchId ?? editingBusiness.branchId;
       if (branchId && (form.phone.trim() || form.address.trim() || form.districtId)) {
         await updateAdminBusinessBranch(editingBusiness.id, {
+          reason,
           phone: form.phone.trim() || undefined,
           address: form.address.trim() || undefined,
           districtId: form.districtId ? Number(form.districtId) : undefined,
