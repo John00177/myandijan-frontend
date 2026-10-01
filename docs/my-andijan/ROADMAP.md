@@ -86,8 +86,8 @@ See `SECURITY.md` for the full ranked list.
 
 ## NEXT — completes what is half-built
 
-### 10. Switch `InventoryView` off mock data · **[REQUIRED]**
-`src/pages/dashboard/mockData.ts` claims *"Products/inventory have no backend at all."* **It has one** — `GET/POST /businesses/:id/menu`, `PATCH/DELETE /menu/:id` — and `api.ts` already wraps all four. Owners currently see rows labelled "Demo" while a working catalogue API sits idle.
+### 10. ~~Switch `InventoryView` off mock data~~ — ✅ DONE 2026-10-01 (Phase 10, production-verified) · **[REQUIRED]**
+~~`src/pages/dashboard/mockData.ts` claims *"Products/inventory have no backend at all."*~~ `InventoryView` now manages the real product/service catalog (new owner read `GET /me/businesses/:id/menu`; create/edit/publish-hide/delete); `mockData.ts` deleted; "Inventory" = catalog, no SKU/stock (D-61). Public catalog restricted to APPROVED businesses (D-62). See `ARCHITECTURE.md` §27.
 
 ### 11. Make the two settings forms persist · **[REQUIRED]**
 - **`AdminSettingsView`** holds platform name, contact email, Telegram, default language and a maintenance toggle in `useState` and saves nothing. `/admin/settings` does not exist, and the **`PlatformSetting` table exists and is entirely unused** — it is the missing consumer. Build the module.
