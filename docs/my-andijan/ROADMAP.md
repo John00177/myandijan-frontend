@@ -104,7 +104,9 @@ Claims can now actually be created (`POST /me/claims`, for existing unowned list
 - ~~**Claims** — approve/reject (3 endpoints)~~ — ✅ **DONE, Phase 9** (`AdminClaimsView`; approval is atomic, D-60)
 - ~~**Review moderation**~~ — ✅ **DONE, Phase 6** (`GET /admin/reviews` added; `AdminReviewsView` is real)
 - ~~**Business actions** — verify, suspend, promote (3)~~ — ✅ **DONE, Phase 11**: grant/revoke verification, suspend (APPROVED only)/restore, promote/end promotion in `AdminBusinessesView`; new `unverify`/`unsuspend`/`unpromote` routes (D-63, D-64). Deployed backend `337fd6e` + build fix `ce7ec66`, frontend `c23b8ef`. See `ARCHITECTURE.md` §28. Hide/unhide deferred (D-63); `isFeatured` control not built (D-66).
-- **Reports** — list + resolve (2 endpoints). **Blocked by a missing producer:** nothing creates `ReviewReport`s, so the UI would always be empty. Needs a user-side "report review" flow first (D-65).
+- ~~**Reports** — list + resolve (2 endpoints)~~ — ✅ **DONE, Phase 12** (2026-10-01, production-verified): customer "report review" flow (`POST /reviews/:id/report`) + `AdminReportsView` (D-70). Backend `c321dc5`, frontend `5f4816a`. See `ARCHITECTURE.md` §29.
+- **Moderator access** — ⚠️ needs a decision on moderator read privileges first (D-68).
+- **Business unhide** — ⚠️ needs the restore-target rule (D-69).
 - **Users** — suspend, activate (2)
 - **Events** — approve/reject (2)
 - **Taxonomy** — category delete + reorder, district/city edit (4)
