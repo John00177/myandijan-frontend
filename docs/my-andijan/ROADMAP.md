@@ -40,6 +40,9 @@ Specified in the deploy brief and never executed:
 - **Regressions:** search, business detail, login, favourites
 - **Mobile at 375px:** no horizontal overflow, bottom nav visible, no iOS zoom on input focus
 
+### 2a. Predictable backend deploys — ⚠️ BLOCKED on owner action (Phase 13 audit, 2026-10-01) · **[VERIFIED]**
+Frontend: Vercel auto-deploys every `main` push — verified, no change needed. Backend: Railway auto-deploy is **disabled and cannot be enabled** (`NO_PROJECT_MEMBER_ACCESS`): the Railway GitHub App has no authorized access to `John00177/my-andijan-api`, so pushes never trigger a deploy and every release since Phase 9 was started manually. **Unblock:** a Railway project member connects a GitHub account with repo access and grants the Railway GitHub App access to the repo, then turns on Auto Deploy + Wait for CI (`ENVIRONMENT.md` → "Deployment pipeline", 4 steps). Until then, follow the manual release/rollback runbook in the same section. After the owner action, verify with a harmless push before marking this done.
+
 ### 3. Configure Eskiz SMS on Railway · **[EXPLICIT]**
 Flagged as a user-side follow-up and still outstanding.
 

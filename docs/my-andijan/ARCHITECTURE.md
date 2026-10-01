@@ -540,6 +540,8 @@ Deployed with `npx vercel --prod` from this machine (no Git integration). Projec
 
 **Neither platform auto-deploys from GitHub.** Pushing to `main` does **not** ship. Every deploy is a manual action from a developer machine, so `main` and production can silently diverge — re-verify after any commit.
 
+> **Superseded 2026-10-01 (Phase 13 audit).** Both are now Git-connected to `main`, but only the frontend deploys on push: **Vercel** auto-deploys every `main` push via its GitHub App (a `vercel[bot]` Production deployment per commit). **Railway** builds from `John00177/my-andijan-api` `main` but **auto-deploy is disabled and cannot be enabled** (`NO_PROJECT_MEMBER_ACCESS` — no project member's GitHub account with the Railway GitHub App has access to the repo), so every backend release is triggered manually. Current pipeline, owner action and recovery runbook: `ENVIRONMENT.md` → "Deployment pipeline"; decision D-71.
+
 #### Why version is identified by content, not commit SHA
 
 Neither platform records a commit, because neither is Git-connected. Both were therefore verified by content:
@@ -900,7 +902,7 @@ Unchanged architecture: class-level `JwtAuthGuard + RolesGuard + @Roles(ADMIN)` 
 ### Deployment (2026-10-01)
 
 - Backend: Railway deployment `f0361a31-0d78-4660-84a8-204700eeeac0` serving `ce7ec66` (= `337fd6e` + the `nixpacks.toml` build fix, D-67). Two earlier attempts at `337fd6e` (`e8ec6579`, `a8d0d6f8`) failed at image build with `nest: not found`; production stayed on the previous image throughout.
-- Pushes still do **not** auto-deploy: Railway's source config keeps losing its branch, and each deploy was triggered by reconnecting the service to `main`. Installing/re-authorizing the Railway GitHub App for `my-andijan-api` is an outstanding owner action.
+- Pushes still do **not** auto-deploy; each deploy was triggered by reconnecting the service to `main`. Root cause confirmed in Phase 13: Railway auto-deploy is disabled with `NO_PROJECT_MEMBER_ACCESS` (Railway GitHub App not authorized for the repo) — see `ENVIRONMENT.md` → "Deployment pipeline".
 - Frontend: Vercel serves `c23b8ef` (bundle `index-BYDIYvrS.js` identical to the local build).
 - Production smoke: every business-ops, claims and reports admin route returns `401` anonymously and with an invalid token; public endpoints (`/businesses`, `/businesses/promoted`, `/businesses/featured`, `/search`, `/categories`, `/geography/regions`, `/events`, public menu) unchanged; OpenAPI lists the three new routes. No production data was read or written through admin routes.
 

@@ -196,6 +196,37 @@ Set: `DATABASE_URL` (Railway provides), `JWT_ACCESS_SECRET`, `SUPABASE_URL`, `SU
 
 Set: `VITE_API_URL` (the Railway URL) and `VITE_SITE_URL` (`https://myandijan.uz`).
 
+### Deployment pipeline (verified 2026-10-01, Phase 13)
+
+| | Frontend → Vercel | Backend → Railway |
+| --- | --- | --- |
+| Production branch | `main` of `John00177/myandijan-frontend` | `main` of `John00177/my-andijan-api` |
+| Trigger | **Automatic on push** via the Vercel GitHub App | **Manual only — auto-deploy is disabled and cannot currently be enabled** (see below) |
+| Evidence | GitHub Deployments API shows a `vercel[bot]` "Production" deployment for every recent `main` push (`889451b`, `5f4816a`, `a13bcf6`); live bundle hash matches the local build of `main` | Railway API: `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`; zero GitHub deployments/commit statuses on the repo; every deployment since Phase 9 was started manually |
+| Build config | `vercel.json` (SPA rewrite only) + project settings | `railway.json` (Nixpacks, `npm run build`; start = `npx prisma migrate deploy && npm run start:prod`) + `nixpacks.toml` (`npm ci --include=dev`, D-67) |
+| Service IDs | Vercel project `prj_qdOeePSAfGZVPyKNDBPYOAjj3iOH` | project `3910b9c5-e86d-4c06-8058-def605847424`, service `4109a788-880f-4d6c-a0a6-766663cd2f24`, env `production` `653c2817-832a-4d76-a236-d91972b55d09` |
+
+**GitHub Actions is validation only.** Both repos' `.github/workflows/ci.yml` run `npm ci → test → build` on push/PR to `main` and contain no deploy step; neither host waits on them today (D-71).
+
+**Why Railway does not auto-deploy.** Railway can read the repo (it is public), so a manual deploy builds the requested commit, but auto-deploy needs a project member's GitHub account connected to Railway **and** the Railway GitHub App installed with access to `John00177/my-andijan-api`. Neither is in place, so Railway never receives push events. Reconnecting the source (`connect-service-source`, or Settings → Source in the dashboard) only starts a one-off deployment of the current `main` HEAD; it does not create a push trigger.
+
+**Owner action to enable auto-deploy (one-time):**
+1. Sign in to Railway with an account that is a member of the project → Account Settings → connect the GitHub account `John00177` (or any GitHub account with access to the repo).
+2. On GitHub → Settings → Applications → **Railway** → Configure: grant repository access to `John00177/my-andijan-api`; accept any pending permission request.
+3. Railway → service `myandijan-api` → Settings → Source: confirm repo `John00177/my-andijan-api`, branch `main`, turn **Auto Deploy** on. Recommended: enable **Wait for CI** so a red `test-and-build` run never ships.
+4. Verify: push a harmless commit to `main`; a Railway deployment for that SHA must appear without any manual action, and GitHub should start showing Railway deployment statuses on commits.
+
+### Release & recovery runbook (backend)
+
+Until auto-deploy is enabled, a backend release is: push to `main` → wait for CI green → trigger the deployment manually → verify.
+
+- **Trigger a deploy of `main` HEAD:** Railway dashboard → service → Deployments → "Deploy latest commit" (or Settings → Source → reconnect `main`; or the Railway MCP `connect-service-source` with `branch: main`).
+- **Identify what is live:** Railway → Deployments (top `SUCCESS` row shows the commit SHA); or MCP `get-deployment-diagnosis` on `latestDeployment.id` from `describe-service`. Cross-check with a route that only exists in the newest commit (e.g. an unauthenticated POST that returns `401` on the new build and `404` on the old one).
+- **Roll back to a known-good build:** Railway → Deployments → previous `SUCCESS` deployment → **Rollback/Redeploy** (re-uses that image; no rebuild). MCP: `redeploy` with that `deploymentId`. Rolled-back code stays on `main` in git — revert the commit on `main` too, or the next manual deploy re-ships it.
+- **Failed build:** production keeps serving the previous image (Railway only swaps on success). Read build logs (dashboard, or ask the MCP `railway-agent` for the build logs of the deployment ID) before retrying; a retry of a deterministic failure fails the same way (see D-67).
+- **Migrations:** the start command runs `prisma migrate deploy` on every boot; a rollback does **not** reverse an applied migration. Keep migrations backward-compatible with the previous release.
+- **Frontend:** Vercel dashboard → Deployments → previous Production deployment → **Promote to Production** (instant rollback); identify the live build by the `index-*.js` hash on `https://myandijan.uz`.
+
 ---
 
 ## 5. Consequences of the defaults — read this before changing anything

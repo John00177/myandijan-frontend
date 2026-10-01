@@ -46,7 +46,8 @@
 - [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
 - [ ] **Admin endpoints still without UI** — hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
-- [ ] **Railway auto-deploy on push is broken** — source config loses its branch; every Phase 9–11 deploy needed a manual reconnect to `main`. Install/re-authorize the Railway GitHub App for `John00177/my-andijan-api` (owner action) **[REVIEW]**
+- [ ] **Enable Railway auto-deploy (owner action)** — verified root cause (Phase 13): `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`. Connect a GitHub account with access to `John00177/my-andijan-api` to Railway, grant the Railway GitHub App access to the repo, turn Auto Deploy (+ Wait for CI) on, then verify with a harmless push. Exact steps: `ENVIRONMENT.md` → "Deployment pipeline" **[VERIFIED]**
+- [ ] **Gate Vercel production on CI** — Vercel deploys on push independently of GitHub Actions; configure Vercel Deployment Checks for `test-and-build` (couldn't be verified/changed via API: 403) **[REVIEW]**
 - [ ] **Business unhide** — needs a decision on which status a HIDDEN listing returns to; three concrete options listed in D-69 **[REVIEW]**
 - [x] **User-side "report this review"** + admin reports queue — **done, Phase 12** (D-70) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**

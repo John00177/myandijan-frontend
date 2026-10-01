@@ -407,6 +407,15 @@
 
 ---
 
+## Phase 13 — Deployment & CI/CD reliability (2026-10-01)
+
+### D-71 · `main` is the production branch; hosts deploy via their own GitHub integrations; Actions only validates 🔒 LOCKED
+**Decision.** Both repos ship from `main`. Deployment is owned by each host's native GitHub integration (Vercel GitHub App for the frontend; Railway GitHub App for the backend, once authorized). `.github/workflows/ci.yml` stays validation-only (`npm ci`, test, build) — no deploy step, no deploy tokens in GitHub secrets.
+**Rationale.** Keeps deploy credentials out of GitHub and avoids a second, competing deploy path. Coupling to CI is done host-side: Railway's "Wait for CI" (recommended once auto-deploy is enabled) makes a red `test-and-build` block the deploy; Vercel builds on push independently of Actions; whether Vercel "Deployment Checks" are configured could not be verified (Vercel API access returned 403), so assume a commit that fails CI can still ship to the frontend — noted as a follow-up.
+**Not done.** No GitHub Actions → Railway deploy workflow was added as a workaround: it would need a Railway token in GitHub secrets and would bypass the real fix (authorizing the Railway GitHub App).
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
