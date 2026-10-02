@@ -1,9 +1,11 @@
 # Phase 15E.4d — Access-Token Session Binding (`sid`)
 
 **Status (2026-10-02):**
-- **15E.4d.1 — IMPLEMENTED** on backend branch `feat/15e4d1-access-token-session-binding`, with a PR to `main`. It is not merged or deployed at the time of writing. See §14.
-- **15E.4d.2** (`sid` mandatory) is **NOT implemented**.
-- **Sections 1–13** are the approved design, kept as written. §14 records what was built and where it is more specific.
+- **15E.4d.1 — IMPLEMENTED and LIVE.**
+  - Merged as backend `main` `253ede8` (PR #6, implementation `509d58b`).
+  - Railway deployment `3e9f4ba0-abee-4f12-a15c-d9f84c125ab5` went live 2026-10-02 12:37:11 UTC. See §14.
+- **15E.4d.2 — IMPLEMENTED** (`sid` mandatory) on backend branch `feat/15e4d-access-token-mandatory-sid`, with a PR to `main`. It is not merged or deployed at the time of writing. See §15.
+- **Sections 1–13** are the approved design, kept as written. §14 and §15 record what was built and where it is more specific.
 
 **Code inspected:**
 - **Backend `main` = `2dc5dc4`** (15E.4c, live as Railway deployment `43c577b0-50c6-4c92-80ee-a3e7caab7fa9`).
@@ -436,6 +438,40 @@ users  →  status = ACTIVE? deleted_at IS NULL? session_version == sv?
 - **Not done in 15E.4d.1:** OPEN-3 (confirm the production TTL — still required before 15E.4d.2), OPEN-5 (pin HS256) and OPEN-7 (session/`sessionVersion` binding).
 
 **Frontend: no change.** Tokens stay opaque to it, and a 401 still leads to one refresh, then a retry or sign-out.
+
+---
+
+---
+
+## 15. Implementation record — Phase 15E.4d.2 (`sid` mandatory)
+
+[VERIFIED] Backend branch `feat/15e4d-access-token-mandatory-sid`, based on `main` `253ede8`. Implementation commit: `8a321c2`.
+
+**The compatibility window is complete:**
+- **15E.4d.1 went live** 2026-10-02 12:37:11 UTC; from then on every new access token carried `sid`.
+- **The production lifetime was confirmed by the owner:** `JWT_ACCESS_EXPIRES_IN` is **15m** (OPEN-3 resolved). It was read in the Railway dashboard by the owner, not through tooling.
+- **The window therefore elapsed at 12:52:11 UTC:** the last access token without `sid` expired no later than that.
+
+**Behaviour now:**
+- **Every accepted access token must carry a valid `sid`.**
+  - `JwtStrategy.validate` always runs the session check (§14), which rejects `sid` that is absent, `undefined`, `null`, non-numeric, non-integer, non-positive or not a safe integer.
+  - For a valid `sid` the checks are unchanged: the session exists, belongs to the token's user, is unrevoked and is inside its absolute expiry.
+- **A token without `sid` is no longer accepted** — even a correctly signed one, for an active user with a live session. It gets the same `401 {"message":"Unauthorized","statusCode":401}` as every other refusal, so a missing `sid` is indistinguishable from an invalid one.
+- **Unchanged:** JWT signature and `exp` verification, the user checks (exists, ACTIVE, not deleted), `sessionVersion`, the fail-closed lookup, ID-only logging, the access-token lifetime, refresh rotation, reuse detection and logout.
+- **Type:** `JwtPayload.sid` is now **required** (`sid: number`), the invariant for every token AuthService signs. The decoded payload is still untrusted input, so the presence and shape check stays at runtime in the strategy.
+- **No schema migration was required, and no forced logout:** every client had refreshed onto a `sid` token within the window. The frontend is unchanged.
+
+**Tests:**
+- **Unit: 996/996** (+1 net).
+  - `src/auth/session-security.spec.ts`: the old "no `sv` claim stays valid" test is replaced by two: a token without `sv` but with a live `sid` still validates (`sv` still defaults to 0); a correctly signed token with no `sid` is refused with the generic 401. The malformed-`sid` cases gain `null` and `undefined`.
+  - `src/authz/authz.e2e.spec.ts`: test tokens now carry `sid`, and its Prisma mock serves a live session.
+- **Real PostgreSQL: 84/84** (`test/db/access-token-sessions.db-spec.ts`, over real HTTP through the global `AuthzGuard` and `JwtStrategy`). Test 5 is now the **regression**: a correctly signed token for an active user with a live session but no `sid` → exactly `{"message":"Unauthorized","statusCode":401}`. Plus:
+  - `sid: undefined` and the malformed values (`null`, `0`, `-1`, `1.5`, `"1"`, an unsafe integer) → 401;
+  - every other 15E.4d.1 case still passes.
+- **Mutation checks:**
+  - 15E.4d.1 compatibility path restored → the two no-`sid` PostgreSQL regressions and two unit tests fail;
+  - session validation removed → 9 of 19 PostgreSQL tests fail;
+  - restored → all pass.
 
 ---
 
