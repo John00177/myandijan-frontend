@@ -101,9 +101,13 @@ const UNAUTHENTICATED: RefreshResult = { status: "unauthenticated" };
 const TRANSIENT: RefreshResult = { status: "transient" };
 
 function defaultId(): string {
-  // Coordination id only — not a secret. randomUUID where available.
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  // Coordination id only — not a secret — but drawn from the Web Crypto CSPRNG
+  // all the same, so auth code never uses a non-cryptographic generator.
+  // randomUUID where available; otherwise getRandomValues, which every
+  // supported browser has (including Safari 14, which lacks randomUUID).
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function isMessage(data: unknown): data is CoordinationMessage {

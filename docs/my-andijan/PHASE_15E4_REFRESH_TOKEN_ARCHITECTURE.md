@@ -1,6 +1,8 @@
 # Phase 15E.4 — Refresh-Token Families, Reuse Detection & Race Protection
 
-**Status:** DESIGN ONLY — nothing in this document is implemented. Written 2026-10-02.
+**Status (2026-10-02):**
+- **15E.4a — frontend cross-tab refresh coordination: IMPLEMENTED** (commit `729d3c6`, branch `feat/15e4a-cross-tab-refresh-coordination`; see §18).
+- **The rest of Phase 15E.4 remains DESIGN ONLY.** Backend sessions and families, race-safe rotation, reuse detection, `sid`, migration — that is 15E.4b, 15E.4c, 15E.4d and 15E.4e — are **not implemented**.
 **Code inspected:**
 - Backend `main` = `41ee971`. Its application code is identical to `c048ff9`; the only difference since then is `CLAUDE.md`.
 - Frontend `main` = `e7e194f`.

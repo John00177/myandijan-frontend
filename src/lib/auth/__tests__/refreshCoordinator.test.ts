@@ -388,6 +388,32 @@ describe("refresh coordinator — across tabs", () => {
     }
   });
 
+  it("coordination ids fall back to crypto.getRandomValues when randomUUID is unavailable", async () => {
+    const realCrypto = globalThis.crypto;
+    vi.stubGlobal("crypto", { getRandomValues: realCrypto.getRandomValues.bind(realCrypto) });
+    try {
+      const browser = createBrowser();
+      const server = createServer();
+      const { coordinator } = browser.openTab(server.perform); // default id generator
+      await expect(coordinator.refresh("access-1")).resolves.toEqual({ status: "refreshed", accessToken: "access-2" });
+      const ids = browser.sent.flatMap((m) => ("operationId" in m ? [m.ownerId, m.operationId] : [m.ownerId]));
+      expect(ids.length).toBeGreaterThan(0);
+      for (const id of ids) expect(id).toMatch(/^[0-9a-f]{32}$/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("the coordinator never uses Math.random (comments excluded)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve } = await import("node:path");
+    // vitest runs from the project root; jsdom's URL cannot be handed to fileURLToPath.
+    const source = readFileSync(resolve(process.cwd(), "src/lib/auth/refreshCoordinator.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).not.toContain("Math.random");
+  });
+
   it("dispose() closes the tab's channel and listeners", () => {
     const browser = createBrowser();
     const { coordinator } = browser.openTab(createServer().perform);
