@@ -1,9 +1,18 @@
 # Phase 15E.4 — Refresh-Token Families, Reuse Detection & Race Protection
 
 **Status (2026-10-02):**
-- **15E.4a — frontend cross-tab refresh coordination: IMPLEMENTED** (commit `729d3c6`, branch `feat/15e4a-cross-tab-refresh-coordination`; see §18).
-- **The rest of Phase 15E.4 remains DESIGN ONLY.** Backend sessions and families, race-safe rotation, reuse detection, `sid`, migration — that is 15E.4b, 15E.4c, 15E.4d and 15E.4e — are **not implemented**.
-**Code inspected:**
+
+| Step | What | Status |
+|---|---|---|
+| **15E.4a** | Frontend cross-tab refresh coordination | **IMPLEMENTED** — frontend PR #4, merged as `add3fbe` (see §18) |
+| **15E.4b** | Backend sessions/families, race-safe rotation, 90-day absolute lifetime, session-wide `@Public` logout, session-level reset/suspension revocation, expand migration + backfill, real-PostgreSQL CI tests | **IMPLEMENTED** — backend branch `feat/15e4b-refresh-token-sessions` (PR to `main`, not merged at the time of writing; see §18) |
+| **15E.4c** | Reuse detection: observe-only, then session revocation on reuse | **DESIGN ONLY** |
+| **15E.4d** | `sid` claim and per-request session check of access tokens | **DESIGN ONLY** |
+| **15E.4e** | Contract: `session_id NOT NULL`, drop the legacy path and unused columns | **DESIGN ONLY** |
+
+Sections 1–17 are the design as written before implementation. Where 15E.4b deliberately differs from it, §18 says so.
+
+**Code inspected for the design (sections 1–17):**
 - Backend `main` = `41ee971`. Its application code is identical to `c048ff9`; the only difference since then is `CLAUDE.md`.
 - Frontend `main` = `e7e194f`.
 
@@ -441,3 +450,139 @@ Each step is its own PR through the gated pipeline, with production smoke checks
   - A refresh whose response is lost (the server rotated, the client never saw it) leaves the client with a refresh token the server has retired. A later retry with it is reuse, which only the server's grace window (15E.4b) can soften.
   - Logout while another tab's refresh is in flight can leave the server-side successor token orphaned but valid until it expires: the frontend discards it, but only server-side session revocation (15E.4b, `@Public` session logout) can kill it.
   - Server-side logout still fails when the access token has expired (§2), until 15E.4b.
+  - *Update after 15E.4b:* the last two limitations are resolved. Logout is `@Public` and authenticated by the refresh token, and it revokes the whole session, including a successor minted by an in-flight refresh. The lost-response case is unchanged: 15E.4b refuses a rotated token with the generic 401, and its grace window only *classifies* (see 15E.4b below).
+
+### 15E.4b — Backend sessions, race-safe rotation, absolute lifetime
+**Status: IMPLEMENTED** on backend branch `feat/15e4b-refresh-token-sessions`, PR to `main`; not merged at the time of writing. Backend only: the frontend needs no change, and the `/auth/refresh` request and response formats are unchanged.
+
+**Files.**
+- `prisma/schema.prisma`; migration `20261002090000_phase15e4b_auth_sessions`.
+- `src/auth/refresh-sessions.ts` (new): constants, pure helpers, `revokeAllUserSessions`.
+- `src/auth/auth.service.ts`: sign-in, refresh, logout, reset; `src/auth/auth.controller.ts`: logout route; `src/auth/auth-throttle.ts`: logout limit.
+- `src/admin/admin.service.ts`: suspension.
+- Tests: `test/db/*.db-spec.ts`, `jest.db.config.js`, `npm run test:db`; CI `.github/workflows/ci.yml`.
+
+#### Final schema
+- **`auth_sessions`**:
+  - `id` (serial PK), `user_id` (FK → users, `ON DELETE CASCADE`), `created_at`;
+  - `absolute_expires_at` (NOT NULL), `revoked_at`, `revoked_reason` (enum `SessionRevokedReason`), `last_used_at`;
+  - `user_agent` `VARCHAR(500)`, `ip_address` `VARCHAR(45)`;
+  - indexes `(user_id)` and `(user_id, revoked_at)`.
+- **`SessionRevokedReason`** = `LOGOUT`, `PASSWORD_RESET`, `SUSPENDED`, `REUSE_DETECTED`, `LEGACY_MIGRATION`.
+  - The last two are declared now and written from 15E.4c / 15E.4e, so those steps need no enum migration.
+  - `ADMIN` was **not** added: no admin session-revocation endpoint exists, and none was built.
+- **`refresh_tokens`** gains:
+  - `session_id` — nullable, FK → auth_sessions `ON DELETE CASCADE`, indexed;
+  - `rotated_at`;
+  - `parent_id` — nullable self-FK `ON DELETE SET NULL`, **UNIQUE**.
+  - `token_hash UNIQUE` is unchanged; `user_agent` and `ip_address` stay unused until 15E.4e.
+
+#### Refresh algorithm (one interactive transaction, READ COMMITTED)
+1. `sha256(token)`, then locate the row. No lock: this read only picks which session to lock.
+2. A session-less legacy token is attached to a new session (see Migration).
+3. **Session lock:** `UPDATE auth_sessions SET last_used_at = now WHERE id = $s AND revoked_at IS NULL AND absolute_expires_at > now`. Zero rows → 401.
+4. **Token compare-and-set**, under the lock: `UPDATE refresh_tokens SET rotated_at = now, revoked_at = now WHERE id = $t AND session_id = $s AND rotated_at IS NULL AND revoked_at IS NULL AND expires_at > now`. Zero rows → 401.
+5. User must be ACTIVE and not deleted, otherwise the transaction rolls back → 401.
+6. INSERT the successor: same session, `parent_id = $t`, `expires_at = min(now + JWT_REFRESH_EXPIRES_IN, absolute_expires_at)`.
+7. Commit, then sign the access JWT.
+
+Any failure inside the transaction throws, so nothing commits. Every failure — unknown, expired, rotated, revoked, lost race, revoked or expired session, inactive user, unique violation — is the same `401 Invalid or expired refresh token`.
+
+**Why the invariant holds ("one predecessor never produces two successors").**
+- **Session lock.** Concurrent requests for one session queue on the row lock taken by step 3. Each re-evaluates the WHERE clause against the committed row once it gets the lock.
+- **Compare-and-set.** Only the request that moves `rotated_at` from NULL gets a count of 1; every other request for that token gets 0.
+- **Database backstop.** `parent_id UNIQUE` makes a second successor impossible even if the code were wrong. P2002 is mapped to the same 401.
+
+**No raw SQL.** Prisma 5.22 emits `updateMany` with scalar filters as a single conditional `UPDATE … WHERE …`. That was verified from Prisma's query log against PostgreSQL 16, and the concurrency tests prove the behaviour. So the lock and the compare-and-set use Prisma's own API. Raw SQL appears only in tests: the lock holder and `pg_stat_activity` observation.
+
+**Lock order** (deadlock-free): user row → legacy session-less tokens → session rows → token rows. Refresh never locks the user row.
+
+#### Deliberate differences from the design (sections 1–17)
+1. **Rotation also sets `revoked_at`**, together with `rotated_at`.
+   - Reason: the previous release ignores `rotated_at`. Without this, a rotated token would become usable again for the old code during the rolling-deploy overlap, or after a rollback — tested.
+   - Consequence for 15E.4c: classify reuse by `rotated_at IS NOT NULL` **before** looking at `revoked_at`. The §6 step 5 order ("`revoked_at IS NOT NULL` → 401, done") must not be copied as-is.
+2. **No `REFRESH_RACE` log and no shadow `REUSE_DETECTED` audit in 15E.4b.** A rotated token gets the plain 401 and nothing else happens.
+   - `isWithinRefreshGraceWindow(token, successor, now)` and `REFRESH_GRACE_WINDOW_MS = 10_000` are implemented and tested; observation and enforcement are 15E.4c.
+   - Grace data that can be queried: `rotated_at` on the token, its successor through the unique `parent_id`, and the successor's `rotated_at`.
+3. **Logout ends a session only when it is given that session's *current* token** — not rotated, not revoked, not expired.
+   - A stale or rotated token ends nothing, so an old token alone cannot sign someone out, and no revocation is triggered by a rotated token in 15E.4b.
+   - The response is always `200 { success: true }`.
+4. **No audit row per sign-in.** The `auth_sessions` row (created time, device, IP) is the sign-in record. Revocations are audited:
+   - logout → `UPDATE` on `AuthSession` `{ revoked, reason: 'LOGOUT', tokensRevoked }`;
+   - reset and suspension → their existing rows.
+   - No `AuditAction.REVOKE` was added: the existing architecture records revocations as `UPDATE` and `SUSPEND`.
+5. **Reset and suspension audit payloads**: `sessionsRevoked` now counts **sessions**, and `tokensRevoked` was added. Before 15E.4b, `sessionsRevoked` counted tokens.
+
+#### Absolute lifetime
+- `absolute_expires_at = created_at + 90 days`, set at sign-in and **never** extended.
+- Every refresh checks it under the lock, and caps the new token's expiry at it.
+- With 2 hours of session left, the next token lives 2 hours, not 30 days.
+
+#### Logout (`POST /auth/logout`, now `@Public`)
+- **Authentication:** possession of the session's current refresh token, so it works after the access token has expired.
+- **Effect, in one transaction:**
+  - the session is locked and revoked (`LOGOUT`), so a refresh in flight finishes first;
+  - all its tokens are revoked, in a fresh snapshot that includes that refresh's successor;
+  - an audit row is written.
+- **Throttle:** 60 per minute per client address.
+- **Authorization records:** route snapshot `authenticated` → `public`. `src/authz/authz-migration.spec.ts` lists it as the single reviewed `INTENDED_PUBLIC` exception; every other route still fails CI if it becomes more permissive.
+- **Scope:** other devices' sessions are untouched. The device's current access token stays valid for ≤ 15 minutes, until 15E.4d.
+
+#### Password reset and suspension
+- **Revocation:** inside their existing transactions, after the user row is written (`sessionVersion + 1`, plus the status for suspension), `revokeAllUserSessions` revokes:
+  - legacy session-less tokens first;
+  - then every session (`PASSWORD_RESET` / `SUSPENDED`);
+  - then every token.
+- **Concurrent refreshes:** a refresh in flight either commits first, and its successor is caught by the final statement, or runs after and finds its session revoked. Tested with both held at the session lock.
+- **Reinstatement** (`activateUser`) touches no session or token, so revoked sessions stay revoked.
+
+#### Migration (expand → backfill → contract)
+- **Expand + backfill** — `20261002090000_phase15e4b_auth_sessions`, runs in the existing `prisma migrate deploy` at boot:
+  - **Additive only:** new enum and table; nullable columns; `parent_id UNIQUE` over all-NULL values.
+  - **Backfill:** each **active** legacy token (not revoked, not expired) gets its own session:
+    - `created_at` = the token's `created_at`;
+    - `absolute_expires_at = GREATEST(created_at + 90 days, token.expires_at)`, so nobody is signed out or shortened by the deploy.
+  - Revoked and expired legacy rows keep `session_id NULL`.
+- **Switchover and rollback:**
+  - The previous release keeps working against the expanded schema. Its INSERTs omit the new columns, and its refresh refuses tokens the new code rotated, because `revoked_at` is set.
+  - Tokens it mints have no session. The new code attaches one on first use: create the session, then compare-and-set `session_id IS NULL`. Of concurrent first uses only one attaches; the losers roll back their session.
+  - Rolling the code back leaves an unused schema behind and resurrects nothing.
+- **Contract — 15E.4e, separate deploy:**
+  - attach or retire the remaining NULL-session rows (`LEGACY_MIGRATION`);
+  - set `session_id NOT NULL`;
+  - drop the legacy path and the unused token columns.
+
+#### PostgreSQL test strategy (`npm run test:db`, CI job `test-and-build`)
+- **CI service:** throwaway `postgres:16-alpine`, pinned by digest, trust authentication — no credential in the repository. `permissions: contents: read` and the job name are unchanged.
+- **Guard:** the suites refuse any database that is not local or whose name lacks `test`, and never read `DATABASE_URL` or `.env`.
+- **Global setup:** deploys every migration on an empty database.
+- **Forced races, not timing luck:** a test transaction holds the session row with `FOR UPDATE`. The test waits until N contenders are observed in `pg_stat_activity` blocked on that `auth_sessions` row lock, then releases.
+  - **Refresh × refresh:** 2 contenders, and 10 contenders × 5 rounds.
+  - **Refresh × logout** and **refresh × reset:** 5 rounds each.
+  - **Unsynchronised bursts:** 4 contenders × 25 rounds.
+  - **Legacy first-use races:** 5 contenders × 10 rounds, and against password reset × 10 rounds.
+- **Mutation check:** with the compare-and-set and parent link removed, the TEST 1 cases fail (2, 10 and 4 successors). With them restored, they pass.
+- **Covered:**
+  - sign-in paths (one session each); device metadata;
+  - chain R1→R4; 90-day expiry (faked clock); TTL capped at session expiry;
+  - logout; reset; suspension + reinstatement; two devices;
+  - rotated-token presentation and grace classification; `parent_id` unique (P2002); rollback on failure;
+  - raw-token absence from logs, Prisma query parameters and every stored column;
+  - previous-release compatibility;
+  - migration backfill on pre-15E.4b data, in its own throwaway database.
+- **Results at the time of writing:** 27 database tests and 976 unit tests pass.
+
+#### Known limitations (15E.4b)
+- **Rotated token = plain 401.** No benign-race "replay" of the successor and no reuse revocation yet. A client that lost the refresh response is signed out on its next refresh — the same as before 15E.4b.
+- **Access tokens are not tied to a session** until 15E.4d. Logout and revocation end refresh, but an access token lives out its ≤ 15 minutes. Reset and suspension still kill all access tokens at once through `sessionVersion`.
+- **Legacy-session absolute expiry** counts from the legacy token's `created_at`, which is the last rotation by the old code, not the real sign-in.
+  - Previous-release overlap: a session-less token minted by the old code during the switchover starts a fresh session on first use.
+- **Logout of a legacy session-less token racing its own first refresh** can lose: the refresh attaches and rotates first, and the logout then finds a rotated token. Transitional only, until 15E.4e.
+- **Dependabot does not track the CI service image digest.** Bump it by hand.
+
+#### Deferred
+- **15E.4c:** observe-only reuse detection (`REFRESH_RACE` / shadow `REUSE_DETECTED`), then session revocation on reuse outside the grace window.
+  - Use `rotated_at`-first classification (difference 1 above) and `isWithinRefreshGraceWindow`.
+  - Open decision: whether reuse also bumps `sessionVersion`.
+- **15E.4d:** `sid` claim in new access tokens; `JwtStrategy` rejects revoked or expired sessions; tokens without `sid` stay valid until they expire.
+- **15E.4e:** contract, as in Migration above, plus an optional cleanup job for expired rows.
