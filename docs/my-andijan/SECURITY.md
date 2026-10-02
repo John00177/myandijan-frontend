@@ -343,7 +343,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | 2 | 🟡 **PARTLY DONE — Phase 15B** | ~~Install `@nestjs/throttler`~~ — installed; `/auth/*` throttled. **Still to do:** `/analytics/*`, `/search`, `/upload/*`, `POST /businesses` | Low |
 | 3 | ✅ **DONE — Phase 15B** | ~~Restrict CORS to known origins~~ | — |
 | 3a | ✅ **DONE — Phase 15E.2** | ~~`forgotPassword` printed the reset code to stdout and used `Math.random()`~~ — and `SmsService` logged every unsent login OTP. Codes are now never logged; reset codes use `crypto.randomInt`; delivery fails closed (503) without an SMS provider; one live code per phone + purpose; a per-phone failure budget across all code rows; atomic single use; no OTP sign-in for staff; timing equalized. **Owner action still required:** set `ESKIZ_EMAIL` / `ESKIZ_PASSWORD` on Railway — until then OTP sign-in and password reset answer 503. | — |
-| 3b | 🟠 Medium — **repository side done (15E.3); OWNER ACTION open** | **Vercel production still does not wait for CI** — re-verified 2026-10-02: `bbe2768` was live in production at 03:13:43 UTC, its `test-and-build` finished at 03:14:10. The workflow is hardened (§15); the gate itself is a Vercel project setting only the owner can enable — see §15 "Owner actions". | Trivial |
+| 3b | 🟢 **Configured (15E.3, 15E.7.1) — production proof pending** | ~~Vercel production did not wait for CI~~ (`bbe2768` was live at 03:13:43 UTC, its `test-and-build` finished at 03:14:10). The owner configured the Vercel Production Deployment Check `Vercel - myandijan-frontend: test-and-build` (2026-10-02), which the CI job reports (§15). The Vercel API does not expose the setting; the first production deployment after it — the merge of the 15E.7.1 documentation PR — is the proof. | — |
 | 4 | 🔴 High | **Gate or disable `/docs` in production** | Trivial |
 | 5 | 🔴 High | **Authenticate or throttle the three `/analytics/*` write endpoints** | Low |
 | 6 | 🟠 Medium | **Verify `JWT_ACCESS_SECRET` is set on Railway**; add `@nestjs/config` with a validation schema so a missing required variable fails at boot | Low |
@@ -399,27 +399,23 @@ Keep these true.
 | Gate | State | Evidence |
 | --- | --- | --- |
 | Railway "Wait for CI" (backend) | ✅ **Active** — `source.checkSuites: true`, 1 replica | `c048ff9`: deployment `112f91a8` created 03:32:22 in **WAITING** → `test-and-build` green 03:33:06 → BUILDING 03:33:13 → SUCCESS 03:34:14. Same pattern for every 15D–15E deploy. |
-| Vercel Deployment Checks (frontend) | ❌ **Not configured — owner action** | Production deployments carry no checks state and are aliased to `myandijan.uz` before CI finishes (`bbe2768`: live 03:13:43, CI done 03:14:10). |
-| `main` branch protection / ruleset | ❌ **None — owner action** | Public API: `protected: false`, no rulesets, on both repos. Configuring it needs repository-admin access, which this tooling does not hold. |
+| Vercel Production Deployment Check (frontend) | 🟢 **Configured by the owner (2026-10-02)** — requires `Vercel - myandijan-frontend: test-and-build` | The CI job posts that commit status on every push to `main` (`3e8219f`: pending 04:06:12 → success 04:06:45) and on same-repository pull requests (`4359f6f`, `e504a0e`). The setting is not readable through the Vercel API, and before it existed production went live ahead of CI (`bbe2768`: live 03:13:43, CI done 03:14:10). **Proof pending:** the first production deployment after configuration — the merge of the 15E.7.1 documentation PR — must stay unpromoted until the status is green. |
+| `main` branch ruleset (both repos) | ✅ **Active** — ruleset "Protect main" (backend `24347110`, frontend `24347040`), target `~DEFAULT_BRANCH` | Public API (`/rules/branches/main`), 2026-10-02: **deletion** blocked, **non_fast_forward** (force push) blocked, **pull_request** required (0 approvals), **required_status_checks** `test-and-build` from GitHub Actions (integration 15368) with **strict** (branch up to date) on. The **bypass list is not readable without admin access** — confirm in Settings → Rules → Rulesets that it is empty. Changes now reach `main` only through a pull request. |
 
 **Release flow.**
 
 ```text
 Backend   push → GitHub CI (test-and-build) → Railway waits for the check suite → build → migrate deploy → production   ✅ gated
-Frontend  push → Vercel builds and promotes to production   ‖   GitHub CI runs in parallel                            ❌ NOT gated yet
-Frontend, once the owner enables Deployment Checks:
-          push → Vercel builds → waits for test-and-build → promotes (assigns myandijan.uz) only on success          (target)
+Both     change → pull request → test-and-build must pass (branch up to date) → merge to main      (ruleset "Protect main")
+Frontend  merge → Vercel builds → waits for "Vercel - myandijan-frontend: test-and-build" → promotes (assigns myandijan.uz) only on success   ✅ configured (proof pending)
 ```
 
-**Owner actions (platform settings — not configurable from the repositories).**
-1. **Vercel — enable Deployment Checks** on project `myandijan-frontend`: Project → Settings → **Deployment Checks** → add the GitHub commit status **`Vercel - myandijan-frontend: test-and-build`** (blocks production alias assignment until it is green). The CI job writes that status itself — `pending` when it starts, then `success` only if every step succeeded (failure, cancellation and timeout report `failure`) — because Vercel's importer reads commit statuses, not the `test-and-build` check run. Vercel documents the same capability on the CLI as `vercel project checks … --blocks deployment-alias`. Verify on the next push: the production deployment must stay un-promoted until `test-and-build` is green.
-2. **GitHub — add a branch ruleset on `main`** in **both** repositories (Settings → Rules → Rulesets → New branch ruleset):
-   - **Name** `main-protection`, **Enforcement** Active, **Target** the default branch (`main`).
-   - **Restrict deletions** ✓ · **Block force pushes** ✓.
-   - **Require a pull request before merging** ✓ (required approvals: 0 — single maintainer).
-   - **Require status checks to pass** ✓ · **Require branches to be up to date before merging** ✓ · add the check **`test-and-build`** (source: GitHub Actions).
-   - **Bypass list:** *Repository admin* — so the owner can still push and administer directly (the current single-maintainer workflow). Everyone else must go through a pull request with `test-and-build` green.
+**Platform configuration (done by the owner, 2026-10-02 — not configurable from the repositories).**
+1. **Vercel Production Deployment Check** on project `myandijan-frontend` requiring the commit status `Vercel - myandijan-frontend: test-and-build`. The CI job writes that status itself — `pending` when it starts, then `success` only if every step succeeded (failure, cancellation and timeout report `failure`) — because Vercel's importer reads commit statuses, not the `test-and-build` check run. Vercel documents the same capability on the CLI as `vercel project checks … --blocks deployment-alias`.
+2. **GitHub ruleset "Protect main"** in both repositories, as verified in the table above.
 
-**Paths that bypass the gates (owner-only; emergency use).** Railway dashboard *Redeploy*/*Deploy* and `railway up`; Vercel dashboard *Promote*/*Redeploy*, `vercel --prod`, `vercel promote` and the promote API; a ruleset bypass by the repository admin. None is used by normal releases. **Policy:** use them only to roll back or to recover from a platform incident; prefer an instant rollback to a previously gated deployment (Railway rollback, Vercel rollback/promote of an earlier production deployment) over deploying an unchecked build; record any such use in CURRENT_STATE. Preview deployments (pull requests) never reach the production domain; Vercel's Git fork protection is on by default.
+**Still to confirm (owner, UI only).** That each ruleset's bypass list is empty; and, after the 15E.7.1 PR merges, that its Vercel production deployment waited for the status before taking `myandijan.uz`.
+
+**Paths that bypass the gates (owner-only; emergency use).** Railway dashboard *Redeploy*/*Deploy* and `railway up`; Vercel dashboard *Promote*/*Redeploy*, `vercel --prod`, `vercel promote` and the promote API; any ruleset bypass actor (the bypass list is not readable without admin access). None is used by normal releases. **Policy:** use them only to roll back or to recover from a platform incident; prefer an instant rollback to a previously gated deployment (Railway rollback, Vercel rollback/promote of an earlier production deployment) over deploying an unchecked build; record any such use in CURRENT_STATE. Preview deployments (pull requests) never reach the production domain; Vercel's Git fork protection is on by default.
 
 **Lint.** Not part of CI. The frontend has `oxlint` (exit 0, 17 pre-existing warnings); the backend has no linter configured.

@@ -501,13 +501,13 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 **Not decided here:** staff password reset by SMS code is still allowed (needed for self-recovery; revisit with 2FA); a second factor for staff; refresh-token reuse detection (15E.4).
 
 
-### D-77 · Production deploys only commits whose `test-and-build` check passed 🔒 LOCKED (frontend gate pending owner action)
+### D-77 · Production deploys only commits whose `test-and-build` check passed 🔒 LOCKED
 **Decision (Phase 15E.3, 2026-10-02).**
-1. **One required check per repository: `test-and-build`** (workflow `CI`). It is the production gate: Railway's "Wait for CI" (`checkSuites: true`) for the backend, Vercel Deployment Checks for the frontend, and the `main` ruleset for merges. Renaming the job breaks the gates.
+1. **One required check per repository: `test-and-build`** (workflow `CI`). It is the production gate: Railway's "Wait for CI" (`checkSuites: true`) for the backend, the Vercel Production Deployment Check `Vercel - myandijan-frontend: test-and-build` (a commit status the CI job reports) for the frontend, and the `main` ruleset for merges. Renaming the job breaks the gates.
 2. **CI is read-only and immutable:** `permissions: contents: read`, actions pinned to full commit SHAs (updated through Dependabot pull requests), `persist-credentials: false`. No workflow deploys; the platforms deploy on the check result.
 3. **Normal releases never bypass the gate.** Manual platform deploys/promotions and ruleset bypass are owner-only emergency tools; prefer rolling back to a previously gated deployment.
-4. **`main` ruleset:** no deletion, no force push, pull request + `test-and-build` (up to date) for everyone except the repository admin (single-maintainer workflow).
-**Status (verified).** Backend gate active. **Frontend gate and both rulesets require the owner** (platform/admin settings; see SECURITY §15 "Owner actions") — until then the frontend is NOT gated.
+4. **`main` ruleset "Protect main" (both repos):** no deletion, no force push, pull request + `test-and-build` (up to date). Changes reach `main` only through a pull request.
+**Status (2026-10-02).** Backend gate active and verified. Rulesets active (verified via the public API; the bypass list is not readable without admin access). Frontend Production Deployment Check configured by the owner; **production proof pending** the first deployment after configuration (the 15E.7.1 documentation PR merge).
 
 ---
 
