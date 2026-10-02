@@ -332,3 +332,12 @@ The transcript is JSONL, one record per line. Record types present: `assistant` 
 **The compaction summary at line 3239** is the highest-value single record — 19,976 characters covering intent, files, errors and fixes, all user messages, pending tasks and current state.
 
 Two practical notes, learned the hard way in this session: Python's default `cp1252` stdout encoding **will** crash on the Uzbek and Russian text in this transcript — write output with `io.open(..., encoding="utf-8")`. And extract with a script file rather than a heredoc, because the transcript's apostrophes break shell quoting.
+
+
+## Phase 15 — authorization & governance (2026-10-01 → 10-02)
+
+- **15A** audited the role model; **15C** designed the two-plane target (PLATFORM_OWNER governance vs operational roles) — approved.
+- **15B** (D-74): owner-only business content, explicit suspension target table, session revocation on reset/suspension, `/auth/*` rate limits, CORS allowlist, audit request context.
+- **15D** (D-75): **capability authorization, deny by default.** Global `AuthzGuard`; every route declares `@Public` / `@Authenticated` / `@RequireCapability`; 20 capabilities in one explicit role table (`src/authz/capabilities.ts`, no inheritance); ownership + conflict-of-interest policies; rank model (`ROLE_HIERARCHY`, `RolesGuard`, `@Roles`) deleted; route-inventory test + committed snapshot fail CI on any undeclared or changed rule; frontend renders from server-issued `capabilities`.
+- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone); the Security Hardening backlog (reset code logged to stdout + `Math.random`, Vercel CI gate, distributed rate limiting, refresh-token reuse detection, remaining rate-limit coverage).
+- **Where to look:** `ARCHITECTURE.md` §31–§32, `DECISIONS.md` D-74/D-75, `SECURITY.md` §3.

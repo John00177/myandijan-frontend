@@ -90,7 +90,7 @@
 **Rationale (schema).** *"Cities sit INSIDE districts, EXCEPT region-level cities (Andijan city), which report directly to the region."* And the trap it exists to prevent: *"Andijan CITY is not Andijon DISTRICT (whose seat is Kuyganyor). Users searching 'Andijan' almost always mean the city."*
 **Evidence it mattered.** `scripts/rename-andijon-district.js` is a one-off fix for exactly this confusion, and `prisma/seed.ts` re-explains it: 14 tumans + Andijon shahri = 15 units.
 
-### D-17 · Role hierarchy as a floor check, not exact match 🔒 LOCKED (one sub-question open)
+### D-17 · Role hierarchy as a floor check, not exact match ⛔ SUPERSEDED by D-75 (Phase 15D) — the rank model, `RolesGuard` and `@Roles` are deleted
 **Rationale (guard comment).** *"@Roles(...) declares the FLOOR a caller must clear… so SUPER_ADMIN satisfies every @Roles(...) check without needing to be listed explicitly on each route."*
 **Implementation.** `Math.min(...required)` then `userLevel >= requiredLevel`; `getAllAndOverride` lets a method override its class in **both** directions (down to `MODERATOR` for approve/reject, up to `SUPER_ADMIN` for hide).
 **⚠️ Open sub-question.** `SUPPORT` (3) outranks `BUSINESS_OWNER` (2), so every `@Roles(BUSINESS_OWNER)` route is also open to support staff. **Never stated as intended or unintended.** See `SECURITY.md` §3.
@@ -451,6 +451,42 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 5. **Supporting controls:** password reset and suspension revoke all sessions (`users.session_version`, carried as `sv`); audit rows record actor role, request id, edge-reported IP and user agent; `/auth/*` is rate limited per address and per phone; CORS is an allowlist.
 **Deliberately not done here (later phases):** PLATFORM_OWNER model/`platform_governance`, ownership transfer, appoint/remove SUPER_ADMIN or ADMIN, lifting an emergency freeze, governance audit and hash chain, step-up re-authentication, the capability map and default-deny guard, the SUPPORT lookup desk, external immutable audit storage.
 **Why locked.** `ownership.authorization.spec.ts` (all six roles × own/other business for profile, hours and reply; route metadata), `catalog.authorization.spec.ts` + `products.service.spec.ts` (catalog), `user-status.authorization.spec.ts` (full actor × target matrix for suspend and reinstate, self, freeze, lost race), `role-write-inventory.spec.ts` (source scan of every role write; no body accepts `role`), `session-security.spec.ts` (suspension and reset kill old access and refresh tokens end-to-end).
+
+### D-75 · Capability authorization, deny by default; ownership and conflict of interest as record policies; no rank anywhere 🔒 LOCKED
+**Decision (Phase 15D).** Replaces D-17's numeric floor model in full.
+1. **Four separate dimensions.** *Role* = operational job (`users.role`). *Capability* = an action a role may take, granted by one explicit table (`src/authz/capabilities.ts` — no inheritance; every role's set is written out). *Ownership* = whether this record is yours (`src/authz/policies.ts`). *Governance* = the PLATFORM_OWNER plane — **not implemented, not a role, not a capability**.
+2. **Deny by default.** A single global `AuthzGuard` (`APP_GUARD`). Every route declares exactly one of `@Public()`, `@Authenticated()` (own-account data only: profile, favorites, uploads, RSVPs) or `@RequireCapability(...)` (all listed required). An undeclared route is refused (403); `@RequireGovernance()` exists only as a placeholder that refuses everyone. Controllers attach no auth guards of their own.
+3. **The matrix** (20 capabilities):
+
+| Capability | CUSTOMER | BUSINESS_OWNER | SUPPORT | MODERATOR | ADMIN | SUPER_ADMIN |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| `review.write` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `review.report` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `business.claim` | ✅ | ✅ | — | — | ✅ | ✅ |
+| `business.create` | — | ✅ | — | — | ✅ | ✅ |
+| `business.manage_own` (+ ownership) | — | ✅ | — | — | ✅ | ✅ |
+| `business.review` (not own) | — | — | — | ✅ | ✅ | ✅ |
+| `review.moderate` (not own) | — | — | — | ✅ | ✅ | ✅ |
+| `report.resolve` (not own) | — | — | — | ✅ | ✅ | ✅ |
+| `business.operate` (not own) | — | — | — | — | ✅ | ✅ |
+| `business.edit_any` (not own, reason) | — | — | — | — | ✅ | ✅ |
+| `claim.review` (not own) | — | — | — | — | ✅ | ✅ |
+| `event.review` (not own) | — | — | — | — | ✅ | ✅ |
+| `taxonomy.manage` | — | — | — | — | ✅ | ✅ |
+| `user.pii.read` | — | — | — | — | ✅ | ✅ |
+| `user.status.manage` (+ target table) | — | — | — | — | ✅ | ✅ |
+| `audit.read` | — | — | — | — | ✅ | ✅ |
+| `analytics.platform` | — | — | — | — | ✅ | ✅ |
+| `business.hide` (not own) | — | — | — | — | — | ✅ |
+| `business.delete` (not own) | — | — | — | — | — | ✅ |
+| `analytics.users` | — | — | — | — | — | ✅ |
+| **governance (PLATFORM_OWNER)** | — | — | — | — | — | — *(not implemented; not a capability)* |
+
+4. **Ownership**: owner routes need `business.manage_own` **and** `ownerId === caller`. **Conflict of interest**: holders of a staff capability are still refused on their own records — their listing (approve/reject, verify, suspend, promote, hide, delete, /admin edit/branch/hours), their claim, a review they wrote or one about their business, a report they filed or that concerns their review/business, an event of their business. **Target rules** for account status stay the explicit table of D-74 (`src/authz/user-status.policy.ts`).
+5. **Intended behaviour changes vs the rank model** (pinned by `authz-migration.spec.ts`, nothing became more permissive): SUPPORT and MODERATOR are refused at the route on all 31 owner routes and on filing claims; CUSTOMER is refused on creating/operating listings (it keeps claiming — a claimant becomes BUSINESS_OWNER on approval; the UI never offered CUSTOMER the owner area). Staff are refused on their own records as above.
+6. **Frontend** renders from the server-issued `capabilities` list (GET /users/me and every auth response) via `useAuth().can()` / `useCan()`; no code compares role names to decide access; fails closed when the list is absent. UX only.
+**Why locked.** `route-authorization.spec.ts` (every route has a rule; committed route→rule snapshot; every route × role vs an independent holder table; APP_GUARD registered), `role-capabilities.spec.ts` (each role's set pinned), `no-rank-model.spec.ts` (the hierarchy, `RolesGuard`, `@Roles` and level comparisons cannot return), `authz-migration.spec.ts` (old vs new for every route × role), `authz.guard.spec.ts`, `policies.spec.ts`, `admin.service.conflict.spec.ts`, `authz.e2e.spec.ts` (real AppModule over HTTP).
+**Not decided here (still deferred):** PLATFORM_OWNER governance and everything in it; SUPPORT desk capabilities; ADMIN cross-business catalog editing (15C open #9).
 
 ---
 

@@ -317,3 +317,12 @@ Ten decisions were **never actually made** and are listed at the end of [`DECISI
 ## 12. One-paragraph verdict
 
 **This is a well-engineered project in an awkward position.** The backend is essentially complete and genuinely good — parameterized SQL throughout, thoughtful schema design with recorded rationale, a sophisticated Uzbek-aware search layer, real anti-abuse constraints, and privacy-by-design in the logging. The frontend is equally complete locally, with full trilingual parity and a careful SEO head layer. **But almost none of the last month's work is visible to users**, because a Windows shell-policy problem has blocked the deploy; the signup flow that two sessions built cannot be completed by anyone because SMS was never configured; and a large fraction of the backend has no UI in front of it. **None of the blocking problems are large.** The first nine items in §6 are mostly single commands or small changes, and they convert a stalled project into a launchable one. The two things that genuinely need attention beyond that are **the committed credential** and **the total absence of tests**.
+
+
+## Phase 15 — authorization & governance (2026-10-01 → 10-02)
+
+- **15A** audited the role model; **15C** designed the two-plane target (PLATFORM_OWNER governance vs operational roles) — approved.
+- **15B** (D-74): owner-only business content, explicit suspension target table, session revocation on reset/suspension, `/auth/*` rate limits, CORS allowlist, audit request context.
+- **15D** (D-75): **capability authorization, deny by default.** Global `AuthzGuard`; every route declares `@Public` / `@Authenticated` / `@RequireCapability`; 20 capabilities in one explicit role table (`src/authz/capabilities.ts`, no inheritance); ownership + conflict-of-interest policies; rank model (`ROLE_HIERARCHY`, `RolesGuard`, `@Roles`) deleted; route-inventory test + committed snapshot fail CI on any undeclared or changed rule; frontend renders from server-issued `capabilities`.
+- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone); the Security Hardening backlog (reset code logged to stdout + `Math.random`, Vercel CI gate, distributed rate limiting, refresh-token reuse detection, remaining rate-limit coverage).
+- **Where to look:** `ARCHITECTURE.md` §31–§32, `DECISIONS.md` D-74/D-75, `SECURITY.md` §3.

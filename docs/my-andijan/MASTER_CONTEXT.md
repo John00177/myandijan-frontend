@@ -54,7 +54,7 @@ The platform is built to become **the default way people in Andijan find local b
 | **Admins** | `ADMIN` | Full catalogue + user + taxonomy management, audit log, analytics | Backend complete (31 routes); UI partially wired to real endpoints |
 | **Super admins / founder** | `SUPER_ADMIN` | Destructive actions (hide/delete business), command-centre analytics, platform health overview | Backend complete; UI thin |
 
-There are **six roles** in a strict privilege hierarchy (`src/common/constants/role-hierarchy.ts`): `CUSTOMER`(1) → `BUSINESS_OWNER`(2) → `SUPPORT`(3) → `MODERATOR`(4) → `ADMIN`(5) → `SUPER_ADMIN`(6).
+There are **six roles** — `CUSTOMER`, `BUSINESS_OWNER`, `SUPPORT`, `MODERATOR`, `ADMIN`, `SUPER_ADMIN` — and since Phase 15D **no hierarchy**: each role holds an explicit set of capabilities (`src/authz/capabilities.ts`, D-75), ownership is checked per record, and the PLATFORM_OWNER governance plane is not implemented.
 
 ---
 
@@ -200,7 +200,7 @@ Full detail and rationale in `DECISIONS.md`. The load-bearing ones:
 2. **Reviews are branch-scoped; favourites are business-scoped.** One review per user per branch (`@@unique([branchId, userId])`) is the primary anti-spam control.
 3. **Vanilla PostgreSQL only** — the database must be relocatable to an Uzbek host. (`pg_trgm` is used; it is a standard contrib extension, not proprietary.)
 4. **Integer autoincrement IDs**, chosen to match the existing auth module, JWT payload, guards and seed script.
-5. **Role check is a hierarchy floor, not exact match.** `@Roles(...)` declares the minimum level; anyone at or above passes, so `SUPER_ADMIN` satisfies every check implicitly.
+5. **Authorization is capability-based and deny-by-default (Phase 15D, D-75).** Every route declares `@Public`, `@Authenticated` or `@RequireCapability(...)`; the global `AuthzGuard` refuses anything undeclared. No role inherits another's permissions. *(The old rank-floor `@Roles` model was removed.)*
 6. **Phone-first auth, `+998XXXXXXXXX`.** No email/password signup path in the new flow; email is optional on the user record.
 7. **Yelp-derived UX:** one field per screen, **no progress bar** (deliberately, to reduce drop-off), "Bepul" (free) in claim headlines, skip button on optional steps, legal consent as text above the CTA rather than a checkbox, account created before the profile step.
 8. **Custom i18n, not `react-i18next`.** Flat dictionaries in `src/i18n/{uz,ru,en}.ts`; `TranslationKey = keyof typeof uz`, so `uz` is the compiler-enforced source of truth. **`t()` has no interpolation** — callers use `.replace("{x}", value)`.
@@ -248,7 +248,7 @@ These are load-bearing. Changing any of them breaks something non-obvious or dis
 
 1. **The `Business` / `Branch` split.** Moving location data onto `Business` would break search geo-filtering, reviews, hours, the map, and every index.
 2. **`dayOfWeek` = 0-is-Monday.** Changing it silently corrupts hours display, "open now", and `schema.org` opening-hours output.
-3. **The role hierarchy semantics** (`@Roles` = floor, not exact match). Switching to exact-match would lock `SUPER_ADMIN` out of most routes.
+3. **The capability model** (D-75). Adding a route without an authorization rule fails CI (`route-authorization.spec.ts`); changing a route's rule requires regenerating the committed snapshot deliberately.
 4. **`uz` as the i18n source of truth.** `TranslationKey` derives from it; that derivation is what makes missing translations a compile error.
 5. **`t()` having no interpolation.** Callers use `.replace()`. Adding interpolation means auditing every call site.
 6. **Vanilla-PostgreSQL-only.** This is a legal/portability requirement, not a style choice.

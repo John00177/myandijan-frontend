@@ -176,3 +176,14 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 - **Ask for a command's output rather than assuming its result.**
 - **When you change the architecture, update the document that owns it** — the table in `CLAUDE.md` §13 maps each kind of change to the file that must be updated.
 - **Never request or reproduce a secret value.** Names only.
+
+
+## Phase 15 — authorization & governance (2026-10-01 → 10-02)
+
+- **15A** audited the role model; **15C** designed the two-plane target (PLATFORM_OWNER governance vs operational roles) — approved.
+- **15B** (D-74): owner-only business content, explicit suspension target table, session revocation on reset/suspension, `/auth/*` rate limits, CORS allowlist, audit request context.
+- **15D** (D-75): **capability authorization, deny by default.** Global `AuthzGuard`; every route declares `@Public` / `@Authenticated` / `@RequireCapability`; 20 capabilities in one explicit role table (`src/authz/capabilities.ts`, no inheritance); ownership + conflict-of-interest policies; rank model (`ROLE_HIERARCHY`, `RolesGuard`, `@Roles`) deleted; route-inventory test + committed snapshot fail CI on any undeclared or changed rule; frontend renders from server-issued `capabilities`.
+- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone); the Security Hardening backlog (reset code logged to stdout + `Math.random`, Vercel CI gate, distributed rate limiting, refresh-token reuse detection, remaining rate-limit coverage).
+- **Where to look:** `ARCHITECTURE.md` §31–§32, `DECISIONS.md` D-74/D-75, `SECURITY.md` §3.
+
+**For review:** any new endpoint must carry an authorization decorator — CI rejects it otherwise (`route-authorization.spec.ts`), and changing who may call a route means editing `src/authz/capabilities.ts` and the committed snapshot together. Proposals that reintroduce a role "level" will fail `no-rank-model.spec.ts` by design.

@@ -284,6 +284,8 @@ Region (1: Andijan) → District (14) → City (11)
 
 Two guards, composed as `@UseGuards(JwtAuthGuard, RolesGuard)`.
 
+> ⛔ **Superseded by Phase 15D (§32, D-75):** `RolesGuard`, `@Roles` and the rank table described below were deleted and replaced by capability authorization. Kept for history.
+
 **`RolesGuard` is a hierarchy floor check, not an exact match:**
 
 ```ts
@@ -964,3 +966,25 @@ Implements the stabilization slice of the approved Phase 15C architecture (two p
 
 **Deployment (Phase 15B).** Backend `fda2390` pushed 12:50:07 UTC → Railway auto-created deployment `5baef717-8d3c-47a9-bfea-98767ccf908f` at 12:50:09 (WAITING for CI) → CI run 36864443549 green 12:51:03 → live 12:52:24 (boot log maps `PUT /admin/businesses/:id/hours`; the start command's `prisma migrate deploy` applied the additive migration before boot). No manual trigger. Frontend `bdb5fcb` pushed only after the backend was live (12:57:57) → CI run 36865345444 green 12:58:28 → Vercel deployment `dpl_BFz6iRiUpE9H4s9Tmqcu1jFh6pW7`, READY 12:58:23 — **5 s before CI finished**, re-confirming the open Vercel gating gap. Live bundle `index-WZDCWr4d.js` = local build; the admin chunk contains the reason prompt.
 **Production smoke (read-only).** `X-Request-Id` on every response. CORS: preflight from `myandijan.uz`/`www.myandijan.uz` echoes the origin; `evil.example` and `localhost:5173` get no `Access-Control-Allow-Origin`; no-Origin requests unaffected; a real cross-origin fetch from `https://myandijan.uz` → 200. All owner routes, `/admin` edit/hours/branch, user suspend/activate, users, audit, hide → `401` anonymous and with an invalid token. Public reads → 200; `/businesses/1` → 404. Rate limiting, using only `/auth/login` with unregistered numbers (login writes nothing unless it succeeds): one phone → 10×401 then 429; a 70-request parallel burst from one address → 60×401 + 10×429, and an identical burst with a forged `X-Real-IP`/`X-Forwarded-For` on every request → the same 60/10 (forged headers open no new bucket). Not provable from a single machine: that two *different* real clients get separate buckets (no IPv6/second egress available). No production record was created or modified.
+
+
+## 32. Capability authorization — 2026-10-02 (Phase 15D)
+
+Decision **D-75**. Replaces the rank model (D-17) entirely. PLATFORM_OWNER governance is **not** implemented.
+
+**Module `src/authz/`.**
+- `capabilities.ts` — the 20 capabilities and THE explicit role → capability table (`ROLE_CAPABILITIES`, `hasCapability`, `capabilitiesFor`).
+- `authz.decorators.ts` — `@Public()`, `@Authenticated()`, `@RequireCapability(...caps)` (all required), `@RequireGovernance()` (placeholder: refuses everyone; used by no route).
+- `authz.guard.ts` — the global `AuthzGuard`, registered as `APP_GUARD` in `AppModule`. No rule → 403; `@Public` → open; otherwise it runs the existing passport JWT strategy (user reloaded per request, status + `session_version` enforced → 401 on failure) and then `decide()`.
+- `decide.ts` — the pure route decision `(rule, role) → allow | unauthenticated | forbidden`, used by the guard **and** every authorization test.
+- `policies.ts` — record-level rules: `assertOwnsBusiness` (owner routes) and the conflict-of-interest checks (`assertNotOwnBusiness`, `assertNotOwnClaim`, `assertNotOwnReviewMatter`, `assertNotOwnReportMatter`), called inside the services' transactions before any write.
+- `user-status.policy.ts` — the explicit suspend/reinstate target table (moved here from `admin/`, unchanged from D-74).
+- `route-inventory.ts` + `route-authorization.snapshot.json` — enumerates every route from real controller metadata; the committed snapshot of 127 routes → rules (38 public/authenticated, 89 capability).
+
+**Controllers** carry one rule per route and no auth guards (`AuthController` keeps only `ThrottlerGuard`). **Deleted:** `common/constants/role-hierarchy.ts`, `common/guards/roles.guard.ts` (+ spec), `common/decorators/roles.decorator.ts`. PII shaping uses `hasCapability(role, 'user.pii.read')`. `GET /users/me` and every auth response return `capabilities: string[]`.
+
+**Frontend.** `src/lib/capabilities.ts` (`Capability`, `hasCapability`); `AuthContext` exposes `can(capability)` and `useCan()` and no longer has `isOwner`/`isAdmin`/`isSuperAdmin`/`canModerate`. Admin navigation: `VIEW_CAPABILITY` maps each admin view to its capability; the dashboard lands on the first view the user may open. Header links, owner dashboard/add-business gates, hide/verify/suspend/promote/edit buttons and analytics follow capabilities; catalog and reply controls need ownership **and** `business.manage_own`. Fails closed when the capability list is absent.
+
+**Tests.** Backend 920 (was 577); new: `route-authorization.spec.ts` (133), `role-capabilities.spec.ts`, `no-rank-model.spec.ts`, `authz-migration.spec.ts`, `authz.guard.spec.ts`, `policies.spec.ts`, `admin.service.conflict.spec.ts`, `authz.e2e.spec.ts` (real `AppModule`, live HTTP), `users.capabilities.spec.ts`; the old floor specs were rewritten to the capability rules. Frontend 153 (was 145).
+
+**Deployment (Phase 15D).** Backend `33790f1` pushed 00:00:27 UTC (2026-10-02) → Railway auto-created deployment `0bf12ab2-c70d-498e-af55-32e435ef6414` at 00:00:28 → CI run 36943767327 green 00:01:06 → booted 00:02:01 ("No pending migrations" — no schema change). Frontend `d25fb43` pushed after the backend was live (00:02:22) → CI run 36943945432 green 00:03:03 → Vercel `dpl_7qdAtNZLbNWYCRWWzvxAN6RNGjNW`; live bundle `index-MqMErRup.js` = local build. **Production smoke (read-only):** all 98 non-public routes (89 capability + 9 authenticated, driven by the committed snapshot) → `401` anonymous and with a forged token; all 18 public GET routes open; `X-Request-Id` present; CORS preflight from `myandijan.uz` allowed. Per-role 403/allow behaviour is proven by `authz.e2e.spec.ts` through the real `AppModule` (no production credentials were used). No production record was created or modified.

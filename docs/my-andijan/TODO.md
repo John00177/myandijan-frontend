@@ -213,7 +213,9 @@
 - [ ] **Add account lockout** after N failed logins **[REVIEW]**
 - [ ] **Add a self-service account-deletion / anonymisation path** — `UserStatus.DELETED` exists, no endpoint **[REVIEW]**
 - [x] **Decide whether `SUPPORT` should outrank `BUSINESS_OWNER`** — Phase 15B (D-74): owner routes are ownership-only, no role inherits by rank **[REVIEW]**
-- [ ] **Phase 15B follow-ups:** send the password-reset code via `SmsService` and stop logging it (+ `crypto.randomInt`) — SECURITY §13 #3a; capability map + default-deny guard (replace remaining `@Roles` floors, SECURITY §3 #1a); PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
+- [x] **Capability map + default-deny guard** — Phase 15D (D-75): rank model removed, every route declares a rule, route-inventory test in CI
+- [ ] **Security Hardening phase (deferred):** send the password-reset code via `SmsService` and stop logging it (+ `crypto.randomInt`) — SECURITY §13 #3a; Vercel CI deployment gate; distributed rate limiting if replicas increase; remaining rate-limit coverage
+- [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
 - [ ] **Remove the dead `JWT_REFRESH_SECRET`** from `.env`/`.env.example` — nothing reads it, and it implies refresh tokens are signed JWTs (they are opaque random bytes) **[REVIEW]**
 - [ ] **Add the seven missing variables to `.env.example`** — `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`, `ESKIZ_BASE_URL` (+ remove `SUPABASE_ANON_KEY` if unneeded). Onboarding from it currently yields an API that will not boot **[REVIEW]**
 - [ ] **Run `npm audit`; enable Dependabot; remove the undeclared `sonner`** **[REVIEW]**
