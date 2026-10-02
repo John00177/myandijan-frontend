@@ -450,7 +450,10 @@ Each step is its own PR through the gated pipeline, with production smoke checks
   - A refresh whose response is lost (the server rotated, the client never saw it) leaves the client with a refresh token the server has retired. A later retry with it is reuse, which only the server's grace window (15E.4b) can soften.
   - Logout while another tab's refresh is in flight can leave the server-side successor token orphaned but valid until it expires: the frontend discards it, but only server-side session revocation (15E.4b, `@Public` session logout) can kill it.
   - Server-side logout still fails when the access token has expired (§2), until 15E.4b.
-  - *Update after 15E.4b:* the last two limitations are resolved. Logout is `@Public` and authenticated by the refresh token, and it revokes the whole session, including a successor minted by an in-flight refresh. The lost-response case is unchanged: 15E.4b refuses a rotated token with the generic 401, and its grace window only *classifies* (see 15E.4b below).
+  - *Update after 15E.4b:*
+    - **Logout racing an in-flight refresh: resolved.** Logout is `@Public`, authenticated by the refresh token, and revokes the whole session. If the refresh committed first, the token the client presents is the one just rotated: it is still accepted for logout **only** while inside the 10 s grace window with its successor unused, and the successor is revoked with the session. An older or replayed token cannot sign anyone out.
+    - **Logout with an expired access token: resolved.**
+    - **The lost-response case for *refresh* is unchanged:** 15E.4b refuses a rotated token with the generic 401, and the grace window does not hand out the successor.
 
 ### 15E.4b — Backend sessions, race-safe rotation, absolute lifetime
 **Status: IMPLEMENTED** on backend branch `feat/15e4b-refresh-token-sessions`, PR to `main`; not merged at the time of writing. Backend only: the frontend needs no change, and the `/auth/refresh` request and response formats are unchanged.
@@ -504,9 +507,11 @@ Any failure inside the transaction throws, so nothing commits. Every failure —
 2. **No `REFRESH_RACE` log and no shadow `REUSE_DETECTED` audit in 15E.4b.** A rotated token gets the plain 401 and nothing else happens.
    - `isWithinRefreshGraceWindow(token, successor, now)` and `REFRESH_GRACE_WINDOW_MS = 10_000` are implemented and tested; observation and enforcement are 15E.4c.
    - Grace data that can be queried: `rotated_at` on the token, its successor through the unique `parent_id`, and the successor's `rotated_at`.
-3. **Logout ends a session only when it is given that session's *current* token** — not rotated, not revoked, not expired.
-   - A stale or rotated token ends nothing, so an old token alone cannot sign someone out, and no revocation is triggered by a rotated token in 15E.4b.
-   - The response is always `200 { success: true }`.
+3. **Logout ends a session only when given that session's current token, or that token's immediate predecessor in one narrow case.**
+   - **The narrow case:** the predecessor was rotated within the grace window (10 s) and its successor is still unused. That is the client signing out while its own refresh was in flight: the server already rotated, and the client never stores the successor.
+   - **Anything older ends nothing:** a token rotated longer ago, one whose successor has been used, or one that is revoked or expired. An old or replayed token alone cannot sign someone out.
+   - **Refresh is unchanged:** it still refuses any rotated token with the generic 401 and never revokes on it.
+   - **Response:** always `200 { success: true }`.
 4. **No audit row per sign-in.** The `auth_sessions` row (created time, device, IP) is the sign-in record. Revocations are audited:
    - logout → `UPDATE` on `AuthSession` `{ revoked, reason: 'LOGOUT', tokensRevoked }`;
    - reset and suspension → their existing rows.
@@ -519,11 +524,16 @@ Any failure inside the transaction throws, so nothing commits. Every failure —
 - With 2 hours of session left, the next token lives 2 hours, not 30 days.
 
 #### Logout (`POST /auth/logout`, now `@Public`)
-- **Authentication:** possession of the session's current refresh token, so it works after the access token has expired.
+- **Authentication:** possession of a refresh token entitled to end the session — the current one, or its predecessor inside the grace window with the successor unused (difference 3). No access token is needed, so it works after the access token has expired.
 - **Effect, in one transaction:**
   - the session is locked and revoked (`LOGOUT`), so a refresh in flight finishes first;
-  - all its tokens are revoked, in a fresh snapshot that includes that refresh's successor;
+  - **entitlement is re-checked under that lock, on a fresh clock.** If the successor was used while logout waited, the revocation rolls back and nothing changes;
+  - all the session's tokens are revoked, in a fresh snapshot that includes the successor of any refresh it waited for;
   - an audit row is written.
+- **Logout racing a refresh of the same session is closed in every order:**
+  - logout locks first → the refresh then finds the session revoked;
+  - the refresh commits first (even before logout reads the token) → logout presents the token just rotated, inside the grace window with its successor unused, and ends the session.
+- **Legacy session-less token:** logout revokes that token alone (it is the whole session). If its UPDATE loses to the token's concurrent first refresh — which attaches a session and rotates the token — logout re-reads the token and ends the session that refresh attached. Logout never creates a session and never un-revokes one.
 - **Throttle:** 60 per minute per client address.
 - **Authorization records:** route snapshot `authenticated` → `public`. `src/authz/authz-migration.spec.ts` lists it as the single reviewed `INTENDED_PUBLIC` exception; every other route still fails CI if it becomes more permissive.
 - **Scope:** other devices' sessions are untouched. The device's current access token stays valid for ≤ 15 minutes, until 15E.4d.
@@ -561,23 +571,32 @@ Any failure inside the transaction throws, so nothing commits. Every failure —
   - **Refresh × logout** and **refresh × reset:** 5 rounds each.
   - **Unsynchronised bursts:** 4 contenders × 25 rounds.
   - **Legacy first-use races:** 5 contenders × 10 rounds, and against password reset × 10 rounds.
-- **Mutation check:** with the compare-and-set and parent link removed, the TEST 1 cases fail (2, 10 and 4 successors). With them restored, they pass.
+- **Forced logout races (R1):**
+  - **Logout during the refresh:** an uncommitted placeholder row with the same `parent_id` stops the refresh at its successor INSERT, after it has rotated the token and while it holds the session lock. Logout is then observed waiting before the placeholder is rolled back.
+  - **Legacy logout losing its first UPDATE:** the same technique makes the logout's UPDATE wait on the token row held by its first refresh.
+  - **Entitlement checked under the lock:** a test transaction holds the session lock and uses the successor while logout waits; logout must roll back.
+- **Mutation checks:**
+  - with the compare-and-set and parent link removed, the TEST 1 cases fail (2, 10 and 4 successors);
+  - with logout's grace rule removed (rotated token → ends nothing), 6 of the R1 tests fail.
+  - With the code restored, all pass.
 - **Covered:**
   - sign-in paths (one session each); device metadata;
   - chain R1→R4; 90-day expiry (faked clock); TTL capped at session expiry;
   - logout; reset; suspension + reinstatement; two devices;
+  - logout with the just-rotated token, with a used successor, outside the window, with a rotation stamped slightly ahead of logout's clock; unsynchronised refresh + logout × 20 rounds; legacy first refresh + logout × 10 rounds;
   - rotated-token presentation and grace classification; `parent_id` unique (P2002); rollback on failure;
   - raw-token absence from logs, Prisma query parameters and every stored column;
   - previous-release compatibility;
   - migration backfill on pre-15E.4b data, in its own throwaway database.
-- **Results at the time of writing:** 27 database tests and 976 unit tests pass.
+- **Results at the time of writing:** 38 database tests and 977 unit tests pass.
 
 #### Known limitations (15E.4b)
 - **Rotated token = plain 401.** No benign-race "replay" of the successor and no reuse revocation yet. A client that lost the refresh response is signed out on its next refresh — the same as before 15E.4b.
 - **Access tokens are not tied to a session** until 15E.4d. Logout and revocation end refresh, but an access token lives out its ≤ 15 minutes. Reset and suspension still kill all access tokens at once through `sessionVersion`.
 - **Legacy-session absolute expiry** counts from the legacy token's `created_at`, which is the last rotation by the old code, not the real sign-in.
   - Previous-release overlap: a session-less token minted by the old code during the switchover starts a fresh session on first use.
-- **Logout of a legacy session-less token racing its own first refresh** can lose: the refresh attaches and rotates first, and the logout then finds a rotated token. Transitional only, until 15E.4e.
+- **The grace-window logout cuts both ways.** Someone holding a stolen copy of the just-rotated token can sign the victim's device out, but only within 10 s of the victim's own refresh and before the victim uses the successor. They gain no tokens or access, and holding the current token would let them do the same anyway.
+- **Logout with an older token is a no-op on purpose.** A client that signs out with a token rotated more than 10 s ago, or whose successor was used, leaves its session alive. With 15E.4a coordination the frontend always signs out with the token it currently holds.
 - **Dependabot does not track the CI service image digest.** Bump it by hand.
 
 #### Deferred
