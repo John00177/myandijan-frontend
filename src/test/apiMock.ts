@@ -283,6 +283,7 @@ export const recordBusinessView = vi.fn();
 export const recordBusinessClick = vi.fn();
 export const recordSearch = vi.fn();
 export const revokeSession = vi.fn().mockResolvedValue(undefined);
+export const notifyLogout = vi.fn();
 
 class ApiError extends Error {
   status: number;
