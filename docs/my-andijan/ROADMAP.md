@@ -142,7 +142,7 @@ Free-text queries on `SearchPage` now use `GET /search?type=business`, so "osh" 
 ### 21. Resolve the two open design questions · **[EXPLICIT]**
 - **Which brand palette wins** — shipped blue/cyan (`primary #3B82F6`) or the specced navy/green (`#1A3A5C` / `#2E7D32`)? Both exist as tokens.
 - ~~**Should `SUPPORT` outrank `BUSINESS_OWNER`?**~~ — ✅ **Resolved Phase 15B (D-74):** business content is ownership-only; no role inherits owner powers by rank.
-- ~~**Replace rank-based authorization with capabilities**~~ — ✅ **DONE, Phase 15D (D-75).** Next in this track: the separate **Security Hardening** phase, then the **PLATFORM_OWNER governance** phase (neither started).
+- ~~**Replace rank-based authorization with capabilities**~~ — ✅ **DONE, Phase 15D (D-75).** Follow-up ✅ **Phase 15D.2**: platform staff hold no business-owner capability (D-75 point 7). Next in this track: the separate **Security Hardening** phase, then the **PLATFORM_OWNER governance** phase (neither started).
 
 ---
 

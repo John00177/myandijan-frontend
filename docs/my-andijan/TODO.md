@@ -214,6 +214,9 @@
 - [ ] **Add a self-service account-deletion / anonymisation path** — `UserStatus.DELETED` exists, no endpoint **[REVIEW]**
 - [x] **Decide whether `SUPPORT` should outrank `BUSINESS_OWNER`** — Phase 15B (D-74): owner routes are ownership-only, no role inherits by rank **[REVIEW]**
 - [x] **Capability map + default-deny guard** — Phase 15D (D-75): rank model removed, every route declares a rule, route-inventory test in CI
+- [x] **Remove owner capabilities from platform staff** — Phase 15D.2 (D-75 point 7): ADMIN/SUPER_ADMIN no longer hold business.claim / business.create / business.manage_own
+- [ ] **Business Staff (deferred):** business-scoped membership (`BusinessMember`), one "businesses this user may operate" resolver replacing the three ownership-check styles, decouple ownership from the automatic CUSTOMER → BUSINESS_OWNER promotion — not a global role
+- [ ] **SUPPORT desk decision (deferred):** what SUPPORT may do beyond member capabilities
 - [ ] **Security Hardening phase (deferred):** send the password-reset code via `SmsService` and stop logging it (+ `crypto.randomInt`) — SECURITY §13 #3a; Vercel CI deployment gate; distributed rate limiting if replicas increase; remaining rate-limit coverage
 - [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
 - [ ] **Remove the dead `JWT_REFRESH_SECRET`** from `.env`/`.env.example` — nothing reads it, and it implies refresh tokens are signed JWTs (they are opaque random bytes) **[REVIEW]**

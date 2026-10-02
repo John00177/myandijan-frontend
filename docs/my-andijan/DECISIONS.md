@@ -462,9 +462,9 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 | --- | :-: | :-: | :-: | :-: | :-: | :-: |
 | `review.write` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `review.report` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `business.claim` | ✅ | ✅ | — | — | ✅ | ✅ |
-| `business.create` | — | ✅ | — | — | ✅ | ✅ |
-| `business.manage_own` (+ ownership) | — | ✅ | — | — | ✅ | ✅ |
+| `business.claim` | ✅ | ✅ | — | — | — | — |
+| `business.create` | — | ✅ | — | — | — | — |
+| `business.manage_own` (+ ownership) | — | ✅ | — | — | — | — |
 | `business.review` (not own) | — | — | — | ✅ | ✅ | ✅ |
 | `review.moderate` (not own) | — | — | — | ✅ | ✅ | ✅ |
 | `report.resolve` (not own) | — | — | — | ✅ | ✅ | ✅ |
@@ -483,8 +483,9 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 | **governance (PLATFORM_OWNER)** | — | — | — | — | — | — *(not implemented; not a capability)* |
 
 4. **Ownership**: owner routes need `business.manage_own` **and** `ownerId === caller`. **Conflict of interest**: holders of a staff capability are still refused on their own records — their listing (approve/reject, verify, suspend, promote, hide, delete, /admin edit/branch/hours), their claim, a review they wrote or one about their business, a report they filed or that concerns their review/business, an event of their business. **Target rules** for account status stay the explicit table of D-74 (`src/authz/user-status.policy.ts`).
-5. **Intended behaviour changes vs the rank model** (pinned by `authz-migration.spec.ts`, nothing became more permissive): SUPPORT and MODERATOR are refused at the route on all 31 owner routes and on filing claims; CUSTOMER is refused on creating/operating listings (it keeps claiming — a claimant becomes BUSINESS_OWNER on approval; the UI never offered CUSTOMER the owner area). Staff are refused on their own records as above.
+5. **Intended behaviour changes vs the rank model** (pinned by `authz-migration.spec.ts`, nothing became more permissive): SUPPORT and MODERATOR — and, since Phase 15D.2, ADMIN and SUPER_ADMIN — are refused at the route on all 31 owner routes and on filing claims; CUSTOMER is refused on creating/operating listings (it keeps claiming — a claimant becomes BUSINESS_OWNER on approval; the UI never offered CUSTOMER the owner area). Staff are refused on their own records as above.
 6. **Frontend** renders from the server-issued `capabilities` list (GET /users/me and every auth response) via `useAuth().can()` / `useCan()`; no code compares role names to decide access; fails closed when the list is absent. UX only.
+7. **Ownership authority and platform authority are separate (Phase 15D.2, 2026-10-02).** *Business Owner permissions are ownership-oriented*: `business.claim` / `business.create` / `business.manage_own` belong to BUSINESS_OWNER (CUSTOMER keeps `business.claim`), and every owner route still checks `ownerId === caller`. *My Andijan staff permissions are platform-capability-oriented*: MODERATOR, ADMIN and SUPER_ADMIN hold **no** owner capability — ADMIN and SUPER_ADMIN lost the owner bundle they held in 15D, so they are refused at the route on all 29 `business.manage_own` routes, `POST /businesses`, `POST /me/businesses` and `/me/claims`. Staff administer other owners' listings through the `/admin` routes with explicit capabilities (`business.edit_any`, `business.operate`, `business.review`, `business.hide`, `business.delete`), which never depend on ownership; conflict of interest (point 4) is unchanged. A person who works for My Andijan and also runs a business does so from a separate BUSINESS_OWNER account. This is **not a new role**. Pre-check: a read-only production query found 0 ADMIN- and 0 SUPER_ADMIN-owned businesses. **Business Staff** (people working for one business) remains future *business-scoped membership* — not a global role; **PLATFORM_OWNER** remains the separate future governance plane.
 **Why locked.** `route-authorization.spec.ts` (every route has a rule; committed route→rule snapshot; every route × role vs an independent holder table; APP_GUARD registered), `role-capabilities.spec.ts` (each role's set pinned), `no-rank-model.spec.ts` (the hierarchy, `RolesGuard`, `@Roles` and level comparisons cannot return), `authz-migration.spec.ts` (old vs new for every route × role), `authz.guard.spec.ts`, `policies.spec.ts`, `admin.service.conflict.spec.ts`, `authz.e2e.spec.ts` (real AppModule over HTTP).
 **Not decided here (still deferred):** PLATFORM_OWNER governance and everything in it; SUPPORT desk capabilities; ADMIN cross-business catalog editing (15C open #9).
 

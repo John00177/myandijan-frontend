@@ -54,7 +54,7 @@ The platform is built to become **the default way people in Andijan find local b
 | **Admins** | `ADMIN` | Full catalogue + user + taxonomy management, audit log, analytics | Backend complete (31 routes); UI partially wired to real endpoints |
 | **Super admins / founder** | `SUPER_ADMIN` | Destructive actions (hide/delete business), command-centre analytics, platform health overview | Backend complete; UI thin |
 
-There are **six roles** — `CUSTOMER`, `BUSINESS_OWNER`, `SUPPORT`, `MODERATOR`, `ADMIN`, `SUPER_ADMIN` — and since Phase 15D **no hierarchy**: each role holds an explicit set of capabilities (`src/authz/capabilities.ts`, D-75), ownership is checked per record, and the PLATFORM_OWNER governance plane is not implemented.
+There are **six roles** — `CUSTOMER`, `BUSINESS_OWNER`, `SUPPORT`, `MODERATOR`, `ADMIN`, `SUPER_ADMIN` — and since Phase 15D **no hierarchy**: each role holds an explicit set of capabilities (`src/authz/capabilities.ts`, D-75), ownership is checked per record, and the PLATFORM_OWNER governance plane is not implemented. **Ownership authority and platform authority are separate (Phase 15D.2, D-75 point 7):** ADMIN and SUPER_ADMIN no longer hold the owner capabilities (`business.claim` / `business.create` / `business.manage_own`) — only BUSINESS_OWNER does (CUSTOMER keeps claiming). Staff administer other owners' listings through `/admin` with explicit platform capabilities such as `business.edit_any`, which never depend on ownership. Not a new role; Business Staff stays future business-scoped membership; PLATFORM_OWNER stays the separate future governance plane.
 
 ---
 
