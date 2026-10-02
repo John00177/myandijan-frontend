@@ -47,7 +47,7 @@
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
 - [ ] **Admin endpoints still without UI** — hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
 - [x] **Enable Railway auto-deploy (owner action)** — **done and verified 2026-10-01**: auto-deploy `enabled=true` + Wait for CI; push of `ded7b7a` auto-deployed as `6b81b152`. Original root cause (Phase 13): `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`. Connect a GitHub account with access to `John00177/my-andijan-api` to Railway, grant the Railway GitHub App access to the repo, turn Auto Deploy (+ Wait for CI) on, then verify with a harmless push. Exact steps: `ENVIRONMENT.md` → "Deployment pipeline" **[VERIFIED]**
-- [ ] **Gate Vercel production on CI** — Vercel deploys on push independently of GitHub Actions (Phase 15A measured production READY 23 s before CI finished). **Owner action (dashboard):** Vercel → `myandijan-frontend` → Settings → Deployment Checks → require `test-and-build` for Production; optionally GitHub branch protection on `main` **[REVIEW]**
+- [x] **Gate Vercel production on CI** — configured by the owner 2026-10-02: Production Deployment Check `Vercel - myandijan-frontend: test-and-build` (the CI job reports that commit status); `main` rulesets active — see the 15E.3 items below **[REVIEW]**
 - [x] **Business unhide** — **done, Phase 14**: restores the status recorded at hide time, else PENDING (D-73) **[REVIEW]**
 - [x] **User-side "report this review"** + admin reports queue — **done, Phase 12** (D-70) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**
@@ -220,9 +220,11 @@
 - [x] **15E.2 — authentication-code security** (SECURITY §13 #3a, D-76): codes never logged, `crypto.randomInt`, one live code, per-phone failure budget, atomic single use, no staff OTP sign-in, timing equalized, fail-closed SMS
 - [ ] **Owner: configure Eskiz SMS on Railway** (`ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, optional `ESKIZ_FROM`) — OTP sign-in and password reset answer 503 until then
 - [x] **15E.3 — CI hardening (repository side):** `permissions: contents: read`, actions pinned to SHAs, `persist-credentials: false`, Dependabot for actions — both repos; backend Railway gate verified
-- [ ] **Owner: enable Vercel Deployment Checks** (project `myandijan-frontend` → Settings → Deployment Checks → require the commit status `Vercel - myandijan-frontend: test-and-build`) — the frontend is NOT gated until then (SECURITY §15)
-- [ ] **Owner: add a `main` branch ruleset in both repos** — no deletion, no force push, PR + required check `test-and-build` (up to date), bypass: repository admin (SECURITY §15)
-- [ ] **After the Vercel gate is on:** push the held frontend-repo commits (CI hardening + 15E.3 docs) and confirm the production deployment waits for `test-and-build`
+- [x] **Owner: enable the Vercel Production Deployment Check** `Vercel - myandijan-frontend: test-and-build` — configured 2026-10-02 (SECURITY §15)
+- [x] **Owner: add a `main` ruleset in both repos** — "Protect main" active (backend `24347110`, frontend `24347040`): no deletion, no force push, PR + `test-and-build` (up to date)
+- [x] **Push the held frontend-repo commits** — pushed with `3e8219f`
+- [ ] **Prove the frontend gate:** after the 15E.7.1 docs PR merges, its Vercel production deployment must stay unpromoted until the status is green
+- [ ] **Owner: confirm both ruleset bypass lists are empty** (Settings → Rules → Rulesets — not readable via the public API)
 - [ ] **Security Hardening phase (remaining):** refresh-token families + reuse detection (15E.4); rate-limit coverage — analytics, search, upload, per-user buckets (15E.5); headers/CSP, Swagger off in production, security-event audit (15E.6); distributed rate limiting if replicas increase
 - [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
 - [ ] **Remove the dead `JWT_REFRESH_SECRET`** from `.env`/`.env.example` — nothing reads it, and it implies refresh tokens are signed JWTs (they are opaque random bytes) **[REVIEW]**
