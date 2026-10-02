@@ -489,6 +489,17 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 **Why locked.** `route-authorization.spec.ts` (every route has a rule; committed route→rule snapshot; every route × role vs an independent holder table; APP_GUARD registered), `role-capabilities.spec.ts` (each role's set pinned), `no-rank-model.spec.ts` (the hierarchy, `RolesGuard`, `@Roles` and level comparisons cannot return), `authz-migration.spec.ts` (old vs new for every route × role), `authz.guard.spec.ts`, `policies.spec.ts`, `admin.service.conflict.spec.ts`, `authz.e2e.spec.ts` (real AppModule over HTTP).
 **Not decided here (still deferred):** PLATFORM_OWNER governance and everything in it; SUPPORT desk capabilities; ADMIN cross-business catalog editing (15C open #9).
 
+
+### D-76 · Authentication codes live only in the SMS; no SMS sign-in for staff; delivery fails closed 🔒 LOCKED
+**Decision (Phase 15E.2, 2026-10-02).**
+1. **A code is never logged, returned, or put in an exception** — anywhere. `SmsService` never logs a message body or phone number. There is no "dev mode" that logs codes: tests and local development stub `SmsService`.
+2. **Fail closed.** Without an SMS provider, `/auth/otp/request` and `/auth/forgot-password` return 503 (configuration-level, identical for every phone). An undelivered code is retired. **Production SMS is NOT configured** — `ESKIZ_EMAIL` / `ESKIZ_PASSWORD` are absent from the Railway production variables (checked by name, 2026-10-02). Until the owner sets them, `POST /auth/otp/request` and `POST /auth/forgot-password` answer **503** ("SMS xizmati hozircha ishlamayapti…"); password sign-in, registration and refresh are unaffected. Before 15E.2 these flows also never delivered a code to a real user — the code was only written to the logs.
+3. **Codes:** `crypto.randomInt`, six digits, bcrypt-hashed at rest; one live code per phone + purpose; 5 wrong guesses per phone + purpose per hour across every code row, reserved atomically; single use by compare-and-set on `usedAt`.
+4. **OTP sign-in is an allowlist — CUSTOMER and BUSINESS_OWNER.** Staff roles (SUPPORT, MODERATOR, ADMIN, SUPER_ADMIN) and any future role sign in with their password; an SMS code alone is not a sufficient factor for a privileged account. The refusal names no role.
+5. **No timing oracle** on forgot-password (equal bcrypt work; SMS sent in the background) or on code checks (equal comparison when no code is live).
+**Why locked.** `auth-codes.spec.ts` (generation, logging, lifecycle, budget, concurrency, staff, timing, SMS) and `session-security.spec.ts` (reset ends every session).
+**Not decided here:** staff password reset by SMS code is still allowed (needed for self-recovery; revisit with 2FA); a second factor for staff; refresh-token reuse detection (15E.4).
+
 ---
 
 ## Decisions that were never actually made

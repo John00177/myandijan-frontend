@@ -82,12 +82,21 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | Revocation is possible | `RefreshToken.revokedAt` + `expiresAt` |
 | OTP codes are hashed | `bcrypt.hash(code, 12)` into `OtpCode.codeHash` — never stored in plaintext |
 | OTP generation | **`crypto.randomInt`** — a CSPRNG, not `Math.random()` |
-| OTP hardening | 6 digits, **5-minute TTL**, single-use (`usedAt`), **max 5 attempts**, **3 SMS per phone per 10 minutes** (verified in production: 200 / 200 / **429**) |
-| Reset-code hardening | 15-minute TTL, max 5 attempts |
+| OTP hardening | 6 digits, **5-minute TTL**, single-use, **3 SMS per phone per 10 minutes** (verified in production: 200 / 200 / **429**) |
+| Reset-code hardening | 15-minute TTL; **`crypto.randomInt`** since Phase 15E.2 (was `Math.random`) |
+| **Codes never leave the SMS (15E.2)** | No OTP or reset code is logged, returned, or put in an exception. The reset-code `console.log` is gone; `SmsService` never logs a message body or phone number (unconfigured, provider error, network error) and reports delivery as a boolean. |
+| **Fail-closed delivery (15E.2)** | With no SMS provider configured, `/auth/otp/request` and `/auth/forgot-password` return **503** — a configuration-level check made before any lookup, so it is the same for every phone. An undelivered code is retired. |
+| **One live code per phone + purpose (15E.2)** | Issuing a code retires every unused code for that phone and purpose in the same transaction (login OTP and reset). |
+| **Wrong-guess budget (15E.2)** | 5 failures per phone + purpose per hour, counted across **every** code row of the window (live, superseded, used, expired) and reserved atomically before each comparison — a fresh code buys no extra guesses; a correct guess hands its reservation back. |
+| **Atomic single use (15E.2)** | Consuming a code is a compare-and-set on `usedAt`; of concurrent requests with one code exactly one succeeds. The reset consumes inside its transaction, so a loser's password change rolls back. |
+| **No OTP sign-in for staff (15E.2, D-76)** | OTP sign-in is an allowlist — CUSTOMER and BUSINESS_OWNER. SUPPORT, MODERATOR, ADMIN and SUPER_ADMIN are refused (403, generic message naming no role) even with a valid code; the code is spent. |
+| **Timing equalization (15E.2)** | `/auth/forgot-password` does the same bcrypt work for unknown phones and sends the SMS in the background; checking a code when none is live still costs one bcrypt comparison. |
+| Password reset ends every session | `sessionVersion` bumped, every refresh token revoked, audit row — in one transaction with consuming the code (15B, kept in 15E.2) |
 | OTP users cannot be password-logged-in | Given `bcrypt(crypto.randomBytes(48).hex)` — an unusable password |
 | **Per-request revalidation** | `JwtStrategy.validate()` queries the database on **every** authenticated request and rejects unless `status === ACTIVE` and `deletedAt` is null. **A suspended user is locked out immediately, without waiting for token expiry.** This costs one query per request and is the right trade. |
 | `ignoreExpiration: false` | Explicit, not defaulted |
 | Input format enforcement | `/^\+998\d{9}$/` in six DTOs; `/^\d{6}$/` for OTP; password `MinLength(8)` |
+| SMS configuration status | **Production SMS is NOT configured** — `ESKIZ_EMAIL` / `ESKIZ_PASSWORD` are absent from the Railway production variables (checked by name, 2026-10-02). Until the owner sets them, `POST /auth/otp/request` and `POST /auth/forgot-password` answer **503** ("SMS xizmati hozircha ishlamayapti…"); password sign-in, registration and refresh are unaffected. Before 15E.2 these flows also never delivered a code to a real user — the code was only written to the logs. |
 | Login-failure disambiguation | A 401 from `/auth/login` is **not** treated as an expired session client-side (`handleUnauthorized` only fires when a token was sent) |
 
 ### Weaknesses
@@ -317,7 +326,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | **SSRF** | ✅ No user-supplied URL is fetched server-side. `Business.website` is stored and rendered, never requested. |
 | **Insecure deserialization** | ✅ JSON only. |
 | **Open redirect** | ✅ Redirects are internal route constants. |
-| **Brute force** | 🟡 **Mitigated (Phase 15B)** — per-phone and per-address throttling on login, SMS-code and reset-code routes. No account lockout yet. |
+| **Brute force** | 🟡 **Mitigated (Phase 15B, 15E.2)** — per-phone and per-address throttling on login, SMS-code and reset-code routes; since 15E.2 SMS codes also have a database-backed budget of 5 wrong guesses per phone + purpose per hour across all code rows. No password-login lockout yet. |
 | **DoS** | 🔴 **Present** — no rate limiting; unauthenticated analytics writes; unthrottled FTS; bcrypt-12 CPU amplification on login. |
 | **Information disclosure** | 🔴 **Present** — public Swagger at `/docs`; Supabase error messages forwarded. |
 | **Dependency vulnerabilities** | ❓ **UNKNOWN.** No `npm audit` run, no Dependabot, no lockfile-verifying CI. `sonner` is installed in the frontend's `node_modules` but absent from `package.json` — an undeclared dependency, which is itself a supply-chain hygiene issue. |
@@ -333,7 +342,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | 1 | ✅ **DONE 2026-09-28** | Rotated all six role accounts to a 192-bit random secret held in Railway's `SEED_ROLE_PASSWORD`; script parameterized to `process.env` with no default; `console.log` removed; literal purged from history before the first push | — |
 | 2 | 🟡 **PARTLY DONE — Phase 15B** | ~~Install `@nestjs/throttler`~~ — installed; `/auth/*` throttled. **Still to do:** `/analytics/*`, `/search`, `/upload/*`, `POST /businesses` | Low |
 | 3 | ✅ **DONE — Phase 15B** | ~~Restrict CORS to known origins~~ | — |
-| 3a | 🔴 High (found in 15B, not fixed — out of scope) | **`forgotPassword` prints the reset code to stdout** (`console.log('[DEV] Reset code …')`, marked "must not ship") and generates it with `Math.random()`. Anyone with Railway log access can reset any account's password. Send it through `SmsService` like login OTPs, and use `crypto.randomInt`. | Low |
+| 3a | ✅ **DONE — Phase 15E.2** | ~~`forgotPassword` printed the reset code to stdout and used `Math.random()`~~ — and `SmsService` logged every unsent login OTP. Codes are now never logged; reset codes use `crypto.randomInt`; delivery fails closed (503) without an SMS provider; one live code per phone + purpose; a per-phone failure budget across all code rows; atomic single use; no OTP sign-in for staff; timing equalized. **Owner action still required:** set `ESKIZ_EMAIL` / `ESKIZ_PASSWORD` on Railway — until then OTP sign-in and password reset answer 503. | — |
 | 3b | 🟠 Medium | **Vercel production does not wait for CI** (Phase 15A measured a promotion 23 s before `test-and-build` finished). Enable Vercel **Deployment Checks** requiring `test-and-build` — a dashboard setting for the owner (see ARCHITECTURE §31). | Trivial |
 | 4 | 🔴 High | **Gate or disable `/docs` in production** | Trivial |
 | 5 | 🔴 High | **Authenticate or throttle the three `/analytics/*` write endpoints** | Low |
