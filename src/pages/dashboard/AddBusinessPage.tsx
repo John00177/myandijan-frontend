@@ -72,7 +72,8 @@ function buildPayload(data: BusinessFormData): CreateBusinessPayload {
 export default function AddBusinessPage() {
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
-  const { isOwner } = useAuth();
+  const { can } = useAuth();
+  const isOwner = can("business.create");
   const { user, token } = useRequireAuth();
   const { categories, loading: categoriesLoading } = useCategories(lang);
   const { regions, loading: regionsLoading } = useRegions(lang);

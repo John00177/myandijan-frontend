@@ -1,3 +1,4 @@
+import { testUser } from "../../../../test/roleCapabilities";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,7 +30,7 @@ import {
 
 /** Renders the view as a signed-in user of the given role (default ADMIN). */
 function renderView(role = "ADMIN") {
-  const user = { id: 1, fullName: "Test", phone: "+998901234567", role };
+  const user = testUser(role);
   localStorage.setItem("myandijan_token", "fake-token");
   localStorage.setItem("myandijan_refresh_token", "fake-refresh-token");
   localStorage.setItem("myandijan_user", JSON.stringify(user));

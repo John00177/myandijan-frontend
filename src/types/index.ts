@@ -303,6 +303,12 @@ export interface AuthUser {
   fullName: string;
   phone: string;
   role: UserRole;
+  /**
+   * The role's capabilities as issued by the server (GET /users/me and auth
+   * responses, D-75). The UI renders from these via `useAuth().can()`;
+   * absent → every check fails closed until the next /users/me refresh.
+   */
+  capabilities?: string[];
   // Profile-completion fields. Not persisted server-side yet — the backend
   // has no /users/me PATCH endpoint and no age/gender columns (confirmed
   // against prisma/schema.prisma, 2026-08-15) — so these live in

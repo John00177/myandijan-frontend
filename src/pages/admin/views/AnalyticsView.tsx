@@ -47,14 +47,15 @@ function SkeletonGrid() {
 }
 
 export default function AnalyticsView() {
-  const { user, isSuperAdmin } = useAuth();
+  const { user, can } = useAuth();
+  const canReadUserAnalytics = can("analytics.users");
   const fetcher = useCallback(() => getDashboardAnalytics(), []);
-  const { data, state, status, reload } = useAdminResource(fetcher, isSuperAdmin);
+  const { data, state, status, reload } = useAdminResource(fetcher, canReadUserAnalytics);
 
   const isMobile = !useMediaQuery("(min-width: 640px)");
   const chartHeight = isMobile ? 240 : 300;
 
-  if (!isSuperAdmin) {
+  if (!canReadUserAnalytics) {
     return (
       <div className="py-16">
         <EmptyState icon={Lock} title="Bu sahifa faqat Super Admin uchun" body={`Sizning rolingiz: ${user?.role ?? "—"}`} />

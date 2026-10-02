@@ -1,3 +1,4 @@
+import { testUser } from "../../../test/roleCapabilities";
 import { render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -11,7 +12,7 @@ vi.mock("../../../lib/api", () => import("../../../test/apiMock"));
 import { getAdminBusinesses, getAdminStats, getMe } from "../../../test/apiMock";
 
 function signInAs(role: string) {
-  const user = { id: 1, fullName: "Test User", phone: "+998901234567", role };
+  const user = { ...testUser(role), fullName: "Test User" };
   localStorage.setItem("myandijan_token", "fake-token");
   localStorage.setItem("myandijan_refresh_token", "fake-refresh-token");
   localStorage.setItem("myandijan_user", JSON.stringify(user));
@@ -94,5 +95,48 @@ describe("AdminDashboard role gate", () => {
 
     expect((await screen.findAllByText("Shikoyatlar")).length).toBeGreaterThan(0);
     expect(screen.queryByText("Sizda admin huquqlari yo'q")).not.toBeInTheDocument();
+  });
+});
+
+// Phase 15D (D-75): the panel renders from the server-issued capability list,
+// not from the role name. These users deliberately mismatch role and
+// capabilities to prove which one the UI reads.
+describe("AdminDashboard follows capabilities, not role names", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  function signInWith(role: string, capabilities: string[] | undefined) {
+    const user = { id: 1, fullName: "Test User", phone: "+998901234567", role, capabilities };
+    localStorage.setItem("myandijan_token", "fake-token");
+    localStorage.setItem("myandijan_refresh_token", "fake-refresh-token");
+    localStorage.setItem("myandijan_user", JSON.stringify(user));
+    getMe.mockResolvedValue(user);
+  }
+
+  it("fails closed: an ADMIN whose capability list has not arrived sees no admin panel", async () => {
+    signInWith("ADMIN", undefined);
+    renderAdmin();
+
+    expect(await screen.findByText("Sizda admin huquqlari yo'q")).toBeInTheDocument();
+    expect(getAdminStats).not.toHaveBeenCalled();
+  });
+
+  it("shows exactly the views whose capabilities are held, whatever the role says", async () => {
+    signInWith("CUSTOMER", ["review.moderate"]);
+    renderAdmin();
+
+    expect((await screen.findAllByText("Sharhlar")).length).toBeGreaterThan(0);
+    for (const label of ["Bizneslar", "Shikoyatlar", ...ADMIN_ONLY_NAV]) {
+      expect(screen.queryByRole("button", { name: label })).not.toBeInTheDocument();
+    }
+  });
+
+  it("lands on home only when analytics.platform is held", async () => {
+    signInWith("MODERATOR", ["business.review", "analytics.platform"]);
+    renderAdmin();
+
+    await waitFor(() => expect(getAdminStats).toHaveBeenCalled());
   });
 });

@@ -27,7 +27,7 @@ type DetailTab = "about" | "menu" | "reviews";
 export default function BusinessDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, t } = useLanguage();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const { business, loading, notFound, error, reload } = useBusiness(slug ?? "", lang);
   const [activeTab, setActiveTab] = useState<DetailTab>("about");
 
@@ -60,7 +60,7 @@ export default function BusinessDetailPage() {
 
   // Catalog management on the public page is the owner's alone (Phase 15B,
   // D-74); staff edit through the admin panel. Server-enforced as well.
-  const canManage = ownsBusiness(user, business.ownerId);
+  const canManage = ownsBusiness(user, business.ownerId) && can("business.manage_own");
 
   const tabs: { key: DetailTab; label: string }[] = [
     { key: "about", label: t("description") },

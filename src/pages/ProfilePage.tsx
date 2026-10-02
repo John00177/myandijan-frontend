@@ -46,7 +46,8 @@ interface MenuItem {
 export default function ProfilePage() {
   const { lang, t } = useLanguage();
   const navigate = useNavigate();
-  const { user, isOwner, logout, updateUser } = useAuth();
+  const { user, can, logout, updateUser } = useAuth();
+  const isOwner = can("business.manage_own");
   const { token } = useRequireAuth();
   const { favorites, loading: favoritesLoading } = useFavorites(lang, token);
   const { claims } = useMyClaims(token);

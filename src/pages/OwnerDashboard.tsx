@@ -21,7 +21,8 @@ export default function OwnerDashboard() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isOwner } = useAuth();
+  const { can } = useAuth();
+  const isOwner = can("business.manage_own");
   const { user, token } = useRequireAuth();
   // AddBusinessPage navigates back here with { state: { view } } so a sidebar
   // click from that page lands on the right tab instead of always "home".

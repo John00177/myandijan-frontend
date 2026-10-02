@@ -8,7 +8,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { useRequireAuth } from "../../hooks/useRequireAuth";
 import AdminLayout from "./AdminLayout";
-import { canOpenView, type AdminView } from "./types";
+import { canOpenView, firstOpenView, type AdminView } from "./types";
 import AdminAuditLogsView from "./views/AdminAuditLogsView";
 import AdminBusinessesView from "./views/AdminBusinessesView";
 import AdminCategoriesView from "./views/AdminCategoriesView";
@@ -48,19 +48,23 @@ function AnalyticsFallback() {
 export default function AdminDashboard() {
   const { lang } = useLanguage();
   const navigate = useNavigate();
-  const { isAdmin, canModerate } = useAuth();
+  const { can } = useAuth();
   const { user, token } = useRequireAuth();
-  // A moderator has no home/stats access (ADMIN-only), so they land on the
-  // business approval queue instead.
-  const [activeView, setActiveView] = useState<AdminView>(isAdmin ? "home" : "businesses");
+  // What the user picked; the view actually shown is re-derived from their
+  // capabilities on every render (D-75), so it is always one they may open —
+  // e.g. a moderator, who lacks analytics.platform, lands on the queue.
+  const [selectedView, setActiveView] = useState<AdminView | null>(null);
+  const landing = firstOpenView(can);
+  const activeView = selectedView && canOpenView(selectedView, can) ? selectedView : landing;
 
   // No token: useRequireAuth already opened the AuthModal. Render nothing rather
   // than the "no admin rights" message, which would flash underneath it.
   if (!token || !user) return null;
 
-  // CUSTOMER, BUSINESS_OWNER and SUPPORT land here — none has moderation
-  // rights on the server, and the message is the same for all.
-  if (!canModerate) {
+  // No admin view is open to this user (CUSTOMER, BUSINESS_OWNER, SUPPORT —
+  // or anyone whose capability list has not arrived yet). The server would
+  // refuse every admin request anyway.
+  if (!activeView) {
     return (
       <div className="min-h-screen bg-base flex items-center justify-center px-6">
         <EmptyState
@@ -71,16 +75,6 @@ export default function AdminDashboard() {
           onAction={() => navigate(`/${lang}`)}
         />
       </div>
-    );
-  }
-
-  // Belt and braces for the sidebar filter: a moderator never renders an
-  // ADMIN-only view, even if activeView were somehow set to one.
-  if (!canOpenView(activeView, isAdmin)) {
-    return (
-      <AdminLayout activeView="businesses" onSelectView={setActiveView}>
-        <AdminBusinessesView />
-      </AdminLayout>
     );
   }
 

@@ -35,6 +35,12 @@ const MENU_ITEMS: { view: AdminView; label: string; icon: LucideIcon }[] = [
   { view: "settings", label: "Sozlamalar", icon: Settings },
 ];
 
+const ROLE_BADGE: Partial<Record<string, string>> = {
+  MODERATOR: "Moderator",
+  ADMIN: "Admin",
+  SUPER_ADMIN: "Super Admin",
+};
+
 interface AdminSidebarProps {
   activeView: AdminView;
   onSelectView: (view: AdminView) => void;
@@ -44,9 +50,10 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ activeView, onSelectView, onNavigate }: AdminSidebarProps) {
   const { lang } = useLanguage();
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, can } = useAuth();
   const navigate = useNavigate();
-  const items = MENU_ITEMS.filter((item) => canOpenView(item.view, isAdmin));
+  // Only views whose capability the user holds (D-75).
+  const items = MENU_ITEMS.filter((item) => canOpenView(item.view, can));
 
   function handleSelect(view: AdminView) {
     onSelectView(view);
@@ -64,7 +71,8 @@ export default function AdminSidebar({ activeView, onSelectView, onNavigate }: A
         <span className="font-bold text-lg tracking-tight">
           <span className="text-ink">My</span> <span className="text-primary">Andijan</span>
         </span>
-        <Badge tone="danger">{isAdmin ? "Admin" : "Moderator"}</Badge>
+        {/* Display label only — nothing is decided by it. */}
+        <Badge tone="danger">{user ? (ROLE_BADGE[user.role] ?? "Admin") : "Admin"}</Badge>
       </div>
 
       <nav className="flex-1 space-y-1 p-3 overflow-y-auto">

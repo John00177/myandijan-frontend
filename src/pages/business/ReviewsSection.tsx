@@ -184,7 +184,7 @@ function ReportReview({ reviewId }: { reviewId: number }) {
 }
 
 export default function ReviewsSection({ businessId, ownerId, reviews, onChanged }: ReviewsSectionProps) {
-  const { user, token, openAuthModal } = useAuth();
+  const { user, token, openAuthModal, can } = useAuth();
   const { t, lang } = useLanguage();
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
@@ -192,7 +192,7 @@ export default function ReviewsSection({ businessId, ownerId, reviews, onChanged
 
   // A reply speaks as the business, so only its owner gets the reply control
   // (Phase 15B, D-74) — staff roles no longer do. Server-enforced as well.
-  const canManage = ownsBusiness(user, ownerId);
+  const canManage = ownsBusiness(user, ownerId) && can("business.manage_own");
 
   return (
     <section id="reviews" className="mt-10">

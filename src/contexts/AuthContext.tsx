@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError, getMe, revokeSession, SESSION_EXPIRED_EVENT } from "../lib/api";
 import type { AuthUser } from "../types";
+import { hasCapability, type Capability } from "../lib/capabilities";
 
 const TOKEN_KEY = "myandijan_token";
 const REFRESH_TOKEN_KEY = "myandijan_refresh_token";
@@ -9,11 +10,11 @@ const USER_KEY = "myandijan_user";
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
-  isOwner: boolean;
-  isAdmin: boolean;
-  isSuperAdmin: boolean;
-  /** MODERATOR, ADMIN or SUPER_ADMIN — the server's moderation floor (D-72). */
-  canModerate: boolean;
+  /**
+   * Whether the signed-in user holds a capability, per the list the server
+   * returned (D-75). UX only — the server authorizes every request itself.
+   */
+  can: (capability: Capability) => boolean;
   login: (token: string, user: AuthUser, refreshToken: string) => void;
   register: (token: string, user: AuthUser, refreshToken: string) => void;
   logout: () => void;
@@ -179,17 +180,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       token,
-      // Hierarchy-aware, matching the backend's RolesGuard: ADMIN and
-      // SUPER_ADMIN can do everything BUSINESS_OWNER/ADMIN could before.
-      // MODERATOR/SUPPORT are excluded from both — they get only the
-      // specific admin actions the backend explicitly grants them.
-      isOwner: user?.role === "BUSINESS_OWNER" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
-      isAdmin: user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
-      isSuperAdmin: user?.role === "SUPER_ADMIN",
-      // Mirrors the MODERATOR floor on the moderation routes (Phase 14):
-      // business approve/reject + list, review and report moderation. Every
-      // other admin view still needs isAdmin. SUPPORT ranks below MODERATOR.
-      canModerate: user?.role === "MODERATOR" || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
+      // Rendering decisions come from the server-issued capability list
+      // (D-75), never from comparing role names. Fails closed when absent.
+      can: (capability: Capability) => hasCapability(user, capability),
       login,
       register,
       logout,
@@ -210,4 +203,9 @@ export function useAuth(): AuthContextValue {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return ctx;
+}
+
+/** `useCan("business.review")` — render-time capability check (UX only). */
+export function useCan(capability: Capability): boolean {
+  return useAuth().can(capability);
 }

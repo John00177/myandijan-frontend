@@ -8,6 +8,7 @@ import type { Lang } from "../../types";
 import type { TranslationKey } from "../../i18n";
 import Badge from "./Badge";
 import Button from "./Button";
+import { firstOpenView } from "../../pages/admin/types";
 
 const LANGS: Lang[] = ["uz", "ru", "en"];
 
@@ -32,7 +33,10 @@ function useNavItems(): NavItem[] {
 
 function AvatarMenu() {
   const { lang, t } = useLanguage();
-  const { user, isOwner, isAdmin, logout } = useAuth();
+  const { user, can, logout } = useAuth();
+  // Owner dashboard and admin panel links follow capabilities (D-75), not role names.
+  const showDashboard = can("business.manage_own");
+  const showAdmin = firstOpenView(can) !== null;
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -82,7 +86,7 @@ function AvatarMenu() {
             <UserIcon size={16} />
             {t("nav.profile")}
           </button>
-          {isOwner && (
+          {showDashboard && (
             <button
               onClick={() => go(`/${lang}/dashboard`)}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-body hover:bg-white/[0.05] hover:text-ink transition-colors"
@@ -91,7 +95,7 @@ function AvatarMenu() {
               {t("nav.dashboard")}
             </button>
           )}
-          {isAdmin && (
+          {showAdmin && (
             <button
               onClick={() => go(`/${lang}/admin`)}
               className="w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-sm text-ink-body hover:bg-white/[0.05] hover:text-ink transition-colors"

@@ -1,3 +1,4 @@
+import { testUser } from "../../../test/roleCapabilities";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -23,7 +24,7 @@ const ME = 7;
 const SOMEONE_ELSE = 99;
 
 function signInAs(role: string) {
-  const user = { id: ME, fullName: "Test", phone: "+998901234567", role };
+  const user = testUser(role, ME);
   localStorage.setItem("myandijan_token", "fake-token");
   localStorage.setItem("myandijan_refresh_token", "fake-refresh-token");
   localStorage.setItem("myandijan_user", JSON.stringify(user));

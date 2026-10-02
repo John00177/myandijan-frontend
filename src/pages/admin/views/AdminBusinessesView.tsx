@@ -110,7 +110,7 @@ function restoreTargetLabel(b: AdminBusiness): string {
 
 export default function AdminBusinessesView() {
   const { lang } = useLanguage();
-  const { isAdmin, isSuperAdmin } = useAuth();
+  const { can } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -376,9 +376,9 @@ export default function AdminBusinessesView() {
             </>
           )}
 
-          {/* Everything below up to the public link is ADMIN-only on the
-              server; a MODERATOR only gets approve/reject above (D-72). */}
-          {isAdmin && (
+          {/* Verify / suspend / promote need `business.operate` (ADMIN,
+              SUPER_ADMIN); a MODERATOR only gets approve/reject above (D-75). */}
+          {can("business.operate") && (
             <>
           {/* Verification: grant on live listings; revoke whenever set. */}
           {b.isVerified ? (
@@ -456,9 +456,10 @@ export default function AdminBusinessesView() {
             </>
           )}
 
-          {/* Hide / restore: SUPER_ADMIN only (D-73). Restore returns the
-              listing to the status recorded at hide time, or PENDING. */}
-          {isSuperAdmin &&
+          {/* Hide / restore: `business.hide` (SUPER_ADMIN only, D-73/D-75).
+              Restore returns the listing to the status recorded at hide time,
+              or PENDING. */}
+          {can("business.hide") &&
             (statusOf(b) === "HIDDEN" ? (
               <button
                 aria-label="Yashirishni bekor qilish"
@@ -494,7 +495,7 @@ export default function AdminBusinessesView() {
               <Eye size={16} />
             </a>
           )}
-          {isAdmin && (
+          {can("business.edit_any") && (
             <button aria-label="Tahrirlash" title="Tahrirlash" onClick={() => openEditModal(b)} className={iconButtonClasses}>
               <Pencil size={16} />
             </button>
@@ -582,7 +583,7 @@ export default function AdminBusinessesView() {
         onSave={handleSaveEdit}
         submitting={editSaving}
         error={editError}
-        canModerate
+        canModerate={can("business.review")}
         onApprove={() => handleModerateFromModal("approve")}
         onReject={() => handleModerateFromModal("reject")}
         moderationPending={editingBusiness ? pendingActionId === editingBusiness.id : false}
