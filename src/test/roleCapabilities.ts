@@ -26,8 +26,9 @@ export const ROLE_CAPABILITIES: Record<string, Capability[]> = {
   BUSINESS_OWNER: [...MEMBER, ...OWNER],
   SUPPORT: [...MEMBER],
   MODERATOR: [...MEMBER, ...MODERATION],
-  ADMIN: [...MEMBER, ...OWNER, ...MODERATION, ...OPERATIONS],
-  SUPER_ADMIN: [...MEMBER, ...OWNER, ...MODERATION, ...OPERATIONS, "business.hide", "business.delete", "analytics.users"],
+  // Platform staff hold no owner capability (Phase 15D.2).
+  ADMIN: [...MEMBER, ...MODERATION, ...OPERATIONS],
+  SUPER_ADMIN: [...MEMBER, ...MODERATION, ...OPERATIONS, "business.hide", "business.delete", "analytics.users"],
 };
 
 /** A signed-in user object as the server would return it for this role. */
