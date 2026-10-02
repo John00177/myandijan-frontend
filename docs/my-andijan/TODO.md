@@ -220,7 +220,7 @@
 - [x] **15E.2 — authentication-code security** (SECURITY §13 #3a, D-76): codes never logged, `crypto.randomInt`, one live code, per-phone failure budget, atomic single use, no staff OTP sign-in, timing equalized, fail-closed SMS
 - [ ] **Owner: configure Eskiz SMS on Railway** (`ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, optional `ESKIZ_FROM`) — OTP sign-in and password reset answer 503 until then
 - [x] **15E.3 — CI hardening (repository side):** `permissions: contents: read`, actions pinned to SHAs, `persist-credentials: false`, Dependabot for actions — both repos; backend Railway gate verified
-- [ ] **Owner: enable Vercel Deployment Checks** (project `myandijan-frontend` → Settings → Deployment Checks → require `test-and-build`) — the frontend is NOT gated until then (SECURITY §15)
+- [ ] **Owner: enable Vercel Deployment Checks** (project `myandijan-frontend` → Settings → Deployment Checks → require the commit status `Vercel - myandijan-frontend: test-and-build`) — the frontend is NOT gated until then (SECURITY §15)
 - [ ] **Owner: add a `main` branch ruleset in both repos** — no deletion, no force push, PR + required check `test-and-build` (up to date), bypass: repository admin (SECURITY §15)
 - [ ] **After the Vercel gate is on:** push the held frontend-repo commits (CI hardening + 15E.3 docs) and confirm the production deployment waits for `test-and-build`
 - [ ] **Security Hardening phase (remaining):** refresh-token families + reuse detection (15E.4); rate-limit coverage — analytics, search, upload, per-user buckets (15E.5); headers/CSP, Swagger off in production, security-event audit (15E.6); distributed rate limiting if replicas increase

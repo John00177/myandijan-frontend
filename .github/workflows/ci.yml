@@ -18,7 +18,31 @@ jobs:
   # branch ruleset) refer to.
   test-and-build:
     runs-on: ubuntu-latest
+    # Job-level grant replaces the workflow default for this job: read the
+    # repository, and write ONE commit status (below) for Vercel Deployment
+    # Checks. Nothing else.
+    permissions:
+      contents: read
+      statuses: write
+    env:
+      # The commit status Vercel Deployment Checks require before promoting a
+      # production deployment. Vercel's importer reads commit statuses, not
+      # check runs. Reported for pushes and same-repository pull requests
+      # (a fork's token cannot write statuses); on a pull request the status
+      # goes on the head commit — the one Vercel built.
+      VERCEL_CHECK_NAME: 'Vercel - myandijan-frontend: test-and-build'
+      STATUS_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
+      - name: Report pending to Vercel
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh api --method POST "repos/${{ github.repository }}/statuses/$STATUS_SHA"
+          -f state=pending -f context="$VERCEL_CHECK_NAME"
+          -f description="test-and-build is running" -f target_url="$RUN_URL"
+
       # Actions are pinned to full commit SHAs (immutable — a moved or
       # compromised tag cannot change what runs in the gate); the comment
       # names the release. Dependabot proposes updates.
@@ -39,3 +63,18 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # always(): runs after a failed step and on cancellation too, so Vercel
+      # is never left waiting on "pending". Only a job that fully succeeded
+      # reports success; failure, cancellation and timeout all report failure.
+      - name: Report result to Vercel
+        if: always() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          state=failure
+          if [ "$JOB_STATUS" = "success" ]; then state=success; fi
+          gh api --method POST "repos/${{ github.repository }}/statuses/$STATUS_SHA" \
+            -f state="$state" -f context="$VERCEL_CHECK_NAME" \
+            -f description="test-and-build: $JOB_STATUS" -f target_url="$RUN_URL"

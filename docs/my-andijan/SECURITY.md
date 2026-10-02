@@ -412,7 +412,7 @@ Frontend, once the owner enables Deployment Checks:
 ```
 
 **Owner actions (platform settings — not configurable from the repositories).**
-1. **Vercel — enable Deployment Checks** on project `myandijan-frontend`: Project → Settings → **Deployment Checks** → add the GitHub check **`test-and-build`** (it blocks production alias assignment until the check passes). Vercel documents the same capability on the CLI as `vercel project checks … --blocks deployment-alias`. Verify on the next push: the production deployment must stay un-promoted until `test-and-build` is green.
+1. **Vercel — enable Deployment Checks** on project `myandijan-frontend`: Project → Settings → **Deployment Checks** → add the GitHub commit status **`Vercel - myandijan-frontend: test-and-build`** (blocks production alias assignment until it is green). The CI job writes that status itself — `pending` when it starts, then `success` only if every step succeeded (failure, cancellation and timeout report `failure`) — because Vercel's importer reads commit statuses, not the `test-and-build` check run. Vercel documents the same capability on the CLI as `vercel project checks … --blocks deployment-alias`. Verify on the next push: the production deployment must stay un-promoted until `test-and-build` is green.
 2. **GitHub — add a branch ruleset on `main`** in **both** repositories (Settings → Rules → Rulesets → New branch ruleset):
    - **Name** `main-protection`, **Enforcement** Active, **Target** the default branch (`main`).
    - **Restrict deletions** ✓ · **Block force pushes** ✓.
