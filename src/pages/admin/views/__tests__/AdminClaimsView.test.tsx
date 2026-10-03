@@ -42,24 +42,75 @@ describe("AdminClaimsView", () => {
     await waitFor(() => expect(getAdminClaims).toHaveBeenLastCalledWith({ status: "APPROVED", limit: 50 }));
   });
 
-  it("approves a pending claim, reports success, and reloads the list", async () => {
+  it("approves a pending claim with the trimmed verification note, reports success, and reloads the list", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("  Ro'yxatdagi raqamga qo'ng'iroq qilindi  ");
     approveAdminClaim.mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
 
     render(<AdminClaimsView />);
     fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
 
-    await waitFor(() => expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id));
+    await waitFor(() =>
+      expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id, "Ro'yxatdagi raqamga qo'ng'iroq qilindi"),
+    );
     expect(await screen.findByText("Da'vo tasdiqlandi — biznes egasi tayinlandi")).toBeInTheDocument();
     expect(getAdminClaims).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces the backend error when approval conflicts (e.g. business already owned)", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("Qo'ng'iroq qilindi");
     approveAdminClaim.mockRejectedValue(new ApiError("Business 1 already has an owner", 409));
 
     render(<AdminClaimsView />);
     fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
 
     expect(await screen.findByText("Business 1 already has an owner")).toBeInTheDocument();
+  });
+
+  it("does not approve, and shows nothing, when the verification-note prompt is cancelled", async () => {
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue(null);
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(approveAdminClaim).not.toHaveBeenCalled();
+    expect(screen.queryByText("Tekshiruv izohi majburiy")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["empty", ""],
+    ["whitespace-only", "   \n\t "],
+  ])("refuses an %s verification note with a clear error and does not call the API", async (_name, note) => {
+    vi.spyOn(window, "prompt").mockReturnValue(note);
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    expect(await screen.findByText("Tekshiruv izohi majburiy")).toBeInTheDocument();
+    expect(approveAdminClaim).not.toHaveBeenCalled();
+  });
+
+  it("refuses a verification note over 1000 characters and does not call the API", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("x".repeat(1001));
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    expect(await screen.findByText("Tekshiruv izohi 1000 belgidan oshmasligi kerak")).toBeInTheDocument();
+    expect(approveAdminClaim).not.toHaveBeenCalled();
+  });
+
+  it("accepts a verification note of exactly 1000 characters", async () => {
+    const note = "x".repeat(1000);
+    vi.spyOn(window, "prompt").mockReturnValue(note);
+    approveAdminClaim.mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    await waitFor(() => expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id, note));
+    // Let the post-approval reload settle before afterEach resets the mocks.
+    expect(await screen.findByText("Da'vo tasdiqlandi — biznes egasi tayinlandi")).toBeInTheDocument();
   });
 
   it("rejects a pending claim with the reason entered in the prompt", async () => {

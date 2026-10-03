@@ -12,6 +12,9 @@ import { ClaimStatusBadge, formatDate } from "../statusLabels";
 const inputClasses =
   "h-10 bg-elevated border border-white/[0.10] rounded-lg px-3 text-sm text-ink outline-none focus:border-primary/50";
 
+// Matches the API's ApproveClaimDto (@MaxLength(1000)).
+const VERIFICATION_NOTE_MAX_LENGTH = 1000;
+
 const STATUS_OPTIONS = [
   { value: "", label: "Barchasi" },
   { value: "PENDING", label: "Kutilmoqda" },
@@ -38,9 +41,27 @@ export default function AdminClaimsView() {
   }, [toast]);
 
   async function handleApprove(claim: AdminClaim) {
+    // Phase 16C.1: approving grants ownership, so the API requires a note on
+    // how the claimant was verified. Cancelling aborts silently, like reject;
+    // a blank or over-long note is refused here with a visible error rather
+    // than a round-trip 400.
+    const input = window.prompt(
+      "Tekshiruv izohi — da'vogar qanday tasdiqlandi (masalan: ro'yxatdagi telefon raqamiga qo'ng'iroq qilindi):",
+    );
+    if (input === null) return;
+    const verificationNote = input.trim();
+    if (!verificationNote) {
+      setToast({ tone: "error", text: "Tekshiruv izohi majburiy" });
+      return;
+    }
+    if (verificationNote.length > VERIFICATION_NOTE_MAX_LENGTH) {
+      setToast({ tone: "error", text: `Tekshiruv izohi ${VERIFICATION_NOTE_MAX_LENGTH} belgidan oshmasligi kerak` });
+      return;
+    }
+
     setPendingActionId(claim.id);
     try {
-      await approveAdminClaim(claim.id);
+      await approveAdminClaim(claim.id, verificationNote);
       setToast({ tone: "success", text: "Da'vo tasdiqlandi — biznes egasi tayinlandi" });
       reload();
     } catch (err) {
