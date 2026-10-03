@@ -413,15 +413,26 @@ export interface AdminBusiness {
   branches?: { id: number; address?: string | null; phone?: string | null; district?: { id?: number; nameUz?: string | null } | null }[] | null;
 }
 
+/**
+ * Matches GET /admin/events (AdminService.findEvents: Event row + business + district).
+ * The real columns are `title`, `startAt`, `venueName`/`address` and
+ * `rejectionReason`; the older guessed names (`nameUz`…, `startsAt`,
+ * `location`) are kept optional only so nothing that still reads them breaks.
+ */
 export interface AdminEvent {
   id: number;
+  title?: string | null;
   nameUz?: string | null;
   nameRu?: string | null;
   nameEn?: string | null;
-  title?: string | null;
   status?: string | null;
+  startAt?: string | null;
   startsAt?: string | null;
+  venueName?: string | null;
+  address?: string | null;
   location?: string | null;
+  rejectionReason?: string | null;
+  business?: { id: number; slug: string; name: string } | null;
 }
 
 /** Matches GET /admin/reviews (see AdminService.findReviews). */
