@@ -1,6 +1,13 @@
 # Phase 15E.4e.0 — Railway Migration Safety Audit (gate for 15E.4e.1)
 
-**Status:** AUDIT ONLY (read-only). No Railway setting, repository code, migration, database, environment variable or deployment was changed.
+**Status (updated 2026-10-03):**
+
+| Step | Status |
+|---|---|
+| Audit (§1–§8) | **DONE** (read-only) |
+| Configuration change (§5) | **IMPLEMENTED** on backend branch `infra/15e4e0-railway-migration-safety`, commit `d137c3f` — **PR open, not merged, not deployed**. Implementation record: §9. |
+| Production verification of the new configuration | **PENDING** — happens when the owner merges; checklist in §9.4 |
+
 **Date:** 2026-10-03
 **Subject:** whether Railway production can safely run the 15E.4e.1 contract migration `20261003090000_phase15e4e1_refresh_token_session_contract` (backend branch `feat/15e4e1-refresh-token-contract-cleanup`, commit `59873c5`).
 
@@ -173,7 +180,7 @@ The deployment details page shows which values came from `railway.json` (file ic
 | # | Precondition | Class |
 |---|---|---|
 | P1 | Owner approves the `railway.json` change in §5 (infrastructure change) | REQUIRES OWNER DECISION |
-| P2 | A separate PR with **only** that `railway.json` change; CI green; merged; deployed through the CI gate | AFTER P1 |
+| P2 | A separate PR with **only** that `railway.json` change; CI green; merged; deployed through the CI gate | AFTER P1. **PR prepared** (branch `infra/15e4e0-railway-migration-safety`, `d137c3f`, §9); CI runs when the PR is opened; not merged. |
 | P3 | That deploy verified: pre-deploy ran `migrate deploy` ("No pending migrations"); start ran `node dist/main` with no migrate output; healthcheck `/categories` passed; SUCCESS; 1/1 replica; anonymous smoke OK | AFTER P2 |
 | P4 | (Recommended) Pre-Deploy Timeout set to 300 s in the dashboard, if the field is offered | AFTER P2, OWNER |
 | P5 | 15E.4e.1 PR updated with `main` (it does not touch `railway.json`, so there is no conflict) and its CI green on the merged result | AFTER P3 |
@@ -199,4 +206,99 @@ The deployment details page shows which values came from `railway.json` (file ic
 
 ---
 
-*Audit only. No deployment, database change, Railway or environment-variable change was made. 15E.4e.1 is not merged; 15E.4e.2 has not started.*
+## 9. Implementation record — configuration change (2026-10-03)
+
+### 9.1 Previous and new configuration [VERIFIED — `railway.json` diff]
+
+The only file changed is backend `railway.json`, on branch `infra/15e4e0-railway-migration-safety`, commit `d137c3f1bf0add53a6cd346584604f3bf84c1e52`, based on `main` `06d6de9`.
+
+| Setting | Previous (`main` `06d6de9`) | New (`d137c3f`) |
+|---|---|---|
+| Pre-Deploy Command | — (none) | `npx prisma migrate deploy` |
+| Start Command | `npx prisma migrate deploy && npm run start:prod` | `npm run start:prod` (= `node dist/main`) |
+| Healthcheck Path | — (none) | `/categories` |
+| Healthcheck Timeout | — (Railway default 300 s, unused without a path) | `120` s |
+| Builder / Build Command | NIXPACKS / `npm run build` | unchanged |
+| Restart policy | `ON_FAILURE`, max 3 | unchanged |
+| `$schema` | `https://railway.app/railway.schema.json` | unchanged |
+
+```diff
+   "deploy": {
+-    "startCommand": "npx prisma migrate deploy && npm run start:prod",
++    "preDeployCommand": "npx prisma migrate deploy",
++    "startCommand": "npm run start:prod",
++    "healthcheckPath": "/categories",
++    "healthcheckTimeout": 120,
+     "restartPolicyType": "ON_FAILURE",
+     "restartPolicyMaxRetries": 3
+   }
+```
+
+`preDeployCommand` uses the string form. Railway's published schema accepts a string or a single-item array (§9.3); §5 showed the array form from Railway's docs example, and both are equivalent.
+
+### 9.2 Why
+
+- **Migrations moved to Pre-Deploy.** Railway runs the pre-deploy command in a separate container from the built image, with the service's variables and private network, *before* the new deployment starts. If it fails, the deployment does not proceed and the previous deployment keeps serving (§5, Railway docs). A failed or timed-out 15E.4e.1 migration therefore cannot take production down (§6 Cases B and C).
+- **Application startup no longer migrates.** Otherwise:
+  - every restart of the serving deployment (`ON_FAILURE`, ×3) would re-run `migrate deploy`;
+  - after any failed migration, a restart would stop on P3009 and turn a blocked deploy into an outage (verified locally, §6 C/E);
+  - the migration would run twice per deploy.
+- **Healthcheck `/categories`.** Traffic switches only after a 2xx, so an application that fails to start after a successful migration leaves the previous deployment serving (§6 Case D). The endpoint was verified for this change (§9.3).
+
+### 9.3 Validation performed [VERIFIED]
+
+| Check | Result |
+|---|---|
+| JSON syntax | parses |
+| Railway schema (`https://railway.app/railway.schema.json` → `backboard.railway.app`, fetched 2026-10-03) | every key in the file is defined; `preDeployCommand` string ✓ (string or single-item array allowed), `startCommand` string ✓, `healthcheckPath` string ✓, `healthcheckTimeout` number ✓, `NIXPACKS` is a valid builder ✓ |
+| Start command | contains no `prisma` |
+| Pre-deploy command | exactly `npx prisma migrate deploy`; the Prisma CLI is in the image (dev dependencies installed by `nixpacks.toml`, no prune step; the current start command already runs `npx prisma` there) |
+| `/categories` | `@Public()` GET in `CategoriesController`; the global `AuthzGuard` returns `true` for public rules before any JWT/session work; pinned as public in `src/authz/authz-migration.spec.ts`; `CategoriesService.findTree` reads `prisma.category.findMany`; not throttled (throttling only on the auth routes); Nest listens only after `PrismaService.onModuleInit` connected; live `GET` → 200 (~3 KB). Unmodified. |
+| Diff / scope | `railway.json` only (+4/−1); no file under `src/`, `prisma/`, `test/`, `.github/` changed; `git diff --check` clean |
+| Backend checks on the branch | Prisma validate ✓; type-check ✓; unit tests **996/996** (40 suites); production build ✓ |
+| Railway CLI | `railway` 5.43.1 is installed locally, but it has no offline config validator; not used (no linking, no deploy) |
+| CI | runs on `pull_request` to `main`; starts when the PR is opened |
+
+### 9.4 Deployment evidence
+
+**Not deployed in this phase — by design.** The production service deploys only from `main`, behind Wait-for-CI. The only environment is `production`. Deploying an unmerged branch would have meant either uploading local code to production (`railway up`, which bypasses review and CI) or changing the service's source branch or environment setup. Both are infrastructure changes outside this phase and ahead of the owner's review. The configuration takes effect when the owner merges the PR.
+
+**Post-merge verification checklist** (precondition P3; read-only):
+
+1. The deployment is on the merge commit and was held in WAITING until CI succeeded.
+2. Build logs: the pre-deploy step ran `npx prisma migrate deploy`, reporting "15 migrations found…" / **"No pending migrations to apply"**. This PR adds no migration, so it is 14 on `main`.
+3. Deploy logs: the container started with `npm run start:prod` / `node dist/main` and shows **no** Prisma migrate output.
+4. The healthcheck on `/categories` succeeded before the deployment became Active; status SUCCESS; previous deployment removed only afterwards.
+5. 1/1 replica running, 0 crashes, no restart loop; no 5xx caused by the change.
+6. Anonymous smoke: `GET /categories` 200; `GET /docs` 200 (public); `GET /favorites` without a token 401.
+7. The deployment details page shows `preDeployCommand`, `startCommand` and `healthcheckPath` sourced from `railway.json` (file icon).
+8. Optional: set **Pre-Deploy Timeout** 300 s in the dashboard if the field is offered (§5, OPEN).
+
+*Placeholder for the results:* merge commit, CI run, deployment ID, timeline, log lines, smoke results.
+
+### 9.5 Relationship to Phase 15E.4e.1
+
+The configuration PR is the prerequisite for merging 15E.4e.1 (preconditions P1–P5). 15E.4e.1 does not touch `railway.json`, so it inherits the new configuration once it is updated with `main`; its migration then runs as the pre-deploy step while `06d6de9` (or the configuration release) keeps serving. 15E.4e.1 stays a separate PR, **not** part of this change, and must not be merged before P3 holds.
+
+### 9.6 Remaining Railway migration risks
+
+| Risk | Class |
+|---|---|
+| **Pre-deploy timeout.** None by default; a hung pre-deploy holds the deployment *in progress* (production stays up). The migration's own 30 s `lock_timeout` bounds the database side. Recommended 300 s in the dashboard. | OPEN (owner, dashboard) |
+| **A failed migration still needs `prisma migrate resolve --rolled-back …`** before the next deploy can pass pre-deploy (P3009). Production stays up meanwhile. | VERIFIED behaviour; operational |
+| **`/categories` is a functional endpoint, not a dedicated liveness probe.** A future change to it (auth, throttling, heavy query) would affect deploys. A dedicated `GET /health` would be cleaner. | OPEN (future code change) |
+| **Config as Code cutoff 2026-12-01.** `railway.json` stops being honoured, and the dashboard has no start command and the RAILPACK builder. These settings must move to the dashboard or IaC before then. | OPEN (owner, follow-up) |
+| **Rollback to a pre-change deployment** runs the old start command (`migrate deploy && …`), which is harmless when no migration is pending or failed. After a failed migration, rolling back is unnecessary (production never left the serving deployment). | VERIFIED (§6 E) / OPEN whether rollback restores old config |
+
+### 9.7 Classification of the implementation
+
+| Item | Class |
+|---|---|
+| `railway.json` change and schema validity; scope (config only); unit tests, type-check, build | **VERIFIED** |
+| `/categories` suitability | **VERIFIED** |
+| Railway behaviour of pre-deploy and healthcheck (docs) | **VERIFIED** (documentation) |
+| Behaviour of this configuration in production | **OPEN** until the post-merge checklist (§9.4) is done |
+
+---
+
+*The audit was read-only. The configuration change is on a feature branch with a PR, not merged and not deployed. No database, schema, migration, environment-variable or application-code change was made. 15E.4e.1 is not merged; 15E.4e.2 has not started.*
