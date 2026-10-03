@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import type {
   AdminBusiness,
   AdminClaim,
+  AdminEvent,
   AdminReviewReport,
   AdminReview,
   Business,
@@ -278,6 +279,19 @@ export const getMyClaims = vi
   .mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
 export const getAdminClaims = vi.fn().mockResolvedValue({ items: [mockAdminClaim], total: 1 });
 export const approveAdminClaim = vi.fn().mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
+export const mockAdminEvent: AdminEvent = {
+  id: 3,
+  title: "Navro'z bayrami konserti",
+  status: "PENDING",
+  startAt: "2026-10-20T15:00:00.000Z",
+  venueName: "Bobur xiyoboni",
+  address: null,
+  rejectionReason: null,
+  business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar" },
+};
+export const getAdminEvents = vi.fn().mockResolvedValue({ items: [mockAdminEvent], total: 1 });
+export const approveAdminEvent = vi.fn().mockResolvedValue({ ...mockAdminEvent, status: "PUBLISHED" });
+export const rejectAdminEvent = vi.fn().mockResolvedValue({ ...mockAdminEvent, status: "REJECTED" });
 export const rejectAdminClaim = vi.fn().mockResolvedValue({ ...mockAdminClaim, status: "REJECTED" });
 export const recordBusinessView = vi.fn();
 export const recordBusinessClick = vi.fn();

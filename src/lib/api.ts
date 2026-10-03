@@ -999,9 +999,24 @@ export async function getAdminUsers(params?: { page?: number; limit?: number }):
   return normalizeAdminList<AdminUser>(raw);
 }
 
-export async function getAdminEvents(): Promise<AdminListResult<AdminEvent>> {
-  const raw = await request<unknown>("/admin/events");
+export async function getAdminEvents(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdminListResult<AdminEvent>> {
+  const raw = await request<unknown>("/admin/events", params);
   return normalizeAdminList<AdminEvent>(raw);
+}
+
+// `event.review` (ADMIN, SUPER_ADMIN). Both only act on a PENDING event (409
+// otherwise) and refuse an event of a business the reviewer owns (403) —
+// AdminService.getPendingEvent. Approve takes no body.
+export function approveAdminEvent(id: number): Promise<AdminEvent> {
+  return authedPostJson<AdminEvent>(`/admin/events/${id}/approve`, {});
+}
+
+export function rejectAdminEvent(id: number, reason: string): Promise<AdminEvent> {
+  return authedPostJson<AdminEvent>(`/admin/events/${id}/reject`, { reason });
 }
 
 export async function getAdminReviews(params?: {

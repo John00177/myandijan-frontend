@@ -363,9 +363,9 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | GET | `/admin/reviews` | **`MODERATOR`** ↓ (Phase 14) | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |
 | POST | `/admin/reviews/:id/hide` | **`MODERATOR`** ↓ (Phase 14) | Hide a review | ✅ |
 | POST | `/admin/reviews/:id/restore` | **`MODERATOR`** ↓ (Phase 14) | Restore a review | ✅ |
-| GET | `/admin/events` | `ADMIN` | List events | ✅ |
-| POST | `/admin/events/:id/approve` | `ADMIN` | Approve | **⭕** |
-| POST | `/admin/events/:id/reject` | `ADMIN` | Reject | **⭕** |
+| GET | `/admin/events` | `ADMIN` | List events (`?status=`; the admin queue opens on `PENDING`). Rows are the `Event` columns (`title`, `startAt`, `venueName`, `address`, `rejectionReason`, …) plus `business` and `district` | ✅ |
+| POST | `/admin/events/:id/approve` | `ADMIN` | Approve → `PUBLISHED` (no body). `409` unless `PENDING`, `403` on your own business's event | ✅ **(Phase 16E.2)** |
+| POST | `/admin/events/:id/reject` | `ADMIN` | Reject → `REJECTED`, body `{ reason }` (non-empty, ≤1000 chars). Same `409`/`403` | ✅ **(Phase 16E.2)** |
 | GET | `/admin/categories` | `ADMIN` | List | ✅ |
 | POST | `/admin/categories` | `ADMIN` | Create | ✅ |
 | PATCH | `/admin/categories/reorder` | `ADMIN` | Bulk `sortOrder` | **⭕** |
