@@ -1,5 +1,6 @@
 import { Check, ClipboardCheck, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import Badge from "../../../components/ui/Badge";
 import Button from "../../../components/ui/Button";
 import EmptyState from "../../../components/ui/EmptyState";
 import Skeleton from "../../../components/ui/Skeleton";
@@ -18,6 +19,27 @@ const STATUS_OPTIONS = [
   { value: "APPROVED", label: "Tasdiqlangan" },
   { value: "REJECTED", label: "Rad etilgan" },
 ];
+
+// Phase 16E.1 review context for a PENDING claim: the conditions the API
+// refuses an approval on (business not approved / deleted / already owned,
+// claimant not active), plus how many other claims compete for the same
+// business. Only fields the API actually sent are judged — an older API that
+// omits them yields no warnings, never false ones. The server stays the
+// authority; this only stops a reviewer approving blind.
+function reviewContext(claim: AdminClaim): { blockers: string[]; competing: number } {
+  if (claim.status !== "PENDING") return { blockers: [], competing: 0 };
+  const { business, claimant } = claim;
+  const blockers: string[] = [];
+  if (business?.deletedAt) blockers.push("Biznes o'chirilgan");
+  else if (business?.status && business.status.toUpperCase() !== "APPROVED")
+    blockers.push(`Biznes tasdiqlangan holatda emas (holati: ${business.status})`);
+  if (business && business.ownerId !== null) blockers.push("Biznesning egasi allaqachon bor");
+  if (claimant?.status && claimant.status.toUpperCase() !== "ACTIVE")
+    blockers.push(`Da'vogar hisobi faol emas (holati: ${claimant.status})`);
+  // _count includes this claim; anything beyond it is a competitor.
+  const competing = Math.max(0, (business?._count?.claims ?? 1) - 1);
+  return { blockers, competing };
+}
 
 export default function AdminClaimsView() {
   const [statusFilter, setStatusFilter] = useState("");
@@ -104,7 +126,9 @@ export default function AdminClaimsView() {
           <EmptyState icon={ClipboardCheck} title="Da'volar topilmadi" body="Filtrni o'zgartirib ko'ring." />
         ) : (
           <div className="flex flex-col gap-3">
-            {claims.map((claim) => (
+            {claims.map((claim) => {
+              const { blockers, competing } = reviewContext(claim);
+              return (
               <div key={claim.id} className="bg-card border border-white/[0.08] rounded-xl p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
@@ -114,8 +138,26 @@ export default function AdminClaimsView() {
                       {formatDate(claim.createdAt)}
                     </div>
                   </div>
+                  {competing > 0 && <Badge tone="amber">{`+${competing} raqobatdosh da'vo`}</Badge>}
                   <ClaimStatusBadge status={claim.status} />
                 </div>
+
+                {blockers.length > 0 && (
+                  <div role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                    <div className="font-medium">Tasdiqlab bo'lmaydi:</div>
+                    <ul className="mt-1 list-disc pl-5">
+                      {blockers.map((b) => (
+                        <li key={b}>{b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {competing > 0 && (
+                  <p className="mt-2 text-xs text-warning">
+                    {`Shu biznesga yana ${competing} ta kutilayotgan da'vo bor — tasdiqlashdan oldin solishtiring.`}
+                  </p>
+                )}
 
                 {claim.evidence && <p className="text-sm text-ink-body mt-3">{claim.evidence}</p>}
 
@@ -138,7 +180,8 @@ export default function AdminClaimsView() {
                       variant="ghost"
                       size="sm"
                       className="!text-success hover:!bg-success/10"
-                      disabled={pendingActionId === claim.id}
+                      disabled={pendingActionId === claim.id || blockers.length > 0}
+                      title={blockers.length > 0 ? "Tasdiqlab bo'lmaydi — yuqoridagi sabablarga qarang" : undefined}
                       onClick={() => handleApprove(claim)}
                     >
                       <Check size={14} />
@@ -157,7 +200,8 @@ export default function AdminClaimsView() {
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
     </div>

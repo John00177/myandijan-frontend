@@ -511,8 +511,20 @@ export interface AdminClaim {
   rejectionReason: string | null;
   createdAt: string;
   reviewedAt: string | null;
-  business: { id: number; slug: string; name: string; ownerId: number | null } | null;
-  claimant: { id: number; fullName: string; phone: string; email: string | null; role: string } | null;
+  // status / deletedAt / _count and claimant.status are the Phase 16E.1 review
+  // context. Optional: an API without that change omits them, and the view
+  // then simply shows no context rather than a false warning.
+  business: {
+    id: number;
+    slug: string;
+    name: string;
+    ownerId: number | null;
+    status?: string;
+    deletedAt?: string | null;
+    /** The business's PENDING claims, this one included. */
+    _count?: { claims: number };
+  } | null;
+  claimant: { id: number; fullName: string; phone: string; email: string | null; role: string; status?: string } | null;
   reviewedBy: { id: number; fullName: string } | null;
 }
 
