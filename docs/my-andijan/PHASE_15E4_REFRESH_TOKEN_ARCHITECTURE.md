@@ -1,16 +1,16 @@
 # Phase 15E.4 — Refresh-Token Families, Reuse Detection & Race Protection
 
-**Status (2026-10-02):**
+**Status (updated 2026-10-03):**
 
 | Step | What | Status |
 |---|---|---|
-| **15E.4a** | Frontend cross-tab refresh coordination | **IMPLEMENTED** — frontend PR #4, merged as `add3fbe` (see §18) |
-| **15E.4b** | Backend sessions/families, race-safe rotation, 90-day absolute lifetime, session-wide `@Public` logout, session-level reset/suspension revocation, expand migration + backfill, real-PostgreSQL CI tests | **IMPLEMENTED** — backend branch `feat/15e4b-refresh-token-sessions` (PR to `main`, not merged at the time of writing; see §18) |
-| **15E.4c** | Reuse detection: observe-only, then session revocation on reuse | **DESIGN ONLY** |
-| **15E.4d** | `sid` claim and per-request session check of access tokens | **DESIGN ONLY** |
-| **15E.4e** | Contract: `session_id NOT NULL`, drop the legacy path and unused columns | **DESIGN ONLY** |
+| **15E.4a** | Frontend cross-tab refresh coordination | **LIVE** — frontend PR #4, merged as `add3fbe` (see §18) |
+| **15E.4b** | Backend sessions/families, race-safe rotation, 90-day absolute lifetime, session-wide `@Public` logout, session-level reset/suspension revocation, expand migration + backfill, real-PostgreSQL CI tests | **LIVE** — backend PR #4, merged as `12e261d` (see §18) |
+| **15E.4c** | Reuse detection: session revocation on reuse | **LIVE** — backend PR #5, merged as `2dc5dc4`; see `PHASE_15E4C_REUSE_DETECTION_ARCHITECTURE.md` |
+| **15E.4d** | `sid` claim and per-request session check of access tokens | **LIVE** — 15E.4d.1 merged as `253ede8`, 15E.4d.2 (mandatory `sid`) as `06d6de9`; see `PHASE_15E4D_ACCESS_TOKEN_SESSION_BINDING_ARCHITECTURE.md` |
+| **15E.4e** | Contract: `session_id NOT NULL`, drop the legacy path and unused columns | **15E.4e.1 IMPLEMENTED** on backend branch `feat/15e4e1-refresh-token-contract-cleanup` (not merged, not deployed); **15E.4e.2 PENDING** (≥ 24 h soak after 15E.4e.1 is live). See `PHASE_15E4E_CONTRACT_CLEANUP_ARCHITECTURE.md` |
 
-Sections 1–17 are the design as written before implementation. Where 15E.4b deliberately differs from it, §18 says so.
+Sections 1–17 are the design as written before implementation. Where 15E.4b deliberately differs from it, §18 says so. The later steps have their own documents (above).
 
 **Code inspected for the design (sections 1–17):**
 - Backend `main` = `41ee971`. Its application code is identical to `c048ff9`; the only difference since then is `CLAUDE.md`.
