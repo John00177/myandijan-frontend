@@ -143,7 +143,19 @@ The schema encodes the MVP boundary explicitly with comments. **In scope now:**
 
 ---
 
-## 8. Current project status (as of 2026-09-28)
+## 8. Project status
+
+### 8.0 Current status — 2026-10-04 (authoritative)
+
+| Area | Status |
+| --- | --- |
+| **Backend** | `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) live as Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` — SUCCESS, 1/1; CI-gated; `prisma migrate deploy` pre-deploy; 127 routes; 16 migrations, none pending |
+| **Frontend** | `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`); Vercel promotes only after `test-and-build` passes |
+| **Tests** | Backend: 1010 unit tests + real-PostgreSQL suites; frontend: Vitest (23 test files); CI gates every merge |
+| **Phase 15 (security)** | **Not yet officially closed.** 15E.4e.2 **CLOSED / PASS**; both HIGH findings of the final audit **remediated in production** (PR #13: staff SMS password reset blocked; `multer` 2.4.0). Open gates: **A** unique ADMIN / SUPER_ADMIN credentials · **B** confirm ruleset bypass lists are empty · **C** final short closure audit. Details: `CURRENT_STATE.md` (top), SECURITY §16 |
+| **Phase 16** | 16E.2 (frontend) already on `main`; PR #10 + #6 (16C.1) and PR #11 + #7 (16E.1) **frozen** until Phase 15 closes |
+
+### 8.1 Status as of 2026-09-28 (historical)
 
 | Area | Status |
 | --- | --- |
@@ -152,7 +164,7 @@ The schema encodes the MVP boundary explicitly with comments. **In scope now:**
 | **Frontend (Vercel)** | **Deployed and current** as of 2026-09-28 (verified byte-identical to a `main` build). |
 | **Local frontend HEAD** | `dd08485`, working tree clean, `npm run build` passes. |
 | **Blocker** | Frontend deploy blocked — see §9. |
-| **Tests** | **Zero.** No test files, no test runner installed in either repo. |
+| **Tests** | **Zero.** No test files, no test runner installed in either repo. *(Historical — resolved; see §8.0.)* |
 | **AI features** | **None.** See `AI.md`. |
 
 ### Evidence for the frontend-behind-production claim
@@ -188,7 +200,7 @@ Two corrections that were established and must not be re-litigated:
 - The Vercel MCP server can read the account but **cannot deploy**, because the project has no Git connection — deploys must originate from this machine.
 - Windows PowerShell 5.1 has **no `&&` operator**. Chain with `;` or run separately.
 
-**2. SMS does not send.** `ESKIZ_EMAIL` / `ESKIZ_PASSWORD` / `ESKIZ_FROM` are **unset on Railway**. `SmsService` degrades to `logger.warn` instead of throwing, so `/auth/otp/request` returns `{"success":true,"message":"Kod yuborildi"}` while **no SMS is sent**. OTP signup is therefore non-functional for real users even once the frontend ships. The Eskiz template must also be registered in the Eskiz dashboard.
+**2. SMS does not send.** `ESKIZ_EMAIL` / `ESKIZ_PASSWORD` / `ESKIZ_FROM` are **unset on Railway** (still true 2026-10-04). *Update (15E.2):* `/auth/otp/request` and `/auth/forgot-password` now fail closed with **503** and never log a code; the behaviour described next is historical. Originally, `SmsService` degraded to `logger.warn` instead of throwing, so `/auth/otp/request` returned `{"success":true,"message":"Kod yuborildi"}` while **no SMS was sent**. OTP signup is therefore non-functional for real users even once the frontend ships. The Eskiz template must also be registered in the Eskiz dashboard.
 
 ---
 

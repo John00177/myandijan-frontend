@@ -68,7 +68,7 @@ Read this section before trusting anything you see.
 | ~~The live site does not reflect the code~~ | **No longer true (2026-09-28).** Production serves current `main` on both platforms, verified by byte-identical bundles and a live smoke test. Judge the product from the site *and* the code. |
 | **Every URL on the domain returns HTTP 200.** | `vercel.json` rewrites `/(.*)` → `/index.html`, so even non-existent asset paths return 200 with HTML. **Status codes prove nothing here** — content type and bundle contents do. |
 | **Code comments about missing endpoints are stale.** | `src/lib/api.ts` asserts that password reset, `POST /businesses`, `/admin/audit-logs` and `/admin/reviews` are 404. Each was true when probed and is now wrong. `AuthContext` claims there is no profile-update endpoint or age/gender columns; both exist. `docs/SSG.md` says the API returns zero businesses; it returns four. **Read controllers, not comments.** |
-| **Analytics dashboards look functional.** | The frontend never calls the ingestion endpoints, so every analytics surface reads from empty tables. |
+| **Analytics dashboards look functional.** | *(2026-09-28; since fixed — the frontend now calls `POST /analytics/view`, `/click`, `/search`.)* The frontend never called the ingestion endpoints, so every analytics surface read from empty tables. |
 | **OTP signup looks like it works.** | `SmsService` is deliberately non-throwing, and `ESKIZ_*` is unset on Railway — so `POST /auth/otp/request` returns `{"success":true,"message":"Kod yuborildi"}` and **sends nothing.** |
 | **Restaurant cuisine, price and delivery times look like data.** | They are derived from `Math.sin(id * k)` in `src/lib/restaurantMock.ts` — deterministic and invented, shipped to production. |
 | **Two settings forms look like they save.** | `AdminSettingsView` and the dashboard `SettingsView` accept input, show success, and persist nothing. |
@@ -112,7 +112,7 @@ Three things follow:
 
 ### Review priorities, in order
 1. **Security** — see §9. The open items are infrastructure posture, not application logic.
-2. **The absence of tests.** 118 routes and 132 components, zero tests, no runner. This is the largest structural risk and it compounds with every change.
+2. ~~**The absence of tests.**~~ *(2026-09-28; resolved — backend 1010 unit tests + real-PostgreSQL suites, frontend Vitest, all CI-gated.)* 118 routes and 132 components, zero tests, no runner.
 3. **Wiring existing backend capability into the frontend** (§3).
 4. **SEO structure** — the sitemaps advertise 96 URLs that resolve to a generic query-string search page. Real `/category/:slug` and `/district/:slug` landing pages are the biggest organic-growth lever.
 5. **Rendering strategy** — the app is SPA-only, so social scrapers see only a bare title. In a Telegram-heavy market that is an acquisition cost. `docs/SSG.md` holds a complete five-step plan; follow it rather than re-deriving one.
@@ -164,7 +164,7 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 | **Blocker** | None for deployment — both platforms run current `main` as of 2026-09-28. |
 | **Then** | Configure `ESKIZ_*` on Railway and register the SMS template. (The seed-script credential rotation is done — completed 2026-09-28.) |
 
-**Production and `main` now agree**, so the live site is a valid reference as of 2026-09-28.
+**Production and `main` now agree**, so the live site is a valid reference as of 2026-09-28. *(Historical. Current production: backend Railway `6b5f057b-ea08-4252-b5fa-79910859f8d8` on `2ea83b6`, frontend `main` `f80ee8d` — see the last section.)*
 
 ---
 
@@ -184,7 +184,19 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 - **15B** (D-74): owner-only business content, explicit suspension target table, session revocation on reset/suspension, `/auth/*` rate limits, CORS allowlist, audit request context.
 - **15D** (D-75): **capability authorization, deny by default.** Global `AuthzGuard`; every route declares `@Public` / `@Authenticated` / `@RequireCapability`; 20 capabilities in one explicit role table (`src/authz/capabilities.ts`, no inheritance); ownership + conflict-of-interest policies; rank model (`ROLE_HIERARCHY`, `RolesGuard`, `@Roles`) deleted; route-inventory test + committed snapshot fail CI on any undeclared or changed rule; frontend renders from server-issued `capabilities`.
 - **15D.2** (D-75 point 7): **platform staff hold no business-owner capability.** ADMIN/SUPER_ADMIN lost `business.claim` / `business.create` / `business.manage_own` (BUSINESS_OWNER = ownership authority; staff = platform capability authority via `/admin`, e.g. `business.edit_any`); pre-checked 0 ADMIN/SUPER_ADMIN-owned businesses in production. Business Staff (membership) and PLATFORM_OWNER governance remain future work.
-- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone); the Security Hardening backlog (reset code logged to stdout + `Math.random`, Vercel CI gate, distributed rate limiting, refresh-token reuse detection, remaining rate-limit coverage).
+- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone). *Of the Security Hardening backlog listed here on 2026-10-02, the reset-code logging + `Math.random` (15E.2), the Vercel CI gate (15E.3 / 15E.7.1) and refresh-token reuse detection (15E.4c) are done; distributed rate limiting and the remaining rate-limit coverage are accepted residual risk (SECURITY §16.3 R1, R2) — see the next section.*
 - **Where to look:** `ARCHITECTURE.md` §31–§32, `DECISIONS.md` D-74/D-75, `SECURITY.md` §3.
 
 **For review:** any new endpoint must carry an authorization decorator — CI rejects it otherwise (`route-authorization.spec.ts`), and changing who may call a route means editing `src/authz/capabilities.ts` and the committed snapshot together. Proposals that reintroduce a role "level" will fail `no-rank-model.spec.ts` by design.
+
+## Phase 15 — security hardening and closeout (2026-10-02 → 10-04)
+
+**Current state (2026-10-04, authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
+
+- **15E.2** (D-76): authentication codes never logged/returned, `crypto.randomInt`, one live code per phone + purpose, per-phone wrong-guess budget, atomic single use, no OTP sign-in for staff, fail-closed SMS (503 while `ESKIZ_*` is unset — still the case).
+- **15E.3 / 15E.7.1** (D-77): CI hardened in both repositories; Railway waits for CI; Vercel production waits for the `test-and-build` status; "Protect main" rulesets.
+- **15E.4** refresh-token hardening — **CLOSED / PASS**: 4a client refresh + cross-tab coordination; 4b one `auth_sessions` row per sign-in, race-safe rotation; 4c reuse detection (10 s grace); 4d `sid`-bound access tokens (mandatory); 4e.0 migrations moved to Railway pre-deploy; 4e.1 `refresh_tokens.session_id` NOT NULL; **4e.2** legacy `user_agent` / `ip_address` columns and `LEGACY_MIGRATION` removed — production verification PASS (E5–E14 = 0, 0 sessionless tokens).
+- **Final security audit (2026-10-04):** two HIGH findings **remediated in production** via PR #13 — SMS password reset refused for SUPPORT / MODERATOR / ADMIN / SUPER_ADMIN (staff recovery is owner-controlled, out of band) and `multer` 2.4.0. Residual risks R1–R14 accepted and assigned (SECURITY §16.3).
+- **Phase 15 is NOT yet officially closed.** Open gates: **A** unique ADMIN / SUPER_ADMIN credentials · **B** confirm the `main` ruleset bypass lists are empty · **C** final short closure audit.
+- **Phase 16:** 16E.2 (frontend) is already on `main`; PR #10 + #6 (16C.1) then PR #11 + #7 (16E.1) stay **frozen** until Phase 15 closes.
+- **Where to look:** `CURRENT_STATE.md` (current-state section), `SECURITY.md` §15–§16, `PHASE_15E4_REFRESH_TOKEN_ARCHITECTURE.md`, `PHASE_15E4D_ACCESS_TOKEN_SESSION_BINDING_ARCHITECTURE.md`.
