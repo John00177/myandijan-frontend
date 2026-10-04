@@ -68,7 +68,7 @@ Three endpoints exist (`POST /analytics/view|click|search`) and nothing calls th
 
 Call `view` on business detail; `click` from `ActionButtons` (call / directions / website / share / favourite); `search` from both search paths. **This is a small frontend change that switches on a large amount of already-built backend.**
 
-### 7. Fix the refresh-token gap · **[REQUIRED]**
+### 7. Fix the refresh-token gap · ✅ **DONE — Phase 15E.4** (client refresh + cross-tab coordination in 15E.4a; server sessions 15E.4b–4e). Kept for history:
 Sessions die after ~15 minutes because the frontend never stores the `refreshToken` from `/auth/login` or `/auth/otp/verify`, and never calls `POST /auth/refresh`. A user can be signed out mid-way through the 8-step claim flow and lose the submission.
 
 Store it; on a 401, attempt one refresh before clearing the session. **Prefer this over simply raising `JWT_ACCESS_EXPIRES_IN`** — raising the TTL weakens the security posture, and the server side already works.
@@ -117,7 +117,7 @@ Claims can now actually be created (`POST /me/claims`, for existing unowned list
 - **Events** — approve/reject (2)
 - **Taxonomy** — category delete + reorder, district/city edit (4)
 
-### 15. Introduce a test runner and cover auth + RBAC first · **[OBSERVED]**
+### 15. Introduce a test runner and cover auth + RBAC first · ✅ **DONE** (backend Jest + real-PostgreSQL suites, frontend Vitest, CI-gated). Kept for history:
 Zero tests across 118 routes and 132 components. Start where a silent regression is most expensive: the role hierarchy (a floor-vs-exact-match mistake would be catastrophic and invisible), OTP TTL/attempt/rate limits, ownership scoping in `OwnerService`, and the `normalizeBusiness` boundary. Vitest for the frontend, Jest + Supertest for the API. Also note the API's `lint` and `format` scripts reference `eslint`/`prettier`, **neither of which is installed** — both fail on a clean checkout.
 
 ### 16. Decide on prerendering · **[EXPLICIT]**

@@ -1,6 +1,6 @@
 # TODO — My Andijan consolidated task list
 
-> Compiled 2026-09-28 from code `TODO`s, unfinished features, the pending-task list recovered from the final session, and this review's findings.
+> **Reconciled 2026-10-04** with the current state (see `CURRENT_STATE.md`, top). Compiled 2026-09-28 from code `TODO`s, unfinished features, the pending-task list recovered from the final session, and this review's findings.
 >
 > **Markers:** `[ ]` TODO · `[~]` IN PROGRESS · `[x]` DONE · `[?]` UNKNOWN / needs investigation
 >
@@ -13,10 +13,10 @@
 - [x] **Rotate the seed-script password in production** — DONE 2026-09-28: 192-bit random secret stored in Railway `SEED_ROLE_PASSWORD`, applied to all six accounts, verified — `api/scripts/seed-role-accounts.js:14`. Hardcoded plaintext password applied to `SUPER_ADMIN` (`+998994796431`), `ADMIN`, `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER`, `CUSTOMER`; printed to stdout; documented as run against production via `railway ssh`; `upsert` re-applies it on every run. **[SESSION]** — flagged at commit time, never done
 - [x] **Parameterize** that script to `process.env.SEED_ROLE_PASSWORD` with **no default**, and remove the `console.log` of the password — done 2026-09-28 **[SESSION]**
 - [x] **Purge the credential from git history before adding any git remote** — done 2026-09-28: `4e3c6bc` rebuilt as `002fca9`; verified absent from all reachable commits before the first push. **Rotation in production is still outstanding.** **[REVIEW]**
-- [ ] **Sessions die after ~15 minutes.** Frontend never stores `refreshToken` and never calls `POST /auth/refresh`. A user can be signed out mid-claim-flow and lose the submission. Fix on the client — do **not** just raise `JWT_ACCESS_EXPIRES_IN` **[REVIEW]**
-- [ ] **OTP codes are never delivered.** `ESKIZ_*` unset on Railway; `SmsService` logs and returns **success**, so the failure is invisible to callers. Signup is unusable by real users **[SESSION]**
-- [ ] **Password-reset codes are logged, not sent** — `api/src/auth/auth.service.ts:347` `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`. **Configuring Eskiz does not fix this**; it needs a code change **[CODE]**
-- [ ] **Analytics tables are never written.** Frontend calls none of `POST /analytics/view|click|search`, so owner analytics, the command centre, `AnalyticsView` and the health score's `visibilityScore` all read empty tables **[REVIEW]**
+- [x] ✅ **Fixed, Phase 15E.4a** (client refresh with cross-tab coordination; server sessions 15E.4b–4e). *Original:* **Sessions die after ~15 minutes.** Frontend never stores `refreshToken` and never calls `POST /auth/refresh`. A user can be signed out mid-claim-flow and lose the submission. Fix on the client — do **not** just raise `JWT_ACCESS_EXPIRES_IN` **[REVIEW]**
+- [ ] **OTP codes are never delivered.** `ESKIZ_*` unset on Railway (still true 2026-10-04). *Since 15E.2 the request fails closed with 503 instead of logging and returning success.* OTP signup stays unusable by real users until the owner configures Eskiz **[SESSION]**
+- [x] ✅ **Fixed, Phase 15E.2** — reset codes are never logged; without SMS the request answers 503. Since the Phase 15 closeout (PR #13) staff accounts cannot reset by SMS at all. *Original:* **Password-reset codes are logged, not sent** — `api/src/auth/auth.service.ts:347` `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`. **Configuring Eskiz does not fix this**; it needs a code change **[CODE]**
+- [x] ✅ **Fixed** — the frontend calls `recordAnalytics` (`src/lib/api.ts`). *Original:* **Analytics tables are never written.** Frontend calls none of `POST /analytics/view|click|search`, so owner analytics, the command centre, `AnalyticsView` and the health score's `visibilityScore` all read empty tables **[REVIEW]**
 
 ## 🚧 Blocking issues
 
@@ -71,7 +71,7 @@
 - [ ] **Nothing schedules `POST /admin/analytics/aggregate`** — the only writer for `PlatformMetric`. No cron exists in the API **[REVIEW]**
 - [ ] `api` `lint` and `format` scripts reference **`eslint` and `prettier`, neither installed** — both fail on a clean checkout **[REVIEW]**
 - [ ] Add a **global exception filter** — currently `UploadService` forwards Supabase's error message verbatim to clients **[REVIEW]**
-- [ ] Populate `RefreshToken.userAgent` / `ipAddress` — columns exist, `issueTokens()` never sets them, so session management and anomaly detection are impossible **[REVIEW]**
+- [x] ~~Populate `RefreshToken.userAgent` / `ipAddress`~~ — superseded: device attribution lives on `auth_sessions` (15E.4b) and the token columns were dropped in 15E.4e.2 **[REVIEW]**
 - [ ] Add `@nestjs/config` with a validation schema so a missing required variable fails at **boot**, not at first use **[REVIEW]**
 - [?] Does `AuditLog.before`/`after` ever snapshot `passwordHash` or other sensitive fields? **Needs checking** **[REVIEW]**
 - [?] Is `Review.rating` bounded `@Min(1) @Max(5)` in its DTO? The column is a bare `Int` with no DB constraint **[REVIEW]**
@@ -180,10 +180,10 @@
 
 ## Testing
 
-- [ ] **Zero tests exist.** No test files, no runner, no `test` script, in either repo — across 118 API routes and 132 components **[REVIEW]**
-- [ ] Choose runners: Vitest (frontend), Jest + Supertest (API) **[REVIEW]**
+- [x] ✅ **Resolved** — backend Jest (1010 unit tests) + real-PostgreSQL suites, frontend Vitest; CI gates every merge. *Original:* **Zero tests exist** across 118 API routes and 132 components **[REVIEW]**
+- [x] Choose runners — Vitest (frontend), Jest (API; HTTP-level specs use a real Nest server) **[REVIEW]**
 - [ ] **Cover first, in this order** (highest cost of silent regression) **[REVIEW]**
-  - [ ] `RolesGuard` hierarchy — a floor-vs-exact-match mistake would be catastrophic and invisible
+  - [x] ~~`RolesGuard` hierarchy~~ — superseded: the rank model was removed in 15D; `route-authorization.spec.ts`, `no-rank-model.spec.ts` and the per-area authorization specs cover the capability model
   - [ ] OTP: TTL, single-use, max attempts, the 3-per-10-min rate limit
   - [ ] Ownership scoping in `OwnerService`
   - [ ] `normalizeBusiness` / `normalizeBranch` at the API boundary
@@ -201,12 +201,12 @@
 > Full ranked analysis in `SECURITY.md`. Highest-severity items are under **Critical bugs** above.
 
 - [x] **Restrict CORS** — allowlist since Phase 15B (`src/common/cors.ts`) **[REVIEW]**
-- [ ] **Gate or disable `/docs` in production** — returns 200, publishing all 118 routes and every DTO **[REVIEW]**
+- [ ] **Gate or disable `/docs` in production** — still returns 200; accepted as low residual risk because both repositories are public (SECURITY §16.3 R8) **[REVIEW]**
 - [x] **Add `@nestjs/throttler`** — Phase 15B: `/auth/*` per-address + per-phone **[REVIEW]**
   - [ ] Extend throttling to `/analytics/*`, `/search`, `/upload/*`, `POST /businesses`
 - [ ] **Throttle or authenticate `POST /analytics/*`** — unauthenticated writes that poison analytics and grow tables without bound **[REVIEW]**
 - [ ] **Add `helmet`** **[REVIEW]**
-- [ ] **Verify `JWT_ACCESS_SECRET` is set on Railway** — no default, no boot validation **[REVIEW]**
+- [x] **Verify `JWT_ACCESS_SECRET` is set on Railway** — present (checked by name, 2026-10-04); a missing secret makes passport-jwt refuse to start, so it fails at boot, not open (SECURITY §16.1) **[REVIEW]**
 - [ ] **Strip EXIF / re-encode uploads** — **GPS coordinates may currently be published** with review and avatar photos **[REVIEW]**
 - [ ] **Add an upload quota per user** — 5 MB per file, unlimited files **[REVIEW]**
 - [ ] **Add an image deletion / orphan-cleanup path** — uploads are public and permanent **[REVIEW]**
@@ -223,13 +223,17 @@
 - [x] **Owner: enable the Vercel Production Deployment Check** `Vercel - myandijan-frontend: test-and-build` — configured 2026-10-02 (SECURITY §15)
 - [x] **Owner: add a `main` ruleset in both repos** — "Protect main" active (backend `24347110`, frontend `24347040`): no deletion, no force push, PR + `test-and-build` (up to date)
 - [x] **Push the held frontend-repo commits** — pushed with `3e8219f`
-- [ ] **Prove the frontend gate:** after the 15E.7.1 docs PR merges, its Vercel production deployment must stay unpromoted until the status is green
-- [ ] **Owner: confirm both ruleset bypass lists are empty** (Settings → Rules → Rulesets — not readable via the public API)
-- [ ] **Security Hardening phase (remaining):** refresh-token families + reuse detection (15E.4); rate-limit coverage — analytics, search, upload, per-user buckets (15E.5); headers/CSP, Swagger off in production, security-event audit (15E.6); distributed rate limiting if replicas increase
-- [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
+- [x] **Prove the frontend gate** — observed on `7de35c6`: Vercel reported success one second after the `test-and-build` status (SECURITY §16.1)
+- [ ] **Phase 15 gate B — Owner: confirm both ruleset bypass lists are empty** (Settings → Rules → Rulesets — not readable via the public API)
+- [ ] **Phase 15 gate A — Owner: give ADMIN and SUPER_ADMIN unique credentials** (today all six role accounts share `SEED_ROLE_PASSWORD`; SECURITY §16.3 R3)
+- [ ] **Phase 15 gate C — final short Phase 15 closure audit**, after A and B; Phase 15 is not officially closed until it passes
+- [x] **15E.4 — refresh-token hardening** (4a–4e.2): sessions, rotation, reuse detection, `sid` binding, NOT NULL contract, legacy cleanup — **CLOSED / PASS** (production verified 2026-10-04)
+- [x] **Phase 15 final audit HIGH findings** — staff SMS password reset blocked, `multer` 2.4.0 — merged in PR #13 (`2ea83b6`), deployed (Railway `6b5f057b-ea08-4252-b5fa-79910859f8d8`), production verification PASS
+- [ ] **Security Hardening phase (remaining):** ~~refresh-token families + reuse detection (15E.4)~~ done; rate-limit coverage — analytics, search, upload, per-user buckets (15E.5); headers/CSP, Swagger off in production, security-event audit (15E.6); distributed rate limiting if replicas increase
+- [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth). *(Populating `RefreshToken.ipAddress/userAgent` and refresh-token reuse detection were removed from this list — superseded/done in 15E.4.)*
 - [ ] **Remove the dead `JWT_REFRESH_SECRET`** from `.env`/`.env.example` — nothing reads it, and it implies refresh tokens are signed JWTs (they are opaque random bytes) **[REVIEW]**
 - [ ] **Add the seven missing variables to `.env.example`** — `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`, `ESKIZ_BASE_URL` (+ remove `SUPABASE_ANON_KEY` if unneeded). Onboarding from it currently yields an API that will not boot **[REVIEW]**
-- [ ] **Run `npm audit`; enable Dependabot; remove the undeclared `sonner`** **[REVIEW]**
+- [ ] **Run `npm audit`; enable Dependabot; remove the undeclared `sonner`** — *partly done:* `npm audit` run in the Phase 15 closeout (remaining backend items: SECURITY §16.3 R6); Dependabot covers GitHub Actions only; `sonner` not re-checked **[REVIEW]**
 - [?] **⚠️ Answer the data-residency question.** The schema's vanilla-PostgreSQL constraint exists so the DB is *"relocatable to an Uzbek host"* — but the DB is on **Railway** and images on **Supabase**, neither Uzbek. Portability is preserved; **residency is not.** If residency is a legal requirement, current hosting does not satisfy it **[REVIEW]**
 - [?] **Has the API's `.env` ever been shared, pasted or backed up?** It holds the Supabase `service_role` key and the production `DATABASE_URL`. Rotate if in any doubt **[REVIEW]**
 

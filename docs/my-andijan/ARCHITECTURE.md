@@ -267,16 +267,16 @@ Region (1: Andijan) → District (14) → City (11)
 | Identifier | Phone, `+998XXXXXXXXX`, enforced by `/^\+998\d{9}$/` in six DTOs |
 | Password hashing | bcrypt, cost **12** (`BCRYPT_ROUNDS`) |
 | Access token | `@nestjs/jwt`, secret `JWT_ACCESS_SECRET`, default TTL `15m` |
-| Refresh token | Separate secret `JWT_REFRESH_SECRET`, default TTL `30d`; stored as `RefreshToken.tokenHash` (unique), with `expiresAt`, `revokedAt`, `userAgent`, `ipAddress` — so rotation and revocation are both possible |
+| Refresh token | **Current (Phase 15E.4):** opaque random bytes (not a JWT — `JWT_REFRESH_SECRET` is read by no code), default TTL `30d` (`JWT_REFRESH_EXPIRES_IN`); stored only as `RefreshToken.tokenHash` (SHA-256, unique) with `expiresAt`, `revokedAt`, `rotatedAt`, `parentId` and a **NOT NULL `sessionId`**. Every sign-in creates one `auth_sessions` row (device user agent/IP, 90-day absolute expiry); rotation is one transaction; reuse after the 10 s grace window revokes the session (§33). *Historical:* the token row carried `userAgent`/`ipAddress` columns (never written; dropped in 15E.4e.2) |
 | Strategy | `passport-jwt`, bearer from `Authorization` header, `ignoreExpiration: false` |
 | Per-request check | `JwtStrategy.validate()` **queries the database on every request** and rejects unless `status === ACTIVE` and `deletedAt` is null. A suspended user is locked out immediately without waiting for token expiry — at the cost of one query per request. |
-| Token payload | `{ sub: number, phone: string, role: UserRole }` |
+| Token payload | `{ sub, phone, role, sv, sid }` — `sv` = `users.session_version` (15B, mandatory since 15E.4e.1), `sid` = the AuthSession (mandatory since 15E.4d.2); `JwtStrategy` rejects a mismatched `sv` or an unknown/revoked/expired/foreign `sid` with a bare 401 |
 | OTP | 6 digits via `crypto.randomInt`, hashed into `OtpCode.codeHash`, 5-min TTL, single-use (`usedAt`), max 5 attempts, **3 SMS per phone per 10 min**. Purposes: `PHONE_VERIFY`, `PASSWORD_RESET`, `LOGIN`. |
 | OTP storage | **PostgreSQL, not Redis.** The spec called for Redis; the `OtpCode` table already provides TTL + attempt counting, so a dependency was avoided. |
 | OTP-created users | Get `passwordHash = bcrypt(crypto.randomBytes(48).hex)` and `fullName: ''` — an unusable password, so the account exists but cannot be password-logged-in until a password is set. |
 | Client-side storage | `localStorage`: `myandijan_token`, `myandijan_user` |
 
-**Gap:** the frontend never stores or uses the refresh token and never calls `POST /auth/refresh` or `POST /auth/logout`. See `CURRENT_STATE.md` §5, bug 1.
+~~**Gap:** the frontend never stores or uses the refresh token and never calls `POST /auth/refresh` or `POST /auth/logout`.~~ ✅ **Resolved** — refresh persistence and logout revocation (Phase 4, below) and cross-tab refresh coordination (Phase 15E.4a); see §33.
 
 ---
 
@@ -516,6 +516,8 @@ Everything that might have been a job is either **on-write** or **on-demand**:
   "deploy": { "startCommand": "npx prisma migrate deploy && npm run start:prod",
               "restartPolicyType": "ON_FAILURE", "restartPolicyMaxRetries": 3 } }
 ```
+> **Superseded by Phase 15E.4e.0 (2026-10-03).** Current `railway.json`: `preDeployCommand: "npx prisma migrate deploy"`, `startCommand: "npm run start:prod"`, healthcheck `/categories` (120 s), restart ON_FAILURE ×3; Railway waits for CI. A failed pre-deploy or healthcheck keeps the previous deployment serving. The config above and the paragraph below are historical.
+
 Migrations run on every boot, **`&&`-chained** — so the app only starts if migrations succeed. A useful corollary: **a running production API proves all prior migrations applied cleanly**, which is how migration state was reasoned about without DB access. `postinstall` runs `prisma generate`. Deployed via `railway up --detach`.
 
 ### Frontend — Vercel
@@ -1001,3 +1003,19 @@ Decision **D-75 point 7**. `ROLE_CAPABILITIES` no longer gives ADMIN or SUPER_AD
 **Deployment (Phase 15D.2).** Backend `2d32a21` pushed 01:45:57 UTC → Railway deployment `b7b550f4-78c6-4ba0-971b-62666200ae67` created 01:45:58 in WAITING → CI run 36952498495 green → BUILDING 01:47:26 → SUCCESS 01:48:22. Frontend `4936d7a` (tests only) → CI run 36952515640 green → Vercel `dpl_4tHHqzU1cdULxjYqRwNMXj198BEh` READY; live bundle `index-MqMErRup.js` unchanged (no app code change). Read-only smoke: 98 protected routes (33 owner-capability) → 401 anonymous and with a forged token; 18 public GET routes open; a real listing's page (id and slug), catalog and reviews, search and the business list → 200; CORS preflight from myandijan.uz allowed.
 
 **Still separate:** Business Staff (business-scoped membership, not a role), PLATFORM_OWNER governance, Phase 15E Security Hardening, the SUPPORT desk decision.
+
+## 33. Refresh-token sessions and the Phase 15 closeout — 2026-10-02 → 10-04 (Phase 15E.4, closeout)
+
+**Sessions (15E.4b).** Every sign-in (password, OTP, registration) creates one `auth_sessions` row (user, device user agent / IP, 90-day absolute expiry, `revoked_at` + `revoked_reason`) with its first refresh token. Rotation is one transaction — a conditional lock on the session, a compare-and-set of the old token's `rotated_at`/`revoked_at`, then the successor insert (`parent_id` UNIQUE, so one successor per token).
+
+**Reuse detection (15E.4c).** Presenting an already-rotated token inside a 10 s grace window (skew bound −5 s) is a harmless race; after it, the session is revoked as `REUSE_DETECTED` (one session, not the whole account) with an audit row. Every refresh failure is the same generic 401.
+
+**Access-token binding (15E.4d).** Access tokens carry `sid`; `JwtStrategy` refuses a token whose session is unknown, revoked, expired or another user's — so logout, reuse revocation and absolute expiry end access tokens immediately. Mandatory since 15E.4d.2.
+
+**Client (15E.4a).** One refresh at a time across browser tabs (`src/lib/auth/refreshCoordinator.ts`).
+
+**Contract and cleanup (15E.4e).** 4e.0 moved migrations to Railway pre-deploy (§ Backend — Railway above); 4e.1 made `refresh_tokens.session_id` NOT NULL and removed the legacy code paths; 4e.2 dropped the never-written `refresh_tokens.user_agent` / `ip_address` and `SessionRevokedReason.LEGACY_MIGRATION`. Production verification PASS (2026-10-04): E5–E14 = 0, 0 sessionless tokens. Rollback floor: the 15E.4e.1 code.
+
+**Phase 15 closeout (PR #13, 2026-10-04).** SMS password reset is refused for SUPPORT / MODERATOR / ADMIN / SUPER_ADMIN (the OTP sign-in allowlist now also governs reset, re-checked inside the reset transaction); `multer` overridden to 2.4.0. Deployed as Railway `6b5f057b-ea08-4252-b5fa-79910859f8d8` on `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` — production verification PASS. **Phase 15 is not yet officially closed** (open gates in `CURRENT_STATE.md`, top).
+
+**Detail:** `PHASE_15E4_REFRESH_TOKEN_ARCHITECTURE.md`, `PHASE_15E4D_ACCESS_TOKEN_SESSION_BINDING_ARCHITECTURE.md`, `SECURITY.md` §16. *(The 15E.4b/4c/4e implementation records are on unmerged documentation branches — see SECURITY §16.4.)*

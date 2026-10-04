@@ -1,6 +1,6 @@
 # DATABASE — My Andijan
 
-> Source of truth: `my-andijan-api/prisma/schema.prisma` (1193 lines) and `prisma/migrations/` (11 migrations). Documented 2026-09-28. **31 models, 19 enums.**
+> Source of truth: `my-andijan-api/prisma/schema.prisma` (1193 lines) and `prisma/migrations/` (11 migrations). Documented 2026-09-28. **31 models, 19 enums.** *(Counts are 2026-09-28 values — there are now 16 migrations. §2.2 and §2.2a were updated 2026-10-04 for the Phase 15E.4 session schema; other models were not re-audited in that pass.)*
 
 ---
 
@@ -81,19 +81,37 @@
 **Indexes:** `role`, `status`, `deletedAt`, `districtId`.
 
 ### 2.2 `RefreshToken` → `refresh_tokens`
-**Purpose:** rotating refresh tokens with revocation and device attribution.
+**Purpose:** rotating refresh tokens with revocation, each belonging to one sign-in session (current schema, Phase 15E.4).
 
 | Field | Type | Req | Notes |
 | --- | --- | --- | --- |
 | `userId` | Int | ✔ | FK → `User`, **Cascade** |
-| `tokenHash` | String | ✔ | **@unique** — the token itself is never stored |
+| `tokenHash` | String | ✔ | **@unique** — SHA-256 of the token; the token itself is never stored |
 | `expiresAt` | DateTime | ✔ | |
 | `revokedAt` | DateTime | ✗ | enables explicit revocation |
-| `userAgent` | VarChar(500) | ✗ | |
-| `ipAddress` | VarChar(45) | ✗ | 45 chars = IPv6 |
+| `createdAt` | DateTime | ✔ | default `now()` |
+| `sessionId` | Int | ✔ | FK → `AuthSession`, **Cascade** — **NOT NULL since 15E.4e.1** |
+| `rotatedAt` | DateTime | ✗ | set (with `revokedAt`) by the one refresh that rotated this token |
+| `parentId` | Int | ✗ | **@unique**, FK → `RefreshToken` (the token this one replaced), **SetNull** — at most one successor per token |
 
-**Indexes:** `userId`, `expiresAt`.
-**Status note:** fully built and issued, but **the frontend never uses it** — see `CURRENT_STATE.md`.
+**Indexes:** `userId`, `expiresAt`, `sessionId`.
+**History:** until 15E.4e.2 (2026-10-04) the table also had `userAgent` VarChar(500) and `ipAddress` VarChar(45); they were never written and were dropped — device attribution lives on `AuthSession`. *(The 2026-09-28 status note "the frontend never uses it" is obsolete: the client refreshes since 15E.4a.)*
+
+### 2.2a `AuthSession` → `auth_sessions` (Phase 15E.4b)
+**Purpose:** one row per sign-in; the unit that refresh, logout, reuse detection and access-token `sid` binding act on.
+
+| Field | Type | Req | Notes |
+| --- | --- | --- | --- |
+| `userId` | Int | ✔ | FK → `User`, **Cascade** |
+| `createdAt` | DateTime | ✔ | default `now()` |
+| `absoluteExpiresAt` | DateTime | ✔ | `createdAt` + 90 days; refresh never extends it |
+| `revokedAt` | DateTime | ✗ | |
+| `revokedReason` | `SessionRevokedReason` | ✗ | `LOGOUT`, `PASSWORD_RESET`, `SUSPENDED`, `REUSE_DETECTED` (`LEGACY_MIGRATION` removed in 15E.4e.2) |
+| `lastUsedAt` | DateTime | ✔ | written by every successful refresh |
+| `userAgent` | VarChar(500) | ✗ | from the request context at sign-in |
+| `ipAddress` | VarChar(45) | ✗ | from the request context at sign-in |
+
+**Indexes:** `userId`, (`userId`, `revokedAt`).
 
 ### 2.3 `OtpCode` → `otp_codes`
 **Purpose:** one-time codes for phone verification, password reset and OTP login.
