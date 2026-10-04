@@ -424,13 +424,15 @@ Frontend  merge → Vercel builds → waits for "Vercel - myandijan-frontend: te
 
 ## 16. Phase 15 closeout audit (2026-10-04)
 
-**Audited state.** Backend `main` `7de05a5` serving as Railway deployment `fe107075` (SUCCESS, 1/1 replicas); frontend `main` `7de35c6`. Method: code read of the auth, authz, upload, analytics and request-context paths; real HTTP probes of production (read-only); GitHub rules API; `npm audit`; production DB invariants read through the Railway Data panel (15E.4e.2 post-deploy query). Nothing in production was modified.
+**Current production state (after the closeout remediation).** Backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (merge of PR #13) serving as Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` — SUCCESS, 1/1 replicas; frontend `main` `7de35c6`.
+
+**Historical audit state (when the audit ran, before the remediation).** Backend `main` `7de05a5` serving as Railway deployment `fe107075` (SUCCESS, 1/1 replicas) — the 15E.4e.2 release; frontend `main` `7de35c6`. Method: code read of the auth, authz, upload, analytics and request-context paths; real HTTP probes of production (read-only); GitHub rules API; `npm audit`; production DB invariants read through the Railway Data panel (15E.4e.2 post-deploy query). Nothing in production was modified.
 
 ### 16.1 Verified controls (current reality)
 
 | Area | State |
 | --- | --- |
-| Sessions & refresh tokens | One `auth_sessions` row per sign-in; opaque SHA-256-hashed refresh tokens rotated in one transaction; reuse inside/after the 10 s grace window revokes the session (`REUSE_DETECTED`); 90-day absolute expiry; `refresh_tokens.session_id` NOT NULL; legacy columns and `LEGACY_MIGRATION` dropped (15E.4e.2). Production: E5–E14 all 0, 0 orphan chains, 16 tokens / 12 sessions. |
+| Sessions & refresh tokens | One `auth_sessions` row per sign-in; opaque SHA-256-hashed refresh tokens rotated in one transaction; reuse inside/after the 10 s grace window revokes the session (`REUSE_DETECTED`); 90-day absolute expiry; `refresh_tokens.session_id` NOT NULL; `refresh_tokens.user_agent` / `ip_address` columns and `SessionRevokedReason.LEGACY_MIGRATION` removed (15E.4e.2). **15E.4e.2 production verification: PASS.** Measured directly in the production database after the 15E.4e.2 deploy (deployment `fe107075`, migration finished 2026-10-04 15:14:57 UTC+5): migration applied, 16 migrations, 0 failed; `session_id` NOT NULL; 0 sessionless tokens; 0 legacy columns; enum = `LOGOUT, PASSWORD_RESET, SUSPENDED, REUSE_DETECTED`; E5–E14 all 0; 0 orphan chains; 16 tokens / 12 sessions. |
 | Access tokens | HS256 with `JWT_ACCESS_SECRET` (passport-jwt refuses to start without a secret, so a missing variable fails at boot, not open); mandatory `sv` (strict equality with `users.session_version`) and `sid` (session must exist, belong to the user, be unrevoked and unexpired); per-request user status check. Production: garbage, `alg:none`, wrong-signature and unsigned tokens all → bare 401 (also on `/admin/*`). |
 | Authorization | Global deny-by-default `AuthzGuard` (undeclared route → 403); 127 routes, 30 public (all GET reads, `/auth/*`, `/analytics/*` writes); capability table with no role inheritance; no rank code remains; route snapshot + `no-rank-model` + `role-write-inventory` tests. |
 | Auth abuse | Per-address and per-phone throttling on every `/auth/*` credential and code route; DB-backed SMS-code wrong-guess budget; OTP sign-in **and (since this closeout) SMS password reset** refused for staff roles. |
@@ -439,7 +441,14 @@ Frontend  merge → Vercel builds → waits for "Vercel - myandijan-frontend: te
 | Frontend | Capability-driven UI (`can(...)`), no role comparisons for authorization; cross-tab refresh coordinator; no `dangerouslySetInnerHTML`; `npm audit --omit=dev`: 0 vulnerabilities. |
 | CI/CD | Both repos: ruleset "Protect main" (PR required, `test-and-build` required + strict, no force push, no deletion); workflow `permissions: contents: read`; actions pinned by SHA; `persist-credentials: false`; Railway waits for CI and runs `prisma migrate deploy` pre-deploy; the Vercel production check behaves as configured: frontend `7de35c6` — the build reported pending from 11:30:29Z, the `Vercel - myandijan-frontend: test-and-build` status turned success at 11:31:09Z, and Vercel reported success at 11:31:10Z, one second later. |
 
-### 16.2 Closeout findings fixed (branch `security/15-closeout`, backend)
+### 16.2 Closeout findings — REMEDIATED in production
+
+Both HIGH Phase 15 findings below were fixed on branch `security/15-closeout`, **merged in PR #13 as commit `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`** and **deployed by Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8`** (SUCCESS, 1/1 replicas, after CI `test-and-build` passed on the merge commit). **Production verification: PASS (2026-10-04):**
+
+- `multer` resolves to **2.4.0** — the build ran `npm ci` against a lockfile whose only `multer` is 2.4.0; no 2.0.x copy remains.
+- Pre-deploy `prisma migrate deploy`: 16 migrations found, **no pending migrations** (the release has none).
+- **Production smoke checks passed** (non-mutating only): `GET /categories` 200; `GET /favorites`, invalid refresh, `GET /admin/users`, `POST /upload/image` and `PUT /auth/profile` without auth → 401; forged HS256 and `alg:none` tokens → 401; 0 5xx; no runtime errors or restarts.
+- **Staff SMS password recovery is blocked for SUPPORT, MODERATOR, ADMIN and SUPER_ADMIN** in the deployed code: no reset code is issued for those roles, and `resetPassword` re-checks the role in its transaction. Staff password recovery stays out of band, controlled by the Platform Owner. SMS remains unconfigured in production (`ESKIZ_*` absent), so the SMS routes answer 503 for everyone.
 
 | Severity | Finding | Fix |
 | --- | --- | --- |
