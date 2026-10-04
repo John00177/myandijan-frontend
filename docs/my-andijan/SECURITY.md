@@ -1,5 +1,7 @@
 # SECURITY — My Andijan
 
+> **Current status lives in §16 (Phase 15 closeout audit, 2026-10-04).** Where an older table below disagrees with §16, §16 is the verified state; the older sections are kept as the record of how each item was found.
+
 > A read-only security review conducted 2026-09-28. **Nothing was modified.** Findings are ordered by severity within each section, and each names the file so it can be verified rather than trusted.
 >
 > **Overall assessment:** the application-level security fundamentals are **better than typical for a project at this stage** — bcrypt at cost 12, hashed refresh tokens, hashed OTP codes, parameterized SQL everywhere, per-request user-status revalidation, a deliberate XSS fix in the map layer, and privacy-by-design in the activity log. The problems are concentrated in **infrastructure posture** (open CORS, no rate limiting, public API docs) and in **one hardcoded production credential committed to git**.
@@ -106,7 +108,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | 1 | 🟢 **RESOLVED — Phase 15B** | ~~No rate limiting on `/auth/login`, `/auth/register`, or `/auth/forgot-password`.~~ Every credential and SMS-code route on `AuthController` now has two `@nestjs/throttler` buckets (`src/auth/auth-throttle.ts`): **per client address per minute** (generous — Uzbek mobile CGNAT) and **per target phone per 15 minutes** (login 10, SMS request 5, code verification 10, reset 5, register 5). Exceeding either → `429`. In-process memory storage: correct for the single Railway replica, resets on redeploy; a second replica would need a shared store (Redis). The DB-counted OTP-send cap stays as the durable second line. Pinned over real HTTP by `auth-throttle.spec.ts`. |
 | 2 | **High** | **`JWT_ACCESS_SECRET` has no default and no startup validation.** If unset, `JwtModule.register({ secret: undefined })` proceeds. There is no `@nestjs/config` schema and no boot check. **Verify it is set on Railway.** |
 | 3 | Medium | **No account lockout** after repeated failed logins. |
-| 4 | Medium | **`userAgent` / `ipAddress` columns on `RefreshToken` are never populated** by `issueTokens()`. The device-attribution capability exists and is unused, so "sign out other devices" and anomaly detection are not possible. |
+| 4 | 🟢 **SUPERSEDED — Phase 15E.4** | ~~`userAgent` / `ipAddress` columns on `RefreshToken` are never populated.~~ Sessions are first-class since 15E.4b (`auth_sessions`, one per sign-in, with its own user-agent/IP fields); the two never-written token columns were dropped in 15E.4e.2 (2026-10-04). A user-facing "sign out other devices" screen is still not built (product backlog). |
 | 5 | Medium | **Tokens live in `localStorage`**, readable by any successful XSS. `httpOnly` cookies would be stronger, though they bring CSRF concerns; this is a conscious trade for a bearer-token API and is worth revisiting rather than assuming. |
 | 6 | Medium | **No refresh flow on the client**, so `JWT_ACCESS_EXPIRES_IN=15m` silently ends sessions. The tempting fix — raising the TTL — **weakens security**; implementing refresh is the correct fix and the server side already exists. |
 | 7 | Low | **Password minimum is 8 characters** with no complexity or breach check. |
@@ -300,7 +302,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | Passwords | ✅ bcrypt 12, never returned |
 | OTP / reset codes | ✅ bcrypt-hashed, TTL'd, single-use, attempt-capped |
 | Refresh tokens | ✅ SHA-256 hashed at rest |
-| IP addresses | ✅ **`ActivityLog` stores `ipHash`, never a raw IP** — the standard to hold. `AuditLog` and `RefreshToken` have raw `ipAddress` columns (appropriate for security records; `RefreshToken`'s is unpopulated). |
+| IP addresses | ✅ **`ActivityLog` stores `ipHash`, never a raw IP** — the standard to hold. `AuditLog` and `AuthSession` have raw IP/user-agent columns (appropriate for security records). `RefreshToken`'s unused `ip_address`/`user_agent` columns were dropped in 15E.4e.2. |
 | Visitor geography | ✅ `BusinessAnalytics.visitorCities` holds city IDs, documented as anonymized |
 | Marketing consent | ✅ `marketingConsent` + `marketingConsentAt` records **when** consent was given — GDPR-shaped thinking |
 | Soft delete / right to erasure | ⚠️ `UserStatus.DELETED` and `deletedAt` exist; **no self-service deletion endpoint and no hard-delete/anonymisation path** |
@@ -354,7 +356,7 @@ The *use* of this key is correct and deliberately reasoned (see `INTEGRATIONS.md
 | 11 | 🟠 Medium | **Audit `AuditLog.before`/`after` for sensitive fields** (especially `passwordHash`) | Low |
 | 12 | 🟠 Medium | **Add the partial unique index** for one pending claim per business | Low |
 | 13 | ✅ **DONE — Phase 15B (D-74)** | ~~Decide and document the `SUPPORT` vs `BUSINESS_OWNER` ranking~~ — SUPPORT inherits nothing; owner routes are ownership-only | — |
-| 14 | 🟡 Low | **Populate `RefreshToken.userAgent`/`ipAddress`** to enable session management. (`AuditLog` IP/user agent are populated since Phase 15B; refresh tokens still are not.) | Low |
+| 14 | 🟢 **SUPERSEDED — Phase 15E.4** | ~~Populate `RefreshToken.userAgent`/`ipAddress`~~ — session attribution lives on `auth_sessions` (15E.4b); the token columns were dropped (15E.4e.2) | — |
 | 15 | 🟡 Low | **Add an upload quota per user** | Low |
 | 16 | 🟡 Low | **Add an image-deletion / orphan-cleanup path** | Medium |
 | 17 | 🟡 Low | **Run `npm audit`, enable Dependabot, remove the undeclared `sonner`** | Low |
@@ -419,3 +421,50 @@ Frontend  merge → Vercel builds → waits for "Vercel - myandijan-frontend: te
 **Paths that bypass the gates (owner-only; emergency use).** Railway dashboard *Redeploy*/*Deploy* and `railway up`; Vercel dashboard *Promote*/*Redeploy*, `vercel --prod`, `vercel promote` and the promote API; any ruleset bypass actor (the bypass list is not readable without admin access). None is used by normal releases. **Policy:** use them only to roll back or to recover from a platform incident; prefer an instant rollback to a previously gated deployment (Railway rollback, Vercel rollback/promote of an earlier production deployment) over deploying an unchecked build; record any such use in CURRENT_STATE. Preview deployments (pull requests) never reach the production domain; Vercel's Git fork protection is on by default.
 
 **Lint.** Not part of CI. The frontend has `oxlint` (exit 0, 17 pre-existing warnings); the backend has no linter configured.
+
+## 16. Phase 15 closeout audit (2026-10-04)
+
+**Audited state.** Backend `main` `7de05a5` serving as Railway deployment `fe107075` (SUCCESS, 1/1 replicas); frontend `main` `7de35c6`. Method: code read of the auth, authz, upload, analytics and request-context paths; real HTTP probes of production (read-only); GitHub rules API; `npm audit`; production DB invariants read through the Railway Data panel (15E.4e.2 post-deploy query). Nothing in production was modified.
+
+### 16.1 Verified controls (current reality)
+
+| Area | State |
+| --- | --- |
+| Sessions & refresh tokens | One `auth_sessions` row per sign-in; opaque SHA-256-hashed refresh tokens rotated in one transaction; reuse inside/after the 10 s grace window revokes the session (`REUSE_DETECTED`); 90-day absolute expiry; `refresh_tokens.session_id` NOT NULL; legacy columns and `LEGACY_MIGRATION` dropped (15E.4e.2). Production: E5–E14 all 0, 0 orphan chains, 16 tokens / 12 sessions. |
+| Access tokens | HS256 with `JWT_ACCESS_SECRET` (passport-jwt refuses to start without a secret, so a missing variable fails at boot, not open); mandatory `sv` (strict equality with `users.session_version`) and `sid` (session must exist, belong to the user, be unrevoked and unexpired); per-request user status check. Production: garbage, `alg:none`, wrong-signature and unsigned tokens all → bare 401 (also on `/admin/*`). |
+| Authorization | Global deny-by-default `AuthzGuard` (undeclared route → 403); 127 routes, 30 public (all GET reads, `/auth/*`, `/analytics/*` writes); capability table with no role inheritance; no rank code remains; route snapshot + `no-rank-model` + `role-write-inventory` tests. |
+| Auth abuse | Per-address and per-phone throttling on every `/auth/*` credential and code route; DB-backed SMS-code wrong-guess budget; OTP sign-in **and (since this closeout) SMS password reset** refused for staff roles. |
+| CORS / transport | Allowlist only (`myandijan.uz`, `www`, `FRONTEND_URL`); a foreign origin gets no `Access-Control-Allow-Origin`; HTTP → 301 HTTPS; `X-Request-Id` on every response; frontend HSTS (Vercel, 2 years). |
+| SQL | No `*RawUnsafe`; the one `Prisma.raw` takes hard-coded literals. |
+| Frontend | Capability-driven UI (`can(...)`), no role comparisons for authorization; cross-tab refresh coordinator; no `dangerouslySetInnerHTML`; `npm audit --omit=dev`: 0 vulnerabilities. |
+| CI/CD | Both repos: ruleset "Protect main" (PR required, `test-and-build` required + strict, no force push, no deletion); workflow `permissions: contents: read`; actions pinned by SHA; `persist-credentials: false`; Railway waits for CI and runs `prisma migrate deploy` pre-deploy; the Vercel production check behaves as configured: frontend `7de35c6` — the build reported pending from 11:30:29Z, the `Vercel - myandijan-frontend: test-and-build` status turned success at 11:31:09Z, and Vercel reported success at 11:31:10Z, one second later. |
+
+### 16.2 Closeout findings fixed (branch `security/15-closeout`, backend)
+
+| Severity | Finding | Fix |
+| --- | --- | --- |
+| **HIGH (latent)** | Staff accounts (incl. SUPER_ADMIN, whose phone number is published in both public repositories) could reset their password with an SMS code alone — the gap 15E.2 closed for OTP sign-in but not for reset. Not exploitable while SMS is unconfigured (503); a takeover path (SIM swap, intercepted SMS) the moment `ESKIZ_*` is set. | `forgotPassword` issues no code for non-allowlisted roles (same response and work as an unknown phone); `resetPassword` re-checks the role inside its transaction. 8 regression tests (fail with the fix reverted). |
+| **HIGH** | `multer` 2.0.2 (pinned by `@nestjs/platform-express` 10.4.22): several HIGH denial-of-service advisories, reachable through `POST /upload/image` and `PUT /auth/profile` by any account — and registration is open. A crash loop could exhaust Railway's ON_FAILURE ×3 restarts. | `overrides.multer: ^2.4.0` (lockfile-only); `upload-multipart.spec.ts` pins the floor and proves real-HTTP parsing, the 5 MB limit and the type check still hold. |
+
+### 16.3 Accepted residual risk (not Phase 15 blockers; assigned)
+
+| # | Severity | Residual | Why acceptable now | Assigned |
+| --- | --- | --- | --- | --- |
+| R1 | Medium | `POST /analytics/view`, `/click`, `/search` are public and unthrottled | Integrity of owner-analytics counters and table growth only; `viewCount` does not drive any public ordering; no data exposure | Rate-limiting phase (with R2) |
+| R2 | Medium | `GET /search`, `POST /upload/image`, `POST /businesses` unthrottled; throttler storage is in-process | Authenticated (upload, businesses) or read-only (search); single replica | Rate-limiting phase; Redis store before a 2nd replica |
+| R3 | Medium | Six production role accounts share one password (`SEED_ROLE_PASSWORD`, 192-bit, Railway-only); SUPER_ADMIN's phone number is public in both repositories | Secret is strong and owner-held; staff cannot use SMS codes (§16.2) | **Owner:** give SUPER_ADMIN (and ADMIN) unique passwords; consider removing demo staff accounts from production |
+| R4 | Medium | Registration does not verify the phone number | Needs a configured SMS provider | Owner: configure `ESKIZ_*`; then verified sign-up |
+| R5 | Medium | Tokens in `localStorage`, no CSP on either side | No XSS sink found; React escaping; Leaflet/JSON-LD escapes in place | Frontend hardening (CSP first) |
+| R6 | Medium | Remaining backend `npm audit` items: `tar` (critical, **install-time** via bcrypt's node-pre-gyp), `js-yaml`/`lodash` (Swagger, no untrusted input), `brace-expansion`, `qs` (moderate), `@nestjs/core` GHSA-36xv (SSE, unused); Dependabot covers GitHub Actions only | None is reachable with untrusted input at runtime except `qs` (moderate DoS) | Dependency phase: Nest 11 / bcrypt 6 upgrade; add npm to Dependabot |
+| R7 | Medium | Uploads trust the client MIME type; EXIF (GPS) not stripped | Stored type is always an image type; Supabase serves, nothing executes | Media phase (re-encode with `sharp`) |
+| R8 | Low | Public Swagger (`/docs`, `/docs-json`) | Both repositories are public, so it discloses nothing the source does not | Optional: disable in production |
+| R9 | Low | No `helmet` (API sends `X-Powered-By`, no `nosniff`/HSTS) | JSON-only API behind HTTPS redirect | Hardening backlog |
+| R10 | Low | Enumeration: register says "already registered"; login answers 403 for an inactive account before checking the password and skips bcrypt for an unknown phone | Per-phone/address throttling; register is enumerating by design | Hardening backlog |
+| R11 | Low | No password-login lockout; 8-char minimum | Throttled per phone (10 / 15 min) | Hardening backlog |
+| R12 | Low | `JWT_REFRESH_SECRET` declared (`.env.example`, Railway) but never read | Misleading only | Cleanup |
+| R13 | Low | No backend linter/static analysis in CI | 1010 unit + real-PostgreSQL suites gate every change | Tooling backlog |
+| R14 | Low | Ruleset bypass list not readable without admin | — | **Owner:** confirm it is empty (Settings → Rules) |
+
+### 16.4 Documentation debt found
+
+`CURRENT_STATE.md`, `MASTER_CONTEXT.md`, `SESSION_CONTEXT.md`, `CHATGPT_CONTEXT.md`, `TODO.md` and `ARCHITECTURE.md` predate Phase 15E.4 (e.g. "no tests at all", refresh token "with `userAgent`, `ipAddress`", "populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection" as future work), and the 15E.4b–15E.4e and 15E.7.1 documentation branches are unmerged. Their reconciliation is a Phase 15 closeout condition (documentation only).
