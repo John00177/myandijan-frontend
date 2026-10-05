@@ -44,6 +44,7 @@ import EditBusinessModal, {
   type EditBusinessFormState,
 } from "../../../components/business/EditBusinessModal";
 import Pagination from "../../search/Pagination";
+import { adminHoursPayload } from "../adminHoursPayload";
 import { renderAdminState } from "../AdminFetchState";
 import BusinessReviewDrawer, { type BusinessReviewMode } from "../BusinessReviewDrawer";
 import DataTable, { type Column } from "../DataTable";
@@ -266,7 +267,7 @@ export default function AdminBusinessesView() {
     setEditModalOpen(true);
   }
 
-  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null }) {
+  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null; hoursLoaded: boolean }) {
     if (!editingBusiness) return;
     // Staff editing someone else's business goes through the audited /admin
     // routes, which require a reason (Phase 15B, D-74) — asked once, recorded
@@ -293,15 +294,13 @@ export default function AdminBusinessesView() {
         website: form.website.trim() || undefined,
       });
 
-      await updateAdminBusinessHours(editingBusiness.id, {
-        reason,
-        hours: form.hours.map((row) => ({
-          dayOfWeek: row.dayOfWeek,
-          openTime: row.isClosed ? undefined : row.openTime,
-          closeTime: row.isClosed ? undefined : row.closeTime,
-          isClosed: row.isClosed,
-        })),
-      });
+      // The hours PUT replaces every stored row, so it is only sent when the
+      // real hours were loaded AND the admin changed them — never the
+      // placeholder grid of a non-APPROVED business (see adminHoursPayload).
+      const hours = adminHoursPayload(form.hours, meta.hoursLoaded);
+      if (hours) {
+        await updateAdminBusinessHours(editingBusiness.id, { reason, hours });
+      }
 
       // Branch fields (phone/address/district) are a separate resource on
       // the backend — only worth the extra call if there's a branch to
@@ -635,6 +634,7 @@ export default function AdminBusinessesView() {
         onSave={handleSaveEdit}
         submitting={editSaving}
         error={editError}
+        preserveUnchangedHours
         canModerate={can("business.review")}
         onApprove={() => handleModerateFromModal("approve")}
         onReject={() => handleModerateFromModal("reject")}
