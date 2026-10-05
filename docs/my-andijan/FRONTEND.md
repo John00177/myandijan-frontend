@@ -237,7 +237,7 @@ All traffic goes through **`src/lib/api.ts`** — see `ARCHITECTURE.md` §7 for 
 | View | Data source |
 | --- | --- |
 | `AdminHomeView` | real — `getAdminStats`, `getAdminAuditLogs` |
-| `AdminBusinessesView` | real — list / approve / reject / edit / edit-branch; PENDING listings open `BusinessReviewDrawer` (submitted details from the list row + a validated rejection-reason form, replacing `window.prompt`) — Phase 16E |
+| `AdminBusinessesView` | real — list / approve / reject / edit / edit-branch; PENDING listings open `BusinessReviewDrawer` (submitted details from the list row + a validated rejection-reason form, replacing `window.prompt`) — Phase 16E. Since 16E.5 the drawer also fetches `GET /admin/businesses/:id` for every branch's hours, photos and coordinates, and the admin edit modal prefills from it (`getAdminBusinessEditDetail`, any status; falls back to `GET /businesses/:id` only on a 404 — the route not deployed yet) |
 | `AdminCategoriesView` | real — list / create / update (+`CategoryModal`) |
 | `AdminUsersView` | real — `getAdminUsers` |
 | `AdminEventsView` | real — `getAdminEvents` |

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getRegions, notifyLogout } from "../api";
+import { ApiError, getAdminBusinessById, getAdminBusinessEditDetail, getRegions, notifyLogout } from "../api";
 
 const TOKEN_KEY = "myandijan_token";
 const REFRESH_TOKEN_KEY = "myandijan_refresh_token";
@@ -147,5 +147,128 @@ describe("request() silent refresh-and-retry", () => {
 
     await expect(pending).rejects.toThrow();
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/auth/refresh"))).toHaveLength(0);
+  });
+});
+
+// Phase 16E.5: the admin detail (GET /admin/businesses/:id, any status) feeds
+// the review drawer and the admin edit modal's prefill.
+describe("admin business detail", () => {
+  /** A PENDING listing as GET /admin/businesses/:id returns it. */
+  const adminDetail = {
+    id: 5,
+    slug: "soy-milliy-taomlar",
+    name: "Soy milliy taomlar",
+    status: "PENDING",
+    description: "Milliy taomlar",
+    coverPhoto: null,
+    hasDelivery: true,
+    deliveryFee: 10000,
+    deliveryTime: "30 daqiqa",
+    instagram: null,
+    telegram: "@soy",
+    website: null,
+    owner: { id: 7, fullName: "Sardor Aliyev" },
+    category: { id: 1, slug: "food", nameUz: "Ovqatlanish" },
+    businessType: { id: 2, slug: "restaurant", nameUz: "Restoran" },
+    branches: [
+      {
+        id: 11,
+        name: "Markaziy",
+        address: "Bobur shoh 1",
+        landmark: "Xiyobon yonida",
+        phone: "+998900000001",
+        phoneAlt: null,
+        lat: "40.78250000",
+        lng: "72.34420000",
+        isPrimary: true,
+        isActive: true,
+        district: { id: 1, slug: "andijon", nameUz: "Andijon" },
+        city: null,
+        hours: [
+          { dayOfWeek: 0, openTime: "10:00", closeTime: "20:00", isClosed: false, is24Hours: false },
+          { dayOfWeek: 1, openTime: null, closeTime: null, isClosed: false, is24Hours: true },
+        ],
+        photos: [{ url: "https://cdn.example/1.jpg", thumbUrl: null, caption: "Zal", isPrimary: true, sortOrder: 0 }],
+      },
+      {
+        id: 12,
+        name: "Asaka",
+        address: "Asaka 5",
+        phone: "+998900000002",
+        isPrimary: false,
+        isActive: true,
+        district: { id: 2, slug: "asaka", nameUz: "Asaka" },
+        city: null,
+        hours: [],
+        photos: [],
+      },
+    ],
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(TOKEN_KEY, "access-token");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads GET /admin/businesses/:id with the staff token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(adminDetail));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminBusinessById(5)).resolves.toEqual(adminDetail);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(new URL(String(url)).pathname).toBe("/admin/businesses/5");
+    expect((init as RequestInit).headers).toMatchObject({ Authorization: "Bearer access-token" });
+  });
+
+  it("prefills the admin edit from the admin detail — a PENDING listing included — keeping branch order and is24Hours", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(adminDetail));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const detail = await getAdminBusinessEditDetail(5);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(detail).toMatchObject({
+      id: 5,
+      name: "Soy milliy taomlar",
+      status: "PENDING",
+      telegram: "@soy",
+      category: { id: 1, slug: "food", nameUz: "Ovqatlanish" },
+    });
+    expect(detail.branches?.map((b) => b.id)).toEqual([11, 12]);
+    expect(detail.branches?.[0]).toMatchObject({
+      address: "Bobur shoh 1",
+      phone: "+998900000001",
+      isPrimary: true,
+      district: { id: 1, slug: "andijon", nameUz: "Andijon" },
+      hours: adminDetail.branches[0].hours,
+    });
+    expect(detail.branches?.[0].hours?.[1]).toMatchObject({ dayOfWeek: 1, is24Hours: true });
+  });
+
+  it("falls back to the public GET /businesses/:id only when the admin route answers 404 (not deployed yet)", async () => {
+    const publicDetail = { id: 5, slug: "soy", name: "Soy", branches: [] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ message: "Cannot GET /admin/businesses/5" }, 404))
+      .mockResolvedValueOnce(jsonResponse(publicDetail));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminBusinessEditDetail(5)).resolves.toEqual(publicDetail);
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual([
+      "/admin/businesses/5",
+      "/businesses/5",
+    ]);
+  });
+
+  it("does not fall back on any other failure, so the modal keeps the hours locked", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ message: "Internal server error" }, 500));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminBusinessEditDetail(5)).rejects.toBeInstanceOf(ApiError);
+    expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(["/admin/businesses/5"]);
   });
 });

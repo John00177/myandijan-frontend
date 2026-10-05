@@ -1,6 +1,8 @@
 import { vi } from "vitest";
 import type {
   AdminBusiness,
+  AdminBusinessDetail,
+  BusinessEditDetail,
   AdminClaim,
   AdminEvent,
   AdminReviewReport,
@@ -237,6 +239,16 @@ export const getBusinessById = vi.fn().mockResolvedValue({
   branches: [],
 });
 export const updateBusinessHours = vi.fn().mockResolvedValue([]);
+// GET /admin/businesses/:id (Phase 16E.4) defaults to production's answer
+// until the API deploy that adds it: 404 (lazy — ApiError is declared below).
+export const getAdminBusinessById = vi.fn<(id: number) => Promise<AdminBusinessDetail>>((id) =>
+  Promise.reject(new ApiError(`Cannot GET /admin/businesses/${id}`, 404)),
+);
+// The admin edit prefill's real 404 fallback is the public loader (see
+// api.ts and its tests); the default here is exactly that fallback.
+export const getAdminBusinessEditDetail = vi.fn<(id: number) => Promise<BusinessEditDetail>>((id) =>
+  getBusinessById(id),
+);
 
 export const mockAdminReport: AdminReviewReport = {
   id: 3,

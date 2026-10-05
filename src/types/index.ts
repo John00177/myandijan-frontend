@@ -422,6 +422,43 @@ export interface AdminBusiness {
   branches?: { id: number; address?: string | null; phone?: string | null; district?: { id?: number; nameUz?: string | null } | null }[] | null;
 }
 
+/** A gallery photo in GET /admin/businesses/:id — never the uploader (Phase 16E.4). */
+export interface AdminBranchPhoto {
+  url: string;
+  thumbUrl?: string | null;
+  caption?: string | null;
+  isPrimary?: boolean;
+  sortOrder?: number;
+}
+
+export interface AdminBranchDetail {
+  id: number;
+  name?: string | null;
+  slug?: string | null;
+  address: string;
+  landmark?: string | null;
+  phone: string;
+  phoneAlt?: string | null;
+  /** Prisma Decimal — serialized as a string ("40.78250000"), or null when unset. */
+  lat?: string | number | null;
+  lng?: string | number | null;
+  isPrimary: boolean;
+  isActive?: boolean;
+  district?: { id: number; slug?: string | null; nameUz?: string | null } | null;
+  city?: { id: number; slug?: string | null; nameUz?: string | null } | null;
+  hours: MyBranchHour[];
+  photos: AdminBranchPhoto[];
+}
+
+/**
+ * GET /admin/businesses/:id (Phase 16E.4, `business.review`): one listing in
+ * full, ANY status except soft-deleted. Every non-deleted branch, primary
+ * first, with hours, photos and coordinates. Owner phone/email only for ADMIN+.
+ */
+export interface AdminBusinessDetail extends Omit<AdminBusiness, "branches"> {
+  branches: AdminBranchDetail[];
+}
+
 /**
  * Matches GET /admin/events (AdminService.findEvents: Event row + business + district).
  * The real columns are `title`, `startAt`, `venueName`/`address` and
