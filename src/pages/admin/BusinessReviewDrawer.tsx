@@ -1,10 +1,92 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
+import { getAdminBusinessById } from "../../lib/api";
 import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/motion-config";
-import type { AdminBusiness } from "../../types";
+import type { AdminBranchDetail, AdminBusiness, AdminBusinessDetail, MyBranchHour } from "../../types";
 import { BusinessStatusBadge, formatDate } from "./statusLabels";
+
+// dayOfWeek is 0 = Monday … 6 = Sunday (NOT Date.getDay()) — same labels as
+// EditBusinessModal's hours grid.
+const DAY_LABELS = ["Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba", "Yakshanba"];
+
+function hoursText(hour: MyBranchHour | undefined): string {
+  if (!hour) return "—";
+  if (hour.is24Hours) return "24 soat";
+  if (hour.isClosed) return "Dam olish kuni";
+  if (hour.openTime && hour.closeTime) return `${hour.openTime}–${hour.closeTime}`;
+  return "—";
+}
+
+/** "40.7825, 72.3442" — plain text, never a map link (unreviewed input). */
+function coordinatesText(branch: AdminBranchDetail): string | null {
+  if (branch.lat == null || branch.lng == null) return null;
+  const lat = Number(branch.lat);
+  const lng = Number(branch.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng) ? `${lat}, ${lng}` : null;
+}
+
+function BranchDetail({ branch }: { branch: AdminBranchDetail }) {
+  const coordinates = coordinatesText(branch);
+  const place = [branch.district?.nameUz, branch.city?.nameUz].filter(Boolean).join(", ");
+  return (
+    <section
+      aria-label={`Filial: ${branch.name || branch.address}`}
+      className="rounded-xl border border-white/[0.08] p-4 flex flex-col gap-3"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium text-ink break-words">{branch.name || branch.address}</span>
+        {branch.isPrimary && <Badge tone="blue">Asosiy</Badge>}
+        {branch.isActive === false && <Badge tone="neutral">Nofaol</Badge>}
+      </div>
+
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Manzil">
+          {branch.address}
+          {place ? `, ${place}` : ""}
+          {branch.landmark && <span className="block text-ink-muted">Mo'ljal: {branch.landmark}</span>}
+        </Field>
+        <Field label="Telefon">
+          {branch.phone}
+          {branch.phoneAlt && <span className="block">{branch.phoneAlt}</span>}
+        </Field>
+        <Field label="Koordinatalar">{coordinates ?? "—"}</Field>
+      </dl>
+
+      <div>
+        <p className="text-xs text-ink-muted mb-1">Ish vaqti</p>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 text-sm">
+          {DAY_LABELS.map((label, dayOfWeek) => (
+            <li key={label} className="flex justify-between gap-3">
+              <span className="text-ink-muted">{label}</span>
+              <span className="text-ink-body">{hoursText(branch.hours.find((h) => h.dayOfWeek === dayOfWeek))}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {branch.photos.length > 0 && (
+        <div>
+          <p className="text-xs text-ink-muted mb-1">Galereya ({branch.photos.length})</p>
+          <div className="grid grid-cols-3 gap-2">
+            {branch.photos.map((photo, index) => (
+              <img
+                key={`${photo.url}-${index}`}
+                src={photo.thumbUrl ?? photo.url}
+                alt={photo.caption || `Rasm ${index + 1}`}
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="w-full aspect-square object-cover rounded-lg bg-elevated"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 // Matches the API's RejectBusinessDto (@IsNotEmpty, @MaxLength(1000)).
 export const REJECTION_REASON_MAX_LENGTH = 1000;
@@ -40,12 +122,14 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 /**
  * Phase 16E: what the owner actually submitted, shown before a moderator
- * decides. Everything here comes from the GET /admin/businesses row the queue
- * already loaded (every Business scalar + owner, category, business type and
- * the primary branch) — no extra request and no new API contract. Hours,
- * gallery photos, secondary branches and map coordinates are not in that
- * response, so they are deliberately not shown rather than fetched from the
- * public endpoint, which 404s for a listing that is not APPROVED.
+ * decides. The summary comes from the GET /admin/businesses row the queue
+ * already loaded, so it renders instantly. On open, the drawer also fetches
+ * GET /admin/businesses/:id (Phase 16E.5) for every branch with its hours,
+ * gallery and coordinates — any status, unlike the public endpoint, which
+ * 404s for a listing that is not APPROVED. If that request fails (production
+ * answers 404 until the API deploy that adds the route), the summary stays
+ * and a note says the rest is unavailable; the decision buttons never wait
+ * on it.
  *
  * Owner-supplied URLs/handles render as plain text, never as links: this is
  * unreviewed input, and a moderator should not be one click from it.
@@ -66,13 +150,38 @@ export default function BusinessReviewDrawer({
   const backdropTransition = useMotionTransition(TRANSITIONS.fast);
   const panelTransition = useMotionTransition(TRANSITIONS.smooth);
 
+  const [detail, setDetail] = useState<AdminBusinessDetail | null>(null);
+  const [detailState, setDetailState] = useState<"loading" | "loaded" | "unavailable">("loading");
+
   const open = business !== null;
+  const businessId = business?.id ?? null;
 
   // A fresh reason per listing — never carry one business's reason to the next.
   useEffect(() => {
     setReason("");
     setReasonError(null);
-  }, [business?.id]);
+  }, [businessId]);
+
+  // The full listing, refetched per business; a late response for a listing
+  // that is no longer open is dropped.
+  useEffect(() => {
+    if (businessId == null) return;
+    let cancelled = false;
+    setDetail(null);
+    setDetailState("loading");
+    getAdminBusinessById(businessId)
+      .then((result) => {
+        if (cancelled) return;
+        setDetail(result);
+        setDetailState("loaded");
+      })
+      .catch(() => {
+        if (!cancelled) setDetailState("unavailable");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [businessId]);
 
   useEffect(() => {
     if (!open) return;
@@ -195,9 +304,24 @@ export default function BusinessReviewDrawer({
                 <span className="whitespace-pre-line">{business.description?.trim() || "—"}</span>
               </Field>
 
-              <p className="text-xs text-ink-muted">
-                Ish vaqti, galereya va qo'shimcha filiallar bu yerda ko'rsatilmaydi.
-              </p>
+              <div className="flex flex-col gap-3">
+                <h3 className="text-sm font-semibold text-ink">Filiallar</h3>
+                {detailState === "loading" && (
+                  <p className="text-xs text-ink-muted">To'liq ma'lumot yuklanmoqda...</p>
+                )}
+                {detailState === "unavailable" && (
+                  <p className="text-xs text-ink-muted">
+                    Ish vaqti, galereya va qo'shimcha filiallarni hozircha yuklab bo'lmadi.
+                  </p>
+                )}
+                {detailState === "loaded" &&
+                  detail &&
+                  (detail.branches.length > 0 ? (
+                    detail.branches.map((b) => <BranchDetail key={b.id} branch={b} />)
+                  ) : (
+                    <p className="text-xs text-ink-muted">Filial kiritilmagan.</p>
+                  ))}
+              </div>
             </div>
 
             {isPending && (

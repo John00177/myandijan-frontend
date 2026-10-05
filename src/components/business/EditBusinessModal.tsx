@@ -9,7 +9,7 @@ import { useRegions } from "../../hooks/useRegions";
 import { ApiError, getBusinessById, uploadImage } from "../../lib/api";
 import { localizedName } from "../../lib/localize";
 import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/motion-config";
-import type { MyBranchHour } from "../../types";
+import type { BusinessEditDetail, MyBranchHour } from "../../types";
 
 const inputClasses =
   "h-12 bg-elevated border border-white/[0.10] rounded-xl px-4 text-ink placeholder:text-ink-muted outline-none focus:border-primary/50";
@@ -240,6 +240,13 @@ interface EditBusinessModalProps {
    */
   preserveUnchangedHours?: boolean;
   /**
+   * Where the prefill comes from. Defaults to the public GET /businesses/:id
+   * (owner dashboard, unchanged). The admin flow passes
+   * getAdminBusinessEditDetail, which also serves non-APPROVED listings
+   * (Phase 16E.5). Must be a stable function — it is an effect dependency.
+   */
+  loadDetail?: (id: number) => Promise<BusinessEditDetail>;
+  /**
    * Status is shown as a read-only badge everywhere. When true (admin
    * context, business currently PENDING), Approve/Reject actions appear
    * inline — NOT as a free-form status dropdown. The backend has no
@@ -264,6 +271,7 @@ export default function EditBusinessModal({
   submitting = false,
   error = null,
   preserveUnchangedHours = false,
+  loadDetail = getBusinessById,
   canModerate = false,
   onApprove,
   onReject,
@@ -296,7 +304,7 @@ export default function EditBusinessModal({
     setFetching(true);
     setHoursLoaded(false);
 
-    getBusinessById(businessId)
+    loadDetail(businessId)
       .then((detail) => {
         if (cancelled) return;
         const branch = detail.branches?.[0] ?? null;
@@ -321,8 +329,9 @@ export default function EditBusinessModal({
         setHoursLoaded(true);
       })
       .catch(() => {
-        // Most commonly a 404 — this endpoint only serves APPROVED
-        // businesses — but any failure here just means the form stays on
+        // Most commonly a 404 from the default loader (GET /businesses/:id
+        // only serves APPROVED businesses; the admin flow's loader serves
+        // every status) — but any failure here just means the form stays on
         // the `initial` data already set above, rather than blocking.
         // `hoursLoaded` stays false: the hours grid is still the placeholder.
       })
@@ -333,7 +342,7 @@ export default function EditBusinessModal({
     return () => {
       cancelled = true;
     };
-  }, [open, businessId]);
+  }, [open, businessId, loadDetail]);
 
   useEffect(() => {
     if (!open) return;

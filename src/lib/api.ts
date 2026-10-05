@@ -1,6 +1,7 @@
 import type {
   AdminAuditLog,
   AdminBusiness,
+  AdminBusinessDetail,
   AdminCategoryPayload,
   AdminClaim,
   AdminEvent,
@@ -899,6 +900,63 @@ export async function getAdminBusinesses(params?: {
 }): Promise<AdminListResult<AdminBusiness>> {
   const raw = await request<unknown>("/admin/businesses", params);
   return normalizeAdminList<AdminBusiness>(raw);
+}
+
+// GET /admin/businesses/:id (Phase 16E.4) — `business.review`. One listing in
+// full, ANY status except soft-deleted: every branch with hours, photos and
+// coordinates. Until the API deploy that adds it, production answers 404, so
+// callers must treat a 404 as "not available yet", never as fatal.
+export function getAdminBusinessById(id: number): Promise<AdminBusinessDetail> {
+  return request<AdminBusinessDetail>(`/admin/businesses/${id}`);
+}
+
+/**
+ * The admin edit modal's prefill (Phase 16E.5). The admin detail serves
+ * DRAFT/PENDING/REJECTED/SUSPENDED/HIDDEN listings too, so their real hours
+ * load and the hours editor unlocks (EditBusinessModal `preserveUnchangedHours`).
+ * Falls back to the public GET /businesses/:id ONLY on a 404 — the route not
+ * deployed yet — which is exactly the pre-16E.5 behaviour (APPROVED listings
+ * prefill, others keep their hours locked). Any other failure propagates, so
+ * the modal keeps the hours locked rather than guessing.
+ */
+export async function getAdminBusinessEditDetail(id: number): Promise<BusinessEditDetail> {
+  let detail: AdminBusinessDetail;
+  try {
+    detail = await getAdminBusinessById(id);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return getBusinessById(id);
+    throw err;
+  }
+  return {
+    id: detail.id,
+    slug: detail.slug ?? "",
+    name: detail.name ?? detail.nameUz ?? "",
+    description: detail.description ?? null,
+    status: detail.status ?? null,
+    coverPhoto: detail.coverPhoto ?? null,
+    hasDelivery: detail.hasDelivery ?? null,
+    deliveryFee: detail.deliveryFee ?? null,
+    deliveryTime: detail.deliveryTime ?? null,
+    instagram: detail.instagram ?? null,
+    telegram: detail.telegram ?? null,
+    website: detail.website ?? null,
+    category:
+      detail.category?.id != null
+        ? { id: detail.category.id, slug: detail.category.slug ?? "", nameUz: detail.category.nameUz ?? "" }
+        : null,
+    // Order preserved: branches[0] is the primary branch — the one
+    // PUT /admin/businesses/:id/hours replaces — and hours keep is24Hours.
+    branches: detail.branches.map((branch) => ({
+      id: branch.id,
+      address: branch.address,
+      phone: branch.phone,
+      isPrimary: branch.isPrimary,
+      district: branch.district
+        ? { id: branch.district.id, slug: branch.district.slug ?? "", nameUz: branch.district.nameUz ?? "" }
+        : null,
+      hours: branch.hours,
+    })),
+  };
 }
 
 export function approveAdminBusiness(id: number): Promise<AdminBusiness> {

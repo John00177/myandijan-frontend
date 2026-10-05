@@ -21,6 +21,7 @@ import { useLanguage } from "../../../contexts/LanguageContext";
 import {
   ApiError,
   approveAdminBusiness,
+  getAdminBusinessEditDetail,
   getAdminBusinesses,
   hideAdminBusiness,
   promoteAdminBusiness,
@@ -635,6 +636,7 @@ export default function AdminBusinessesView() {
         submitting={editSaving}
         error={editError}
         preserveUnchangedHours
+        loadDetail={getAdminBusinessEditDetail}
         canModerate={can("business.review")}
         onApprove={() => handleModerateFromModal("approve")}
         onReject={() => handleModerateFromModal("reject")}
