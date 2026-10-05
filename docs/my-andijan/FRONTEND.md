@@ -96,7 +96,7 @@ export default function SearchPage() {
 - `pages/signup/`: `PhoneScreen`, `OtpScreen`, `ProfileScreen`
 - `pages/claim/`: `StepShell` + 8 steps
 - `pages/dashboard/`: `DashboardLayout`, `Sidebar`, `TopBar`, `MobileDrawer`, `KpiCard`, `ProductModal`, `ProductRow`, `addBusiness/` (`Step1BasicInfo`, `Step2Location`, `Step3Hours`, `StepIndicator`, `FormField`)
-- `pages/admin/`: `AdminLayout`, `AdminSidebar`, `AdminTopBar`, `AdminMobileDrawer`, `DataTable`, `CategoryModal`, `AdminFetchState`, `statusLabels`, `auditFormat`, `charts/ChartCard`
+- `pages/admin/`: `AdminLayout`, `AdminSidebar`, `AdminTopBar`, `AdminMobileDrawer`, `DataTable`, `CategoryModal`, `BusinessReviewDrawer`, `AdminFetchState`, `statusLabels`, `auditFormat`, `charts/ChartCard`
 
 ---
 
@@ -237,7 +237,7 @@ All traffic goes through **`src/lib/api.ts`** — see `ARCHITECTURE.md` §7 for 
 | View | Data source |
 | --- | --- |
 | `AdminHomeView` | real — `getAdminStats`, `getAdminAuditLogs` |
-| `AdminBusinessesView` | real — list / approve / reject / edit / edit-branch |
+| `AdminBusinessesView` | real — list / approve / reject / edit / edit-branch; PENDING listings open `BusinessReviewDrawer` (submitted details from the list row + a validated rejection-reason form, replacing `window.prompt`) — Phase 16E |
 | `AdminCategoriesView` | real — list / create / update (+`CategoryModal`) |
 | `AdminUsersView` | real — `getAdminUsers` |
 | `AdminEventsView` | real — `getAdminEvents` |

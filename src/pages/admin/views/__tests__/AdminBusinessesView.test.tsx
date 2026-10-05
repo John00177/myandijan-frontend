@@ -1,5 +1,5 @@
 import { testUser } from "../../../../test/roleCapabilities";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../../../contexts/AuthContext";
@@ -16,6 +16,7 @@ import {
   hideAdminBusiness,
   mockAdminBusiness,
   promoteAdminBusiness,
+  rejectAdminBusiness,
   suspendAdminBusiness,
   unhideAdminBusiness,
   unpromoteAdminBusiness,
@@ -395,5 +396,184 @@ describe("AdminBusinessesView — business operations", () => {
     expect(updateAdminBusiness).not.toHaveBeenCalled();
     expect(updateAdminBusinessHours).not.toHaveBeenCalled();
     expect(updateBusiness).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 16E: the review drawer shows what the owner submitted — straight from
+// the GET /admin/businesses row — and every reject path goes through its
+// reason form instead of window.prompt.
+describe("AdminBusinessesView — review drawer", () => {
+  const submitted = {
+    ...mockAdminBusiness,
+    status: "PENDING",
+    description: "Milliy taomlar va choyxona",
+    website: "https://soy.example",
+    telegram: "@soy_taomlar",
+    hasDelivery: true,
+    deliveryFee: 10000,
+    deliveryTime: "30-40 daqiqa",
+    branchCount: 2,
+    businessType: { id: 2, nameUz: "Restoran", slug: "restaurant" },
+    owner: { id: 7, fullName: "Sardor Aliyev", phone: "+998901112233", email: "sardor@example.com" },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    window.prompt = vi.fn(() => null);
+    window.confirm = vi.fn(() => false);
+    listOf(submitted);
+  });
+
+  async function openDrawer(role = "ADMIN") {
+    renderView(role);
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: "Ko'rib chiqish" })[0]);
+    return screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+  }
+
+  async function openRejectForm() {
+    renderView();
+    await waitForRow();
+    fireEvent.click(screen.getByRole("button", { name: /Rad etish/ }));
+    return screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+  }
+
+  it("shows the submitted listing from the queue row, without another request", async () => {
+    const drawer = await openDrawer();
+
+    for (const text of [
+      "Milliy taomlar va choyxona",
+      "Ovqatlanish",
+      "Restoran",
+      "Andijon shahri, Andijon (+1 filial)",
+      "Sardor Aliyev",
+      "+998901112233",
+      "sardor@example.com",
+      "Bor · 10000 so'm · 30-40 daqiqa",
+    ]) {
+      expect(within(drawer).getByText(text)).toBeInTheDocument();
+    }
+    expect(getAdminBusinesses).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders owner-supplied URLs as plain text, never as links", async () => {
+    const drawer = await openDrawer();
+
+    expect(within(drawer).getByText("https://soy.example")).toBeInTheDocument();
+    expect(within(drawer).getByText("@soy_taomlar")).toBeInTheDocument();
+    expect(within(drawer).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("shows a MODERATOR the owner's name only, as the API returns it", async () => {
+    listOf({ ...submitted, owner: { id: 7, fullName: "Sardor Aliyev" } });
+    const drawer = await openDrawer("MODERATOR");
+
+    expect(within(drawer).getByText("Sardor Aliyev")).toBeInTheDocument();
+    expect(within(drawer).queryByText("+998901112233")).not.toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: /Tasdiqlash/ })).toBeInTheDocument();
+  });
+
+  it("approves from the drawer, closes it and reloads the queue", async () => {
+    const drawer = await openDrawer();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: /Tasdiqlash/ }));
+
+    await waitFor(() => expect(approveAdminBusiness).toHaveBeenCalledWith(submitted.id));
+    expect(await screen.findByText("Biznes tasdiqlandi")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getAdminBusinesses).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the drawer open and shows the API's refusal inside it", async () => {
+    approveAdminBusiness.mockRejectedValueOnce(new ApiError("Business 5 is not pending review", 409));
+    const drawer = await openDrawer();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: /Tasdiqlash/ }));
+
+    expect(await within(drawer).findByText("Business 5 is not pending review")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("opens the reason form from the row's 'Rad etish' and never uses window.prompt", async () => {
+    const drawer = await openRejectForm();
+
+    expect(within(drawer).getByLabelText("Rad etish sababi")).toBeInTheDocument();
+    expect(window.prompt).not.toHaveBeenCalled();
+  });
+
+  it("rejects with the trimmed reason, closes the drawer and reports success", async () => {
+    const drawer = await openRejectForm();
+
+    fireEvent.change(within(drawer).getByLabelText("Rad etish sababi"), {
+      target: { value: "  Manzil noto'g'ri ko'rsatilgan  " },
+    });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Rad etishni tasdiqlash" }));
+
+    await waitFor(() =>
+      expect(rejectAdminBusiness).toHaveBeenCalledWith(submitted.id, "Manzil noto'g'ri ko'rsatilgan"),
+    );
+    expect(await screen.findByText("Biznes rad etildi")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it.each([
+    ["blank", "   ", "Rad etish sababi majburiy"],
+    ["over 1000 characters", "x".repeat(1001), "Rad etish sababi 1000 belgidan oshmasligi kerak"],
+  ])("refuses a %s reason without calling the API", async (_name, value, message) => {
+    const drawer = await openRejectForm();
+
+    fireEvent.change(within(drawer).getByLabelText("Rad etish sababi"), { target: { value } });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Rad etishni tasdiqlash" }));
+
+    expect(await within(drawer).findByText(message)).toBeInTheDocument();
+    expect(rejectAdminBusiness).not.toHaveBeenCalled();
+  });
+
+  it("keeps the typed reason when the API refuses the rejection", async () => {
+    rejectAdminBusiness.mockRejectedValueOnce(new ApiError("Forbidden: you cannot review your own business", 403));
+    const drawer = await openRejectForm();
+    const field = within(drawer).getByLabelText("Rad etish sababi");
+
+    fireEvent.change(field, { target: { value: "Soxta ma'lumot" } });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Rad etishni tasdiqlash" }));
+
+    expect(await within(drawer).findByText("Forbidden: you cannot review your own business")).toBeInTheDocument();
+    expect(field).toHaveValue("Soxta ma'lumot");
+  });
+
+  it("goes back from the reason form, and closes without deciding anything", async () => {
+    const drawer = await openRejectForm();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "Orqaga" }));
+    expect(within(drawer).queryByLabelText("Rad etish sababi")).not.toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: /Tasdiqlash/ })).toBeInTheDocument();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "Yopish" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(approveAdminBusiness).not.toHaveBeenCalled();
+    expect(rejectAdminBusiness).not.toHaveBeenCalled();
+  });
+
+  it("offers no review action on a listing that is not PENDING", async () => {
+    listOf({ ...submitted, status: "APPROVED" });
+    renderView();
+    await waitForRow();
+
+    expect(screen.queryByRole("button", { name: "Ko'rib chiqish" })).not.toBeInTheDocument();
+  });
+
+  it("hands the edit modal's 'Rad etish' to the drawer's reason form", async () => {
+    renderView("ADMIN");
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: /Tahrirlash/ })[0]);
+    const modal = await screen.findByRole("dialog", { name: "Biznesni tahrirlash" });
+
+    fireEvent.click(within(modal).getByRole("button", { name: /Rad etish/ }));
+
+    const drawer = await screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+    expect(within(drawer).getByLabelText("Rad etish sababi")).toBeInTheDocument();
+    expect(window.prompt).not.toHaveBeenCalled();
+    expect(rejectAdminBusiness).not.toHaveBeenCalled();
   });
 });

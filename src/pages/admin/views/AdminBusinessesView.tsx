@@ -2,6 +2,7 @@ import {
   ArchiveRestore,
   Ban,
   Check,
+  ClipboardList,
   Eye,
   EyeOff,
   Megaphone,
@@ -44,6 +45,7 @@ import EditBusinessModal, {
 } from "../../../components/business/EditBusinessModal";
 import Pagination from "../../search/Pagination";
 import { renderAdminState } from "../AdminFetchState";
+import BusinessReviewDrawer, { type BusinessReviewMode } from "../BusinessReviewDrawer";
 import DataTable, { type Column } from "../DataTable";
 import { BusinessStatusBadge, formatDate } from "../statusLabels";
 
@@ -128,6 +130,15 @@ export default function AdminBusinessesView() {
   const [pendingActionId, setPendingActionId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
+  // Phase 16E: the listing open in the review drawer, and whether the drawer
+  // shows its decision buttons or the rejection-reason form.
+  const [reviewing, setReviewing] = useState<AdminBusiness | null>(null);
+  const [reviewMode, setReviewMode] = useState<BusinessReviewMode>("review");
+  const [reviewError, setReviewError] = useState<string | null>(null);
+
+  // The row the edit modal was opened from — its "Rad etish" hands that row
+  // to the review drawer's reason form.
+  const [editingSource, setEditingSource] = useState<AdminBusiness | null>(null);
   const [editingBusiness, setEditingBusiness] = useState<EditableBusiness | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
@@ -139,37 +150,52 @@ export default function AdminBusinessesView() {
     return () => clearTimeout(id);
   }, [toast]);
 
-  async function handleApprove(id: number): Promise<boolean> {
+  /** Runs an approve/reject decision. Resolves to the refusal message, or null on success. */
+  async function moderate(id: number, decision: () => Promise<unknown>, successText: string): Promise<string | null> {
     setPendingActionId(id);
     try {
-      await approveAdminBusiness(id);
-      setToast({ tone: "success", text: "Biznes tasdiqlandi" });
+      await decision();
+      setToast({ tone: "success", text: successText });
       reload();
-      return true;
+      return null;
     } catch (err) {
-      setToast({ tone: "error", text: err instanceof ApiError ? err.message : "Xatolik yuz berdi" });
-      return false;
+      const message = err instanceof ApiError ? err.message : "Xatolik yuz berdi";
+      setToast({ tone: "error", text: message });
+      return message;
     } finally {
       setPendingActionId(null);
     }
   }
 
-  async function handleReject(id: number): Promise<boolean> {
-    const reason = window.prompt("Rad etish sababi:");
-    if (!reason || !reason.trim()) return false;
+  function handleApprove(id: number) {
+    return moderate(id, () => approveAdminBusiness(id), "Biznes tasdiqlandi");
+  }
 
-    setPendingActionId(id);
-    try {
-      await rejectAdminBusiness(id, reason.trim());
-      setToast({ tone: "success", text: "Biznes rad etildi" });
-      reload();
-      return true;
-    } catch (err) {
-      setToast({ tone: "error", text: err instanceof ApiError ? err.message : "Xatolik yuz berdi" });
-      return false;
-    } finally {
-      setPendingActionId(null);
-    }
+  // Phase 16E: rejecting used to be a bare window.prompt — no sight of what
+  // was submitted, no length limit, and a blank answer silently did nothing.
+  // Every reject path now goes through the review drawer's reason form, which
+  // enforces the API's RejectBusinessDto (non-empty, ≤ 1000) before calling it.
+  function openReview(business: AdminBusiness, mode: BusinessReviewMode = "review") {
+    setReviewing(business);
+    setReviewMode(mode);
+    setReviewError(null);
+  }
+
+  const closeReview = useCallback(() => setReviewing(null), []);
+
+  async function approveFromReview() {
+    if (!reviewing) return;
+    const error = await handleApprove(reviewing.id);
+    if (error) setReviewError(error);
+    else setReviewing(null);
+  }
+
+  async function rejectFromReview(reason: string) {
+    if (!reviewing) return;
+    const id = reviewing.id;
+    const error = await moderate(id, () => rejectAdminBusiness(id, reason), "Biznes rad etildi");
+    if (error) setReviewError(error);
+    else setReviewing(null);
   }
 
   /** Shared runner for the business operations: busy state, toast, reload. */
@@ -234,6 +260,7 @@ export default function AdminBusinessesView() {
   }
 
   function openEditModal(business: AdminBusiness) {
+    setEditingSource(business);
     setEditingBusiness(toEditableBusiness(business));
     setEditError(null);
     setEditModalOpen(true);
@@ -303,8 +330,14 @@ export default function AdminBusinessesView() {
 
   async function handleModerateFromModal(action: "approve" | "reject") {
     if (!editingBusiness) return;
-    const succeeded = action === "approve" ? await handleApprove(editingBusiness.id) : await handleReject(editingBusiness.id);
-    if (succeeded) setEditModalOpen(false);
+    if (action === "reject") {
+      if (!editingSource) return;
+      setEditModalOpen(false);
+      openReview(editingSource, "reject");
+      return;
+    }
+    const error = await handleApprove(editingBusiness.id);
+    if (!error) setEditModalOpen(false);
   }
 
   const rows = useMemo(() => {
@@ -356,6 +389,14 @@ export default function AdminBusinessesView() {
         <div className="flex items-center gap-1">
           {statusOf(b) === "PENDING" && (
             <>
+              <button
+                aria-label="Ko'rib chiqish"
+                title="Ko'rib chiqish"
+                onClick={() => openReview(b)}
+                className={iconButtonClasses}
+              >
+                <ClipboardList size={16} />
+              </button>
               <Button
                 size="sm"
                 className="bg-green-600 hover:bg-green-500"
@@ -369,7 +410,7 @@ export default function AdminBusinessesView() {
                 variant="ghost"
                 className="text-red-400 hover:text-red-300"
                 disabled={pendingActionId === b.id}
-                onClick={() => handleReject(b.id)}
+                onClick={() => openReview(b, "reject")}
               >
                 <X size={14} /> Rad etish
               </Button>
@@ -563,7 +604,18 @@ export default function AdminBusinessesView() {
             loading={state === "loading"}
             emptyTitle="Bizneslar topilmadi"
             emptyBody="Filtrlarni o'zgartirib ko'ring."
-            mobileHeader={(b) => <div className="font-semibold text-ink">{businessName(b)}</div>}
+            mobileHeader={(b) => (
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-semibold text-ink min-w-0 break-words">{businessName(b)}</div>
+                {/* The actions column is desktop-only; on a phone the drawer
+                    is the way to review, approve or reject a pending listing. */}
+                {statusOf(b) === "PENDING" && (
+                  <Button size="sm" variant="ghost" className="shrink-0" onClick={() => openReview(b)}>
+                    <ClipboardList size={14} /> Ko'rib chiqish
+                  </Button>
+                )}
+              </div>
+            )}
           />
           {data?.total != null && (
             <Pagination
@@ -587,6 +639,20 @@ export default function AdminBusinessesView() {
         onApprove={() => handleModerateFromModal("approve")}
         onReject={() => handleModerateFromModal("reject")}
         moderationPending={editingBusiness ? pendingActionId === editingBusiness.id : false}
+      />
+
+      <BusinessReviewDrawer
+        business={reviewing}
+        mode={reviewMode}
+        onModeChange={(mode) => {
+          setReviewMode(mode);
+          setReviewError(null);
+        }}
+        onClose={closeReview}
+        onApprove={approveFromReview}
+        onReject={rejectFromReview}
+        pending={reviewing ? pendingActionId === reviewing.id : false}
+        error={reviewError}
       />
     </div>
   );
