@@ -330,7 +330,7 @@ Four sub-scores (profile, engagement, visibility, response) plus a weighted `ove
 
 ---
 
-## 15. Admin — `/admin` (36 routes; +3 in Phase 11, +1 in Phase 14, +1 in Phase 15B)
+## 15. Admin — `/admin` (37 routes; +3 in Phase 11, +1 in Phase 14, +1 in Phase 15B, +1 in Phase 16E)
 
 > **Phase 15B (D-74).** Staff edits of a business someone else owns happen **only** here, each with a required `reason` (recorded as the audit note): `PATCH /admin/businesses/:id` (now also `coverPhoto`, `hasDelivery`, `deliveryFee`, `deliveryTime`, `website`, `telegram`, `instagram`), `PATCH …/branch`, and **new `PUT /admin/businesses/:id/hours`** (`{ reason, hours: [...] }`). `POST /admin/users/:id/suspend|activate` now require `{ reason }` and follow an explicit actor→target table: never yourself, never a `SUPER_ADMIN`; `ADMIN` → `CUSTOMER`/`BUSINESS_OWNER`; `SUPER_ADMIN` → also `MODERATOR`/`SUPPORT` and an emergency freeze of an `ADMIN` that no role can reinstate (`403` otherwise; `409` on a wrong current status or a lost race). Suspension revokes all of the target's sessions. There is **no** role-change endpoint. Every admin audit row now records actor role, request id, IP and user agent.
 
@@ -342,6 +342,7 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | --- | --- | --- | --- | --- |
 | GET | `/admin/stats` | `ADMIN` | Platform stats | ✅ |
 | GET | `/admin/businesses` | **`MODERATOR`** ↓ (Phase 14; owner PII ADMIN+ only) | List businesses (paginated; `?status=` any `BusinessStatus`, `?district=`, `?search=`) | ✅ (status filter server-side since Phase 11) |
+| GET | `/admin/businesses/:id` | **`MODERATOR`** ↓ (`business.review`; owner PII ADMIN+ only) | **New Phase 16E.** One listing in full for the review drawer, **any status** except soft-deleted (`404`). Every non-deleted branch, primary first: `name`, `address`, `landmark`, `phone`, `phoneAlt`, `lat`/`lng` (decimal strings or `null`), `isPrimary`, `isActive`, `district`, `city`, `hours[]` (`dayOfWeek` 0 = Monday … 6, `openTime`, `closeTime`, `isClosed`, `is24Hours`) and `photos[]` (`url`, `thumbUrl`, `caption`, `isPrimary`, `sortOrder` only — never the uploader). No products, events or reviews. Read-only, not audited | ⭕ (16E follow-up: review drawer + admin edit prefill) |
 | POST | `/admin/businesses/:id/approve` | **`MODERATOR`** ↓ | Approve | ✅ |
 | POST | `/admin/businesses/:id/reject` | **`MODERATOR`** ↓ | Reject — body `{ reason }` **required** (`@IsNotEmpty`) | ✅ |
 | PATCH | `/admin/businesses/:id/hide` | **`SUPER_ADMIN`** ↑ | Hide (any status → `HIDDEN`); records the prior status in `statusBeforeHide` (Phase 14) | ✅ **(Phase 14)** |
