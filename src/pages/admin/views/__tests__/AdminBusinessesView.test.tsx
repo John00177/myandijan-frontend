@@ -12,6 +12,7 @@ import {
   ApiError,
   approveAdminBusiness,
   getAdminBusinesses,
+  getBusinessById,
   getMe,
   hideAdminBusiness,
   mockAdminBusiness,
@@ -379,10 +380,9 @@ describe("AdminBusinessesView — business operations", () => {
         expect.objectContaining({ reason: "Egasi telefon orqali so'radi" }),
       ),
     );
-    expect(updateAdminBusinessHours).toHaveBeenCalledWith(mockAdminBusiness.id, {
-      reason: "Egasi telefon orqali so'radi",
-      hours: expect.any(Array),
-    });
+    // Hours were not edited, so the hours PUT (which replaces every stored
+    // row) is not sent at all — see the "hours preservation" block below.
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
     expect(updateBusiness).not.toHaveBeenCalled();
     expect(updateBusinessHours).not.toHaveBeenCalled();
   });
@@ -575,5 +575,97 @@ describe("AdminBusinessesView — review drawer", () => {
     expect(within(drawer).getByLabelText("Rad etish sababi")).toBeInTheDocument();
     expect(window.prompt).not.toHaveBeenCalled();
     expect(rejectAdminBusiness).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 16E data-integrity fix: PUT /admin/businesses/:id/hours replaces
+// every stored row, and GET /businesses/:id 404s for any non-APPROVED
+// listing. An admin edit used to submit the modal's placeholder 09:00–18:00
+// grid in that case, overwriting the business's real hours, and reset every
+// 24-hour day.
+describe("AdminBusinessesView — hours preservation in the admin edit", () => {
+  const REASON = "Egasi so'radi";
+
+  /** Stored hours: Mon 10:00–20:00, Tue 24 hours, Sun closed, Wed–Sat no row. */
+  const storedHours = [
+    { dayOfWeek: 0, openTime: "10:00", closeTime: "20:00", isClosed: false, is24Hours: false },
+    { dayOfWeek: 1, openTime: null, closeTime: null, isClosed: false, is24Hours: true },
+    { dayOfWeek: 6, openTime: null, closeTime: null, isClosed: true, is24Hours: false },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    // spyOn, like the edit tests above: once window.prompt has been spied on,
+    // a plain reassignment no longer replaces it.
+    vi.spyOn(window, "prompt").mockReturnValue(REASON);
+    window.confirm = vi.fn(() => false);
+  });
+
+  async function openEdit(business = mockAdminBusiness) {
+    listOf(business);
+    renderView("ADMIN");
+    await waitForRow(business.name as string);
+    fireEvent.click(screen.getAllByRole("button", { name: /Tahrirlash/ })[0]);
+    const modal = await screen.findByRole("dialog", { name: "Biznesni tahrirlash" });
+    const save = within(modal).getByRole("button", { name: "Saqlash" });
+    await waitFor(() => expect(save).toBeEnabled());
+    return { modal, save };
+  }
+
+  function prefillWithStoredHours() {
+    getBusinessById.mockResolvedValueOnce({
+      id: mockAdminBusiness.id,
+      slug: mockAdminBusiness.slug,
+      name: mockAdminBusiness.name,
+      status: "APPROVED",
+      branches: [{ id: 1, address: "Andijon shahri", phone: "+998901234567", hours: storedHours }],
+    });
+  }
+
+  it("does not submit hours when the prefill 404s for a non-approved business", async () => {
+    getBusinessById.mockRejectedValueOnce(new ApiError("Business \"5\" not found", 404));
+    const { modal, save } = await openEdit({ ...mockAdminBusiness, status: "PENDING" });
+
+    // The placeholder grid is not shown as if it were the business's hours.
+    expect(within(modal).getByText("Ish vaqtini yuklab bo'lmadi. Saqlaganda ish vaqti o'zgarmaydi.")).toBeInTheDocument();
+    expect(within(modal).queryByDisplayValue("09:00")).not.toBeInTheDocument();
+
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateAdminBusiness).toHaveBeenCalled());
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
+  });
+
+  it("leaves stored hours untouched when a loaded business is saved without editing them", async () => {
+    prefillWithStoredHours();
+    const { modal, save } = await openEdit();
+
+    expect(within(modal).getByDisplayValue("20:00")).toBeInTheDocument();
+    expect(within(modal).getByText("24 soat ochiq")).toBeInTheDocument();
+
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateAdminBusiness).toHaveBeenCalled());
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
+  });
+
+  it("submits an edited day, keeps the 24-hour day 24-hour, and adds no 09:00–18:00 placeholder days", async () => {
+    prefillWithStoredHours();
+    const { modal, save } = await openEdit();
+
+    fireEvent.change(within(modal).getByDisplayValue("20:00"), { target: { value: "22:00" } });
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(updateAdminBusinessHours).toHaveBeenCalledWith(mockAdminBusiness.id, {
+        reason: REASON,
+        hours: [
+          { dayOfWeek: 0, openTime: "10:00", closeTime: "22:00", isClosed: false, is24Hours: false },
+          { dayOfWeek: 1, openTime: undefined, closeTime: undefined, isClosed: false, is24Hours: true },
+          { dayOfWeek: 6, openTime: undefined, closeTime: undefined, isClosed: true, is24Hours: false },
+        ],
+      }),
+    );
   });
 });
