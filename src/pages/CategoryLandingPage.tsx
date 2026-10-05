@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import JsonLd from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
+import NotFoundState from "../components/seo/NotFoundState";
 import StaggerContainer, { StaggerItem } from "../components/StaggerContainer";
 import EmptyState from "../components/ui/EmptyState";
 import Skeleton from "../components/ui/Skeleton";
@@ -40,7 +41,7 @@ export default function CategoryLandingPage() {
   if (notFound || categoryError || !category) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <EmptyState icon={SearchX} title={t("categoryNotFound")} body={t("categoryNotFoundBody")} />
+        <NotFoundState title={t("categoryNotFound")} body={t("categoryNotFoundBody")} noIndex={notFound} />
       </div>
     );
   }

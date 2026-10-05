@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import JsonLd from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
+import NotFoundState from "../components/seo/NotFoundState";
 import StaggerContainer, { StaggerItem } from "../components/StaggerContainer";
 import EmptyState from "../components/ui/EmptyState";
 import Skeleton from "../components/ui/Skeleton";
@@ -46,7 +47,9 @@ export default function DistrictLandingPage() {
   if (regionsError || !district) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <EmptyState icon={SearchX} title={t("districtNotFound")} body={t("districtNotFoundBody")} />
+        {/* Confirmed only when the district list loaded and the slug matched
+            nothing; a failed load (regionsError) may hide a real district. */}
+        <NotFoundState title={t("districtNotFound")} body={t("districtNotFoundBody")} noIndex={!regionsError} />
       </div>
     );
   }

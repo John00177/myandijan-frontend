@@ -92,7 +92,7 @@
 
 ### Bugs
 - [ ] **HEIC uploads fail.** `api.ts` allows `image/heic`/`image/heif`; the server's allow-list does not. iPhone photos pass the client check and 400 **[REVIEW]**
-- [ ] **No 404 route.** An unmatched path under `/:lang` renders an empty `Layout` **[REVIEW]**
+- [x] **No 404 route.** — **done, Phase 16F.1.** An unmatched path under `/:lang` now renders `NotFoundPage` (noindex); a path with no supported language prefix is redirected under `/uz`; business/category/district/event not-found states are noindex when the absence is confirmed (`NotFoundState`). The SPA still answers HTTP 200 for every URL (`vercel.json`), so `noindex` — not a status code — is what keeps these out of the index **[REVIEW]**
 - [ ] **Dashboard sub-views are not deep-linkable** and the back button does not move between them (view state, not routes) **[REVIEW]**
 - [?] **`replyToReview()` uses `PATCH /reviews/:id/reply`** (edit) rather than `POST` (create) — verify it works when no reply exists yet **[REVIEW]**
 - [ ] **Nothing adapts above `lg` (1024px)** — zero `xl:`/`2xl:` usage **[REVIEW]**
