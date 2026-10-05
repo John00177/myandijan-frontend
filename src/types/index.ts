@@ -392,8 +392,17 @@ export interface AdminBusiness {
   hasDelivery?: boolean | null;
   deliveryFee?: number | null;
   deliveryTime?: string | null;
-  owner?: { id?: number; fullName?: string | null; phone?: string | null } | null;
+  coverUrl?: string | null;
+  website?: string | null;
+  email?: string | null;
+  telegram?: string | null;
+  instagram?: string | null;
+  /** Denormalized count across all branches; only the primary one is in `branches`. */
+  branchCount?: number | null;
+  /** phone/email are only returned to ADMIN+; a MODERATOR gets { id, fullName } (D-72). */
+  owner?: { id?: number; fullName?: string | null; phone?: string | null; email?: string | null } | null;
   ownerId?: number | null;
+  businessType?: { id?: number; nameUz?: string | null; slug?: string | null } | null;
   // Business-operation state (GET /admin/businesses returns every scalar).
   isVerified?: boolean | null;
   isPromoted?: boolean | null;
