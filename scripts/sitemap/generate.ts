@@ -16,12 +16,13 @@ import {
   buildSitemaps,
   type ApiBusiness,
   type ApiCategory,
+  type ApiEvent,
   type ApiRegion,
   type BuiltSitemaps,
   type SitemapSources,
 } from "./build.ts";
 
-/** The API rejects limit > 100 with a 400, so the business list has to be paged. */
+/** The API rejects limit > 100 with a 400, so the business and event lists have to be paged. */
 export const PAGE_SIZE = 100;
 /** Guard against a malformed meta block turning paging into an unbounded loop. */
 export const MAX_PAGES = 200;
@@ -61,22 +62,25 @@ function expectArray<T>(path: string, value: unknown): T[] {
   return value as T[];
 }
 
-/** Every APPROVED business, page by page; a truncated walk is an error, not a smaller sitemap. */
-async function fetchAllBusinesses(apiUrl: string, fetchImpl: FetchLike): Promise<ApiBusiness[]> {
-  const all: ApiBusiness[] = [];
+/**
+ * Every row of a paginated public list (`{ data, meta: { totalPages } }`),
+ * page by page; a truncated walk is an error, not a smaller sitemap.
+ */
+async function fetchAllPages<T>(apiUrl: string, resource: string, fetchImpl: FetchLike): Promise<T[]> {
+  const all: T[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const path = `/businesses?page=${page}&limit=${PAGE_SIZE}`;
+    const path = `${resource}?page=${page}&limit=${PAGE_SIZE}`;
     const body = (await fetchJsonStrict(apiUrl, path, fetchImpl)) as {
       data?: unknown;
       meta?: { totalPages?: number };
     } | null;
-    const rows = expectArray<ApiBusiness>(path, body?.data);
+    const rows = expectArray<T>(path, body?.data);
     all.push(...rows);
 
     const totalPages = body?.meta?.totalPages ?? 1;
     if (rows.length === 0 || page >= totalPages) return all;
   }
-  throw new SitemapSourceError(`/businesses: more than ${MAX_PAGES} pages — refusing to publish a truncated sitemap`);
+  throw new SitemapSourceError(`${resource}: more than ${MAX_PAGES} pages — refusing to publish a truncated sitemap`);
 }
 
 /**
@@ -85,12 +89,15 @@ async function fetchAllBusinesses(apiUrl: string, fetchImpl: FetchLike): Promise
  * homepage tiles and left every other category's landing page unlisted.
  */
 export async function fetchSitemapSources(apiUrl: string, fetchImpl: FetchLike): Promise<SitemapSources> {
-  const [regions, categories, businesses] = await Promise.all([
+  const [regions, categories, businesses, events] = await Promise.all([
     fetchJsonStrict(apiUrl, "/geography/regions", fetchImpl).then((v) => expectArray<ApiRegion>("/geography/regions", v)),
     fetchJsonStrict(apiUrl, "/categories", fetchImpl).then((v) => expectArray<ApiCategory>("/categories", v)),
-    fetchAllBusinesses(apiUrl, fetchImpl),
+    // GET /businesses lists only APPROVED, non-deleted businesses.
+    fetchAllPages<ApiBusiness>(apiUrl, "/businesses", fetchImpl),
+    // GET /events lists only PUBLISHED, non-deleted events (Phase 16F.5).
+    fetchAllPages<ApiEvent>(apiUrl, "/events", fetchImpl),
   ]);
-  return { regions, categories, businesses };
+  return { regions, categories, businesses, events };
 }
 
 export interface GenerateOptions {

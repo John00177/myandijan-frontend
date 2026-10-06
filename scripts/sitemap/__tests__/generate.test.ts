@@ -14,6 +14,8 @@ function healthyRoutes(): Record<string, () => Response | Promise<Response>> {
     "/categories": () => json([{ slug: "oziq-ovqat", children: [{ slug: "kafe" }] }, { slug: "xizmatlar" }]),
     "/businesses?page=1&limit=100": () => json({ data: [{ slug: "soy" }], meta: { totalPages: 2 } }),
     "/businesses?page=2&limit=100": () => json({ data: [{ slug: "kok-choy" }], meta: { totalPages: 2 } }),
+    "/events?page=1&limit=100": () => json({ data: [{ slug: "navroz-bayrami" }], meta: { totalPages: 2 } }),
+    "/events?page=2&limit=100": () => json({ data: [{ slug: "kitob-kuni" }], meta: { totalPages: 2 } }),
   };
 }
 
@@ -49,7 +51,7 @@ describe("generateSitemaps (Phase 16F.4)", () => {
     expect(paths).not.toContain("/categories/homepage");
   });
 
-  it("walks every business page and writes the four sub-sitemaps, then the index last", async () => {
+  it("walks every business and event page and writes the five sub-sitemaps, then the index last", async () => {
     const { promise, writeFile } = run(fakeFetch(healthyRoutes()));
     const built = await promise;
 
@@ -59,10 +61,21 @@ describe("generateSitemaps (Phase 16F.4)", () => {
       "out/sitemap-businesses.xml",
       "out/sitemap-categories.xml",
       "out/sitemap-locations.xml",
+      "out/sitemap-events.xml",
       "out/sitemap.xml",
     ]);
-    expect(built.files.map((f) => f.urlCount)).toEqual([9, 6, 9, 6]);
+    expect(built.files.map((f) => f.urlCount)).toEqual([9, 6, 9, 6, 6]);
     expect(writeFile.mock.calls[1][1]).toContain("https://myandijan.uz/uz/business/kok-choy");
+    expect(writeFile.mock.calls[4][1]).toContain("https://myandijan.uz/uz/events/kitob-kuni");
+    expect(writeFile.mock.calls[5][1]).toContain("<loc>https://myandijan.uz/sitemap-events.xml</loc>");
+  });
+
+  it("reads events from the public, paginated GET /events list", async () => {
+    const fetchImpl = fakeFetch(healthyRoutes());
+    await run(fetchImpl).promise;
+
+    const paths = fetchImpl.mock.calls.map(([url]) => url.slice(API.length));
+    expect(paths).toEqual(expect.arrayContaining(["/events?page=1&limit=100", "/events?page=2&limit=100"]));
   });
 
   // The regression this slice exists for: an unreachable or broken API used to
@@ -75,6 +88,9 @@ describe("generateSitemaps (Phase 16F.4)", () => {
     ["a business page has no data array", { "/businesses?page=1&limit=100": () => json({ items: [] }) }],
     ["the second business page fails", { "/businesses?page=2&limit=100": () => json({}, 500) }],
     ["the regions payload is not an array", { "/geography/regions": () => json({ regions: [] }) }],
+    ["the events request fails with HTTP 500", { "/events?page=1&limit=100": () => json({}, 500) }],
+    ["the second events page fails", { "/events?page=2&limit=100": () => Promise.reject(new TypeError("fetch failed")) }],
+    ["an events page has no data array", { "/events?page=1&limit=100": () => json({ events: [] }) }],
   ])("aborts without writing a single file when %s", async (_case, override) => {
     const { promise, writeFile } = run(fakeFetch({ ...healthyRoutes(), ...override }));
 
@@ -104,6 +120,16 @@ describe("generateSitemaps (Phase 16F.4)", () => {
     const built = await promise;
 
     expect(built.files[1].urlCount).toBe(0);
-    expect(writeFile).toHaveBeenCalledTimes(5);
+    expect(writeFile).toHaveBeenCalledTimes(6);
+  });
+
+  it("still writes a valid, empty event sitemap when there are no published events", async () => {
+    const { promise, writeFile } = run(
+      fakeFetch({ ...healthyRoutes(), "/events?page=1&limit=100": () => json({ data: [], meta: { totalPages: 1 } }) }),
+    );
+    const built = await promise;
+
+    expect(built.files[4].urlCount).toBe(0);
+    expect(writeFile).toHaveBeenCalledTimes(6);
   });
 });
