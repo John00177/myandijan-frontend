@@ -1,6 +1,6 @@
 /**
- * Generates public/sitemap.xml (a sitemap index) plus four sub-sitemaps from
- * live API data.
+ * Generates public/sitemap.xml (a sitemap index) plus five sub-sitemaps —
+ * pages, businesses, categories, locations and events — from live API data.
  *
  * Run with:  npm run sitemap
  *

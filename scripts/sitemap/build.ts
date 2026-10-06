@@ -49,10 +49,20 @@ export interface ApiBusiness {
   updatedAt?: string | null;
 }
 
+/**
+ * A row of GET /events. The list selects no `updatedAt`, so event URLs carry
+ * no lastmod — `startAt` is when the event happens, not when the page last
+ * changed, and passing it off as lastmod would be fake precision.
+ */
+export interface ApiEvent {
+  slug: string;
+}
+
 export interface SitemapSources {
   regions: ApiRegion[];
   categories: ApiCategory[];
   businesses: ApiBusiness[];
+  events: ApiEvent[];
 }
 
 /* -------------------------------------------------------------- XML helpers */
@@ -203,11 +213,19 @@ export function buildSitemaps(sources: SitemapSources, options: { siteUrl: strin
     lastmod: district.updatedAt,
   }));
 
+  // Phase 16F.5: /:lang/events/:slug detail pages. GET /events lists exactly
+  // what GET /events/:slug serves (PUBLISHED, not deleted), past events
+  // included — their pages still resolve, like any business page.
+  const eventEntries: SitemapEntry[] = dedupeBySlug(sources.events).map((event) => ({
+    path: `events/${event.slug}`,
+  }));
+
   const groups: Array<{ name: string; entries: SitemapEntry[] }> = [
     { name: "sitemap-pages.xml", entries: pages },
     { name: "sitemap-businesses.xml", entries: businessEntries },
     { name: "sitemap-categories.xml", entries: categoryEntries },
     { name: "sitemap-locations.xml", entries: locationEntries },
+    { name: "sitemap-events.xml", entries: eventEntries },
   ];
 
   const files = groups.map((group) => ({

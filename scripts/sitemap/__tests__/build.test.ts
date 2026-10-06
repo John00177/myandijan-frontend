@@ -5,7 +5,7 @@ const SITE = "https://myandijan.uz";
 const TODAY = "2026-10-06";
 
 function sources(overrides: Partial<SitemapSources> = {}): SitemapSources {
-  return { regions: [], categories: [], businesses: [], ...overrides };
+  return { regions: [], categories: [], businesses: [], events: [], ...overrides };
 }
 
 function locs(xml: string): string[] {
@@ -50,7 +50,7 @@ describe("renderUrlset", () => {
 });
 
 describe("buildSitemaps", () => {
-  it("builds the four sub-sitemaps and an index listing all of them, empty ones included", () => {
+  it("builds the five sub-sitemaps and an index listing all of them, empty ones included", () => {
     const built = buildSitemaps(sources(), { siteUrl: SITE, today: TODAY });
 
     expect(built.files.map((f) => f.name)).toEqual([
@@ -58,6 +58,7 @@ describe("buildSitemaps", () => {
       "sitemap-businesses.xml",
       "sitemap-categories.xml",
       "sitemap-locations.xml",
+      "sitemap-events.xml",
     ]);
     expect(locs(built.index)).toEqual(built.files.map((f) => `${SITE}/${f.name}`));
     expect(built.index).toContain(`<lastmod>${TODAY}</lastmod>`);
@@ -121,5 +122,31 @@ describe("buildSitemaps", () => {
     const urls = locs(built.files[3].xml);
     expect(urls.filter((l) => l.includes("/uz/"))).toEqual([`${SITE}/uz/district/asaka`]);
     expect(urls.join(" ")).not.toContain("city");
+  });
+
+  // Phase 16F.5: event detail pages (/:lang/events/:slug).
+  it("lists every event detail page once per language, with alternates and no fake lastmod", () => {
+    const built = buildSitemaps(
+      sources({ events: [{ slug: "navroz-bayrami" }, { slug: "navroz-bayrami" }, { slug: "kitob-kuni" }] }),
+      { siteUrl: SITE, today: TODAY },
+    );
+    const file = built.files[4];
+
+    expect(file.name).toBe("sitemap-events.xml");
+    expect(file.urlCount).toBe(6);
+    expect(locs(file.xml)).toEqual([
+      `${SITE}/uz/events/navroz-bayrami`, `${SITE}/ru/events/navroz-bayrami`, `${SITE}/en/events/navroz-bayrami`,
+      `${SITE}/uz/events/kitob-kuni`, `${SITE}/ru/events/kitob-kuni`, `${SITE}/en/events/kitob-kuni`,
+    ]);
+    expect(file.xml).toContain(`hreflang="x-default" href="${SITE}/uz/events/kitob-kuni"`);
+    expect(file.xml).not.toContain("<lastmod>");
+  });
+
+  it("does not change the other sitemaps when events are added", () => {
+    const base = sources({ businesses: [{ slug: "soy" }], regions: [{ slug: "r", districts: [{ slug: "asaka" }] }] });
+    const without = buildSitemaps(base, { siteUrl: SITE, today: TODAY });
+    const withEvents = buildSitemaps({ ...base, events: [{ slug: "navroz-bayrami" }] }, { siteUrl: SITE, today: TODAY });
+
+    expect(withEvents.files.slice(0, 4)).toEqual(without.files.slice(0, 4));
   });
 });
