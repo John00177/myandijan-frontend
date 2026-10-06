@@ -74,7 +74,7 @@ Emitted tags:
 | `<title>` | caller |
 | `<meta name="description">` | caller |
 | `<link rel="canonical">` | `SITE_URL + pathForLang(pathname, lang)` |
-| `<meta name="robots" content="noindex, nofollow">` | when `noIndex` |
+| `<meta name="robots" content="noindex, nofollow">` | when `noIndex` — and then **no** canonical and **no** hreflang alternates (Phase 16F.1: canonical + noindex are contradictory signals) |
 | `<link rel="alternate" hreflang>` ×3 | `uz`, `ru`, `en` |
 | `<link rel="alternate" hreflang="x-default">` | points at the **`uz`** URL |
 | `og:site_name`, `og:title`, `og:description`, `og:type`, `og:url`, `og:image` (+ `width` 1200, `height` 630), `og:locale` | |
@@ -82,6 +82,8 @@ Emitted tags:
 | `twitter:card` (`summary_large_image`), `twitter:title`, `twitter:description`, `twitter:image` | |
 
 **Coverage:** `HomePage`, `SearchPage`, `CategorySearchPage`, `BusinessDetailPage`, `EventsPage`, `PricingPage`, `SignupPage`, `ClaimPage`, `FavoritesPage`, `ProfilePage`, `OwnerDashboard`, `AdminDashboard`, `AddBusinessPage` — i.e. **all public pages plus the private ones (which pass `noIndex`)**.
+
+**Not-found states (Phase 16F.1).** Because the SPA answers `200` for every URL, a missing page is kept out of the index with `noindex`, not a status code. `NotFoundState` renders the empty state plus `MetaTags noIndex` (title `"<not found> — My Andijan"`) when the absence is **confirmed** — business/category/event `404`, or a district slug matching nothing in the loaded list. A transient failure (network/5xx) emits no head tags, so a crawler that hits a blip is not told to drop a real page. Unknown paths under `/:lang` reach the `*` route (`NotFoundPage`, always noindex), and a first segment that is not `uz`/`ru`/`en` is redirected under `/uz` (`LangShell`) instead of rendering the homepage.
 
 **Supporting module `src/lib/seo.ts`:**
 - `SITE_URL` from `VITE_SITE_URL`, defaulting to `https://myandijan.uz`, trailing slash stripped. **Deploy previews should set `VITE_SITE_URL`** so they don't advertise production as their canonical — this is documented in the file and is a genuinely thoughtful detail.

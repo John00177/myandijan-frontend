@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,6 +66,28 @@ describe("CategoryLandingPage", () => {
     renderCategoryPage("does-not-exist");
 
     expect(await screen.findByText("Turkum topilmadi")).toBeInTheDocument();
+  });
+
+  // Phase 16F.1: a confirmed not-found is noindex; a transient failure is not.
+  it("marks an unknown category slug noindex", async () => {
+    getCategoryBySlug.mockRejectedValue(new ApiError("Not found", 404));
+
+    renderCategoryPage("does-not-exist");
+
+    await screen.findByText("Turkum topilmadi");
+    await waitFor(() =>
+      expect(document.head.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe("noindex, nofollow"),
+    );
+    expect(document.title).toBe("Turkum topilmadi — My Andijan");
+  });
+
+  it("does not noindex the category page when the lookup fails transiently", async () => {
+    getCategoryBySlug.mockRejectedValue(new ApiError("Internal server error", 500));
+
+    renderCategoryPage();
+
+    await screen.findByText("Turkum topilmadi");
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
   });
 
   it("sets a unique, category-specific title and description", async () => {

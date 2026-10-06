@@ -1,9 +1,8 @@
-import { SearchX } from "lucide-react";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import JsonLd, { type LocalBusinessInput } from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
-import EmptyState from "../components/ui/EmptyState";
+import NotFoundState from "../components/seo/NotFoundState";
 import Skeleton from "../components/ui/Skeleton";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -43,7 +42,7 @@ export default function BusinessDetailPage() {
   if (notFound || error || !business) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-20">
-        <EmptyState icon={SearchX} title={t("businessNotFound")} body={t("businessNotFoundBody")} />
+        <NotFoundState title={t("businessNotFound")} body={t("businessNotFoundBody")} noIndex={notFound} />
       </div>
     );
   }

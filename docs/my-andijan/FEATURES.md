@@ -50,7 +50,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Events listing | **IMPLEMENTED** | `/:lang/events`. **Phase 5 (2026-09-29) also fixed a live bug here:** the frontend `Event` type/`EventCard` used field names (`nameUz`, `image`, `startsAt`, `location`, `categoryLabel`) that don't exist in the real `GET /events` response (`title`, `coverUrl`, `startAt`, `venueName`/`address`) — every card was rendering a blank title, no image and no date in production. Corrected to match `EVENT_LIST_SELECT`. |
 | Event detail page | **IMPLEMENTED** | **Phase 5:** `/:lang/events/:slug` added, backed by `GET /events/:slug`. Renders date range, venue, business link, description, attendee count |
 | Event RSVP | **IMPLEMENTED** | **Phase 5:** `POST /events/:slug/attend` wired to a button on the new detail page; gated behind login like favourites |
-| 404 page | **PLANNED** | No catch-all route |
+| 404 page | **IMPLEMENTED** (Phase 16F.1) | `*` route under `/:lang` → `NotFoundPage` (noindex); unsupported language prefix → redirect under `/uz`. HTTP status stays 200 (SPA rewrite) |
 
 ## 2. Search & filtering
 

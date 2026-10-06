@@ -8,7 +8,7 @@ import EventDetailPage from "../EventDetailPage";
 
 vi.mock("../../lib/api", () => import("../../test/apiMock"));
 
-import { attendEvent, mockEvent } from "../../test/apiMock";
+import { ApiError, attendEvent, getEventBySlug, mockEvent } from "../../test/apiMock";
 
 function renderEventDetailPage() {
   return render(
@@ -46,5 +46,17 @@ describe("EventDetailPage", () => {
     fireEvent.click(rsvpButton);
 
     await waitFor(() => expect(attendEvent).not.toHaveBeenCalled());
+  });
+
+  // Phase 16F.1: not-found states are never indexable.
+  it("marks a confirmed not-found (404) noindex with a not-found title", async () => {
+    getEventBySlug.mockRejectedValueOnce(new ApiError("Event not found", 404));
+    renderEventDetailPage();
+
+    expect(await screen.findByText("Tadbir topilmadi")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.head.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe("noindex, nofollow"),
+    );
+    expect(document.title).toBe("Tadbir topilmadi — My Andijan");
   });
 });

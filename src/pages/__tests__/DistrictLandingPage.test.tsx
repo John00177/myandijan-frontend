@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,6 +66,27 @@ describe("DistrictLandingPage", () => {
     renderDistrictPage("does-not-exist");
 
     expect(await screen.findByText("Tuman topilmadi")).toBeInTheDocument();
+  });
+
+  // Phase 16F.1: a slug that matches nothing in the loaded list is noindex;
+  // a failed list load is not (the district may exist).
+  it("marks an unknown district slug noindex", async () => {
+    renderDistrictPage("does-not-exist");
+
+    await screen.findByText("Tuman topilmadi");
+    await waitFor(() =>
+      expect(document.head.querySelector('meta[name="robots"]')?.getAttribute("content")).toBe("noindex, nofollow"),
+    );
+    expect(document.title).toBe("Tuman topilmadi — My Andijan");
+  });
+
+  it("does not noindex when the district list fails to load", async () => {
+    getRegions.mockRejectedValue(new Error("network down"));
+
+    renderDistrictPage();
+
+    await screen.findByText("Tuman topilmadi");
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
   });
 
   it("sets a unique, district-specific title", async () => {
