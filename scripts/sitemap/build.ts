@@ -50,12 +50,14 @@ export interface ApiBusiness {
 }
 
 /**
- * A row of GET /events. The list selects no `updatedAt`, so event URLs carry
- * no lastmod — `startAt` is when the event happens, not when the page last
- * changed, and passing it off as lastmod would be fake precision.
+ * A row of GET /events. `updatedAt` is the event's last real edit — since API
+ * Phase 16F.6, RSVP counts no longer move it — and is its only lastmod source.
+ * `startAt` is deliberately NOT used: it is when the event happens, not when
+ * the page last changed.
  */
 export interface ApiEvent {
   slug: string;
+  updatedAt?: string | null;
 }
 
 export interface SitemapSources {
@@ -71,7 +73,8 @@ export interface SitemapSources {
 export interface SitemapEntry {
   /** Path WITHOUT the language prefix, e.g. "search" or "business/foo". Empty = language root. */
   path: string;
-  lastmod?: string | null;
+  /** Raw API value; validated by toLastmod at render time, so it may be anything. */
+  lastmod?: unknown;
 }
 
 export function escapeXml(value: string): string {
@@ -87,15 +90,38 @@ function urlFor(siteUrl: string, lang: Lang, path: string): string {
   return `${siteUrl}/${lang}${path ? `/${path}` : ""}`;
 }
 
-/** W3C date (YYYY-MM-DD) — sitemaps accept it and it avoids fake precision. */
-export function toLastmod(value: string | null | undefined): string | null {
-  if (!value) return null;
+/**
+ * W3C date (YYYY-MM-DD) — sitemaps accept it and it avoids fake precision.
+ *
+ * The value comes straight from API JSON, so it is not trusted to be what the
+ * type says (Phase 16F.7). Anything that is not an ISO calendar date string
+ * yields null — the URL is still listed, just without <lastmod> — instead of
+ * a wrong or invalid date:
+ * - non-strings (a number or boolean would otherwise become 1970-01-01);
+ * - strings that do not start YYYY-MM-DD (Date parses other formats, e.g.
+ *   "October 5", differently per engine);
+ * - unparseable or out-of-range values (an extended year would serialise as
+ *   "+275760-…", not a valid sitemap date);
+ * - dates after `notAfter` (the run's date): a future lastmod is wrong data,
+ *   and search engines distrust a sitemap that publishes them.
+ */
+export function toLastmod(value: unknown, notAfter?: string): string | null {
+  if (typeof value !== "string") return null;
+  const prefix = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!prefix) return null;
+  // Date rolls impossible days over ("2026-02-30" → 2 March); reject them.
+  const [year, month, dayOfMonth] = prefix.slice(1).map(Number);
+  const calendar = new Date(Date.UTC(year, month - 1, dayOfMonth));
+  if (calendar.getUTCMonth() !== month - 1 || calendar.getUTCDate() !== dayOfMonth) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  const day = date.toISOString().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  if (notAfter && day > notAfter) return null;
+  return day;
 }
 
-export function renderUrlset(siteUrl: string, entries: SitemapEntry[]): string {
+export function renderUrlset(siteUrl: string, entries: SitemapEntry[], options: { notAfter?: string } = {}): string {
   const blocks: string[] = [];
 
   for (const entry of entries) {
@@ -107,7 +133,7 @@ export function renderUrlset(siteUrl: string, entries: SitemapEntry[]): string {
         `    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(urlFor(siteUrl, "uz", entry.path))}" />`,
       );
 
-      const lastmod = toLastmod(entry.lastmod);
+      const lastmod = toLastmod(entry.lastmod, options.notAfter);
       blocks.push(
         [
           "  <url>",
@@ -218,6 +244,7 @@ export function buildSitemaps(sources: SitemapSources, options: { siteUrl: strin
   // included — their pages still resolve, like any business page.
   const eventEntries: SitemapEntry[] = dedupeBySlug(sources.events).map((event) => ({
     path: `events/${event.slug}`,
+    lastmod: event.updatedAt,
   }));
 
   const groups: Array<{ name: string; entries: SitemapEntry[] }> = [
@@ -230,7 +257,8 @@ export function buildSitemaps(sources: SitemapSources, options: { siteUrl: strin
 
   const files = groups.map((group) => ({
     name: group.name,
-    xml: renderUrlset(siteUrl, group.entries),
+    // No lastmod later than the run's own date (see toLastmod).
+    xml: renderUrlset(siteUrl, group.entries, { notAfter: today }),
     urlCount: group.entries.length * LANGS.length,
   }));
 
