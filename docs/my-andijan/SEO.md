@@ -185,6 +185,8 @@ The script is well-built:
 - Configurable via `SITE_URL` and `VITE_API_URL`.
 - 30 s request timeout.
 
+**Phase 16F.4 — all-or-nothing, and the full category tree.** The original generator turned any failed request into an empty list and wrote the files anyway, so running it while the API was down silently replaced the committed business/category/location sitemaps with empty ones and still exited 0. It now fetches everything first: a failed, non-2xx, malformed or truncated (> `MAX_PAGES`) response aborts **before any file is written**, prints `Sitemap generation aborted — no files were written`, and exits 1. Categories now come from `GET /categories` (every active category, nested ones included) instead of `GET /categories/homepage`, which only held the homepage tiles. Split into `scripts/sitemap/build.ts` (pure XML building) and `scripts/sitemap/generate.ts` (fetch + write, network/disk injected), both covered by `scripts/sitemap/__tests__`. **Regenerating the committed files needs the live API** (Railway) — the XML in `public/` is unchanged by this phase.
+
 ### Why the business sitemap is empty — and the fix
 
 **The generator is not broken. It was last run when the API genuinely had zero businesses** (`docs/SSG.md` records that state: *"the API returns zero businesses"*). The live API now returns **4**.
