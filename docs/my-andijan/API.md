@@ -118,7 +118,7 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 | PUT | `/businesses/:id/hours` | 🔒 **owner only** (Phase 15B) | Replace the **primary branch's** 7-day hours wholesale. Staff use `PUT /admin/businesses/:id/hours` | ✅ |
 | GET | `/businesses/featured` | — | `isFeatured` businesses | ✅ |
 | GET | `/businesses/promoted` | — | `isPromoted` businesses | **⭕** |
-| GET | `/businesses` | — | **List + filter + paginate** (name `contains`, no ranking) — used for category/district-only browsing | ✅ |
+| GET | `/businesses` | — | **List + filter + paginate** (name `contains`, no ranking) — used for category/district-only browsing. Each item carries `updatedAt` since Phase 16F.6 (also on `/featured` and `/promoted`, which share the projection): the last real edit of the listing — views and favourites no longer move it — for the sitemap's `lastmod` | ✅ |
 | GET | `/businesses/:id` | — | Detail by **id or slug**; only `APPROVED` | ✅ |
 | GET | `/businesses/:id/reviews` | — | Reviews for a business | ✅ |
 | POST | `/businesses/:id/reviews` | 🔒 `CUSTOMER` | Create a review; resolves to the primary branch server-side | ✅ |
@@ -220,7 +220,7 @@ Not editable through this API (no columns or deliberately server-owned): SKU, st
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| GET | `/events` | — | Paginated list | ✅ |
+| GET | `/events` | — | Paginated list. Each item carries `updatedAt` since Phase 16F.6: the last real edit of the event — RSVPs no longer move it — for the sitemap's `lastmod` | ✅ |
 | POST | `/events` | 🔒 **owner of `businessId`** (Phase 15B; no role floor) | Create an event | **⭕** |
 | GET | `/events/:slug` | — | Detail by slug | **⭕** |
 | POST | `/events/:slug/attend` | 🔒 | RSVP (`EventAttendee`) | **⭕** |
@@ -291,7 +291,7 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`) | **⭕** |
+| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`). Since Phase 16F.6 the `viewCount` increment is a plain SQL update that does **not** move the business's `updatedAt` (same for favourite ±1 and RSVP `attendeeCount` +1 — `src/common/counters.ts`) | **⭕** |
 | POST | `/analytics/click` | — | Record a click (`RecordClickDto`) | **⭕** |
 | POST | `/analytics/search` | — | Record a search (`RecordSearchDto`) | **⭕** |
 
