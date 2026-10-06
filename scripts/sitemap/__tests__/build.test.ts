@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSitemaps, renderUrlset, type SitemapSources } from "../build.ts";
+import { buildSitemaps, renderUrlset, toLastmod, type SitemapSources } from "../build.ts";
 
 const SITE = "https://myandijan.uz";
 const TODAY = "2026-10-06";
@@ -46,6 +46,23 @@ describe("renderUrlset", () => {
 
   it("escapes XML special characters", () => {
     expect(renderUrlset(SITE, [{ path: "business/a&b" }])).toContain(`${SITE}/uz/business/a&amp;b`);
+  });
+});
+
+describe("toLastmod (Phase 16F.7)", () => {
+  it.each([
+    ["2026-09-20", "2026-09-20"],
+    ["2026-09-20T10:15:00.000Z", "2026-09-20"],
+    // Calendar day in UTC, as before: 23:30 at UTC+5 is 18:30 UTC.
+    ["2026-09-20T23:30:00+05:00", "2026-09-20"],
+    ["2026-09-20T22:00:00-05:00", "2026-09-21"],
+  ])("%s → %s", (value, day) => {
+    expect(toLastmod(value)).toBe(day);
+  });
+
+  it("accepts a date on the run's own day and rejects one after it", () => {
+    expect(toLastmod("2026-10-06T23:00:00.000Z", TODAY)).toBe("2026-10-06");
+    expect(toLastmod("2026-10-07T00:00:00.000Z", TODAY)).toBeNull();
   });
 });
 
@@ -140,6 +157,123 @@ describe("buildSitemaps", () => {
     ]);
     expect(file.xml).toContain(`hreflang="x-default" href="${SITE}/uz/events/kitob-kuni"`);
     expect(file.xml).not.toContain("<lastmod>");
+  });
+
+  // Phase 16F.7: business and event lastmod come from the API's updatedAt.
+  describe("lastmod from updatedAt", () => {
+    /** The <url> blocks of one sitemap, keyed by <loc>. */
+    function blocks(xml: string): Map<string, string> {
+      const out = new Map<string, string>();
+      for (const match of xml.matchAll(/ {2}<url>\n([\s\S]*?)\n {2}<\/url>/g)) {
+        out.set(/<loc>([^<]+)<\/loc>/.exec(match[1])![1], match[1]);
+      }
+      return out;
+    }
+
+    it("gives every language version of a business its updatedAt day", () => {
+      const file = buildSitemaps(sources({ businesses: [{ slug: "soy", updatedAt: "2026-09-20T10:15:00.000Z" }] }), {
+        siteUrl: SITE,
+        today: TODAY,
+      }).files[1];
+
+      for (const lang of ["uz", "ru", "en"]) {
+        expect(blocks(file.xml).get(`${SITE}/${lang}/business/soy`)).toContain("<lastmod>2026-09-20</lastmod>");
+      }
+    });
+
+    it("gives every language version of an event its updatedAt day — never its startAt", () => {
+      const file = buildSitemaps(
+        sources({
+          events: [{ slug: "navroz", updatedAt: "2026-09-01T08:00:00.000Z", startAt: "2027-03-21T10:00:00.000Z" } as never],
+        }),
+        { siteUrl: SITE, today: TODAY },
+      ).files[4];
+
+      for (const lang of ["uz", "ru", "en"]) {
+        expect(blocks(file.xml).get(`${SITE}/${lang}/events/navroz`)).toContain("<lastmod>2026-09-01</lastmod>");
+      }
+      expect(file.xml).not.toContain("2027-03-21");
+    });
+
+    it("keeps lastmod right after <loc>, in the existing format", () => {
+      const file = buildSitemaps(sources({ events: [{ slug: "navroz", updatedAt: "2026-09-01T08:00:00.000Z" }] }), {
+        siteUrl: SITE,
+        today: TODAY,
+      }).files[4];
+
+      expect(file.xml).toContain(
+        [
+          "  <url>",
+          `    <loc>${SITE}/uz/events/navroz</loc>`,
+          "    <lastmod>2026-09-01</lastmod>",
+          `    <xhtml:link rel="alternate" hreflang="uz" href="${SITE}/uz/events/navroz" />`,
+        ].join("\n"),
+      );
+    });
+
+    it.each([
+      ["missing", undefined],
+      ["null", null],
+      ["empty", ""],
+      ["not a date", "not a date"],
+      ["a non-ISO format", "October 5, 2026"],
+      ["an impossible day", "2026-02-30T00:00:00.000Z"],
+      ["an impossible month", "2026-13-01"],
+      ["a five-digit year", "99999-01-01T00:00:00.000Z"],
+      ["in the future", "2026-10-07T00:00:00.000Z"],
+      ["a number", 1727740800000],
+      ["a boolean", true],
+      ["an object", { at: "2026-09-01" }],
+      ["markup after a valid date", "2026-09-01</lastmod><script>alert(1)</script>"],
+    ])("omits lastmod, but keeps the URL, when updatedAt is %s", (_name, updatedAt) => {
+      const built = buildSitemaps(
+        sources({
+          businesses: [{ slug: "soy", updatedAt } as never],
+          events: [{ slug: "navroz", updatedAt } as never],
+        }),
+        { siteUrl: SITE, today: TODAY },
+      );
+
+      for (const file of [built.files[1], built.files[4]]) {
+        expect(file.urlCount).toBe(3);
+        expect(locs(file.xml)).toHaveLength(3);
+        expect(file.xml).not.toContain("<lastmod>");
+        expect(file.xml).not.toContain("<script>");
+      }
+    });
+
+    it("changes nothing else: removing the lastmod lines gives exactly the output without updatedAt", () => {
+      const withDates: SitemapSources = sources({
+        regions: [{ slug: "r", districts: [{ slug: "asaka" }] }],
+        categories: [{ slug: "oziq-ovqat", children: [{ slug: "kafe" }] }],
+        businesses: [
+          { slug: "soy", updatedAt: "2026-09-20T10:00:00.000Z" },
+          { slug: "kok-choy", updatedAt: "2026-08-01T00:00:00.000Z" },
+          { slug: "soy", updatedAt: "2026-01-01T00:00:00.000Z" },
+        ],
+        events: [
+          { slug: "navroz", updatedAt: "2026-09-01T08:00:00.000Z" },
+          { slug: "kitob-kuni" },
+        ],
+      });
+      const withoutDates: SitemapSources = {
+        ...withDates,
+        businesses: withDates.businesses.map(({ slug }) => ({ slug })),
+        events: withDates.events.map(({ slug }) => ({ slug })),
+      };
+
+      const a = buildSitemaps(withDates, { siteUrl: SITE, today: TODAY });
+      const b = buildSitemaps(withoutDates, { siteUrl: SITE, today: TODAY });
+      const stripBusinessAndEventLastmod = (xml: string) => xml.replace(/ {4}<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>\n/g, "");
+
+      expect(a.index).toBe(b.index);
+      expect(a.files.map((f) => f.name)).toEqual(b.files.map((f) => f.name));
+      expect(a.files.map((f) => f.urlCount)).toEqual(b.files.map((f) => f.urlCount));
+      for (const i of [0, 2, 3]) expect(a.files[i].xml).toBe(b.files[i].xml);
+      for (const i of [1, 4]) expect(stripBusinessAndEventLastmod(a.files[i].xml)).toBe(b.files[i].xml);
+      // The first occurrence of a duplicated slug keeps its own date.
+      expect(blocks(a.files[1].xml).get(`${SITE}/uz/business/soy`)).toContain("<lastmod>2026-09-20</lastmod>");
+    });
   });
 
   it("does not change the other sitemaps when events are added", () => {

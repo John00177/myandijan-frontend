@@ -70,6 +70,32 @@ describe("generateSitemaps (Phase 16F.4)", () => {
     expect(writeFile.mock.calls[5][1]).toContain("<loc>https://myandijan.uz/sitemap-events.xml</loc>");
   });
 
+  // Phase 16F.7: the API's updatedAt (16F.6 contract) reaches the written files.
+  it("writes each business's and event's API updatedAt as its lastmod", async () => {
+    const { promise, writeFile } = run(
+      fakeFetch({
+        ...healthyRoutes(),
+        "/businesses?page=1&limit=100": () =>
+          json({ data: [{ slug: "soy", updatedAt: "2026-09-20T10:00:00.000Z", viewCount: 999 }], meta: { totalPages: 1 } }),
+        "/events?page=1&limit=100": () =>
+          json({
+            data: [{ slug: "navroz", updatedAt: "2026-09-01T08:00:00.000Z", startAt: "2027-03-21T10:00:00.000Z" }],
+            meta: { totalPages: 1 },
+          }),
+      }),
+    );
+    await promise;
+
+    const contents = Object.fromEntries(
+      writeFile.mock.calls.map(([path, xml]) => [path.replace(/\\/g, "/").replace("out/", ""), xml]),
+    );
+    expect(contents["sitemap-businesses.xml"]).toContain("<lastmod>2026-09-20</lastmod>");
+    expect(contents["sitemap-events.xml"]).toContain("<lastmod>2026-09-01</lastmod>");
+    expect(contents["sitemap-events.xml"]).not.toContain("2027-03-21");
+    expect(contents["sitemap-categories.xml"]).not.toContain("<lastmod>");
+    expect(contents["sitemap-locations.xml"]).not.toContain("<lastmod>");
+  });
+
   it("reads events from the public, paginated GET /events list", async () => {
     const fetchImpl = fakeFetch(healthyRoutes());
     await run(fetchImpl).promise;

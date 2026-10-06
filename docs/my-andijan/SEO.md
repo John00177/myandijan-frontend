@@ -189,6 +189,8 @@ The script is well-built:
 
 **Phase 16F.5 — event detail pages.** A fifth sub-sitemap, `sitemap-events.xml`, lists every `/:lang/events/:slug` page from the paginated public `GET /events` (only PUBLISHED, non-deleted events — exactly what `GET /events/:slug` serves; past events included, since their pages still resolve). No `lastmod`: the list returns no `updatedAt`, and `startAt` is not a modification date. Fetched with the same all-or-nothing rules. The index lists the new file once the generator next runs against the live API; until then `public/` is unchanged.
 
+**Phase 16F.7 — real `lastmod` for businesses and events.** Business and event entries now carry `<lastmod>` from the API's `updatedAt` (API Phase 16F.6: views, favourites and RSVPs no longer move it, so it is the last real edit). Never `startAt`, view counts or the local clock. `toLastmod` treats the value as untrusted JSON: only a string that starts as a valid ISO calendar date (`YYYY-MM-DD…`) becomes a `YYYY-MM-DD` lastmod; a missing, non-string, non-ISO, impossible (`2026-02-30`), out-of-range or future (after the run's date) value simply omits `<lastmod>` for that URL — the URL itself is always kept, so a bad date can neither break the XML nor drop a page. Apart from those `<lastmod>` lines, the output is byte-identical to before. Still waits on Railway for the API to serve `updatedAt` and for `public/` to be regenerated.
+
 ### Why the business sitemap is empty — and the fix
 
 **The generator is not broken. It was last run when the API genuinely had zero businesses** (`docs/SSG.md` records that state: *"the API returns zero businesses"*). The live API now returns **4**.
