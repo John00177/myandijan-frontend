@@ -1,6 +1,8 @@
 # HANDOFF_INDEX — My Andijan
 
-**Entry point for the next engineer or AI architect.** Read this document first, end to end. It is short by design; everything else is reference.
+> **Role changed 2026-10-07 (D-78).** The recovery entry point is now [`CURRENT_STATE.md`](CURRENT_STATE.md) (top section). The memory map is [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md), and agents start at [`intelligence/AGENT_GUIDE.md`](intelligence/AGENT_GUIDE.md). This document is the **historical 2026-09-28 handoff and audit**, plus the document directory in §7. Its status, blockers, priorities, counts and repository paths (`C:\Users\JKT443\Desktop\…`; now `D:\My-Andijan-Work\…`) are as of 2026-09-28 unless marked otherwise. Do not read it end to end for orientation.
+
+*Original preamble:* **Entry point for the next engineer or AI architect.** Read this document first, end to end. It is short by design; everything else is reference.
 
 Compiled 2026-09-28 from the two live repositories, their git history, a recovered Claude Code transcript (2026-08-24 → 2026-09-27), and read-only probes of the live API and site.
 
@@ -157,6 +159,8 @@ The shortest path to a launchable product. Details in [`ROADMAP.md`](ROADMAP.md)
 | [`TODO.md`](TODO.md) | You want a task. Grouped and marked `[ ] [~] [x] [?]` |
 | [`SESSION_CONTEXT.md`](SESSION_CONTEXT.md) | You want the development history and the non-obvious bugs already solved |
 | [`CHATGPT_CONTEXT.md`](CHATGPT_CONTEXT.md) | **You are ChatGPT acting as architect/reviewer** — what you can rely on, what to ask for, and where this project will mislead a reviewer who cannot execute code |
+| [`ENGINEERING_RULES.md`](ENGINEERING_RULES.md) | *(added 2026-10-07)* Do-not-break rules, conventions and commands for both repos (moved out of the former `CLAUDE.md` files) |
+| [`intelligence/`](intelligence/PROJECT_MEMORY.md) | *(added 2026-10-07)* Memory control: map, contract and update protocol, agent guide, architecture, knowledge model, planned AI Brain |
 | [`../SSG.md`](../SSG.md) | You are considering SSR/prerendering (pre-existing doc, still valid) |
 | [`../../CLAUDE.md`](../../CLAUDE.md) | You are an AI agent — the working contract |
 | [`../../README.md`](../../README.md) | Setup, commands, deployment |
@@ -166,6 +170,8 @@ Plus [`my-andijan-api/CLAUDE.md`](../../../my-andijan-api/CLAUDE.md) in the API 
 ---
 
 ## 8. How another AI should start
+
+> *Superseded 2026-10-07 by [`intelligence/AGENT_GUIDE.md`](intelligence/AGENT_GUIDE.md). Kept as the 2026-09-28 guidance.*
 
 1. **Read this document, then [`CURRENT_STATE.md`](CURRENT_STATE.md), then [`DECISIONS.md`](DECISIONS.md).** That is ~30 minutes and covers 80% of what you need.
 2. **Read `prisma/schema.prisma` in full.** It is the densest source of intent in the project.
@@ -330,7 +336,9 @@ Ten decisions were **never actually made** and are listed at the end of [`DECISI
 
 ## Phase 15 — security hardening and closeout (2026-10-02 → 10-04)
 
-**Current state (2026-10-04, authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
+> *Historical — superseded 2026-10-07. **Phase 15 was CLOSED / PASS on 2026-10-05** (gates A, B, C); the open-gate and "frozen" lines below are historical. Current state, including Phase 16 and the Railway release blocker: [`CURRENT_STATE.md`](CURRENT_STATE.md) top section.*
+
+**State as of 2026-10-04 (then authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
 
 - **15E.2** (D-76): authentication codes never logged/returned, `crypto.randomInt`, one live code per phone + purpose, per-phone wrong-guess budget, atomic single use, no OTP sign-in for staff, fail-closed SMS (503 while `ESKIZ_*` is unset — still the case).
 - **15E.3 / 15E.7.1** (D-77): CI hardened in both repositories; Railway waits for CI; Vercel production waits for the `test-and-build` status; "Protect main" rulesets.

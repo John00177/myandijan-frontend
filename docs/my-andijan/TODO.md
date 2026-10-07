@@ -20,7 +20,10 @@
 
 ## 🚧 Blocking issues
 
-- [~] **Frontend deploy blocked.** Root cause is local: PowerShell's execution policy blocks `D:\Node.js\npx.ps1`, so `vercel login`, `vercel link` and four `npm i -g vercel` attempts all failed before Vercel was invoked **[SESSION]**
+- [ ] **🔴 Railway plan / account access expired — API production releases blocked** (owner-reported 2026-10-07). Nothing after backend `2ea83b6` is deployed. **Owner action**; agents must not deploy, change Railway or touch production while it lasts. See `CURRENT_STATE.md` top section.
+- [x] **Phase 15 closure** — CLOSED / PASS 2026-10-05 (gates A, B, C; evidence in `CURRENT_STATE.md` top section).
+- [?] **SIG Gate 2 production status** — not recorded in the repositories; owner to confirm.
+- [x] ✅ *Resolved 2026-09-28 (historical item below).* **Frontend deploy blocked.** Root cause is local: PowerShell's execution policy blocks `D:\Node.js\npx.ps1`, so `vercel login`, `vercel link` and four `npm i -g vercel` attempts all failed before Vercel was invoked **[SESSION]**
   - [ ] Run `npx.cmd vercel login` (interactive — **must be the human**, not an agent)
   - [ ] Run `npx.cmd vercel --prod`
   - [x] **Do NOT run `vercel link`** — verified against the Vercel API; the link is correct and the earlier "stale orgId" diagnosis was retracted
@@ -241,15 +244,16 @@
 
 ## Deployment
 
-- [~] **Frontend deploy** — see Blocking issues
-- [x] **API deployed and verified** on Railway, zero downtime
-- [ ] **No CI/CD in either repo** — no GitHub Actions, no pipeline **[REVIEW]**
+- [ ] **API releases blocked by Railway plan/access (2026-10-07)** — see Blocking issues
+- [x] ~~**Frontend deploy**~~ — resolved 2026-09-28; since Phase 13/15E.3 Vercel deploys `main` from GitHub, gated on `test-and-build`
+- [x] **API deployed and verified** on Railway, zero downtime *(2026-09-28; last API deployment on record: `2ea83b6`, 2026-10-04)*
+- [x] ~~**No CI/CD in either repo**~~ — resolved: GitHub Actions `test-and-build` gates merges and deploys in both repos (D-71, D-77) **[REVIEW]**
 - [ ] **No staging environment** **[REVIEW]**
 - [ ] **No error tracking** (no Sentry) — a production frontend exception is invisible unless a user reports it **[REVIEW]**
 - [ ] **No uptime monitoring** — and no `/health` endpoint to monitor **[REVIEW]**
-- [ ] **Vercel project is not Git-connected**, so deploys depend on one developer's local CLI auth on a machine whose shell policy blocks the tooling — a single point of failure **[REVIEW]**
+- [x] ~~**Vercel project is not Git-connected**~~ — resolved: Vercel deploys from GitHub (deployment records on every `main` merge). *Original:* **Vercel project is not Git-connected**, so deploys depend on one developer's local CLI auth on a machine whose shell policy blocks the tooling — a single point of failure **[REVIEW]**
 - [ ] **Node version mismatch** — API pins `"engines": {"node": "22.x"}`; the dev machine runs 24.18 **[REVIEW]**
-- [ ] **Single `master` branch in both repos**, no PR flow, large multi-concern commits (e.g. `1d53f7f` = "Restaurant search, premium monetization UI, and reliability fixes") **[REVIEW]**
+- [x] ~~**Single `master` branch in both repos**~~ — resolved: `main` + PR flow + "Protect main" ruleset. *Original:* **Single `master` branch in both repos**, no PR flow, large multi-concern commits (e.g. `1d53f7f` = "Restaurant search, premium monetization UI, and reliability fixes") **[REVIEW]**
 - [ ] **Decide monorepo / shared types** — two repos, parallel hand-maintained type definitions, different TypeScript majors (6.0 vs 5.9) **[REVIEW]**
 - [?] **Domain/DNS** — a session prompt says `myandijan.uz (UzCloud)`; registrar and DNS host are **not verifiable from the repos** **[REVIEW]**
 
@@ -270,6 +274,8 @@
 ---
 
 ## Counts
+
+> Counts below are the 2026-09-28 tally and were not recomputed after later reconciliations.
 
 | Group | Open `[ ]` | In progress `[~]` | Done `[x]` | Unknown `[?]` |
 | --- | --- | --- | --- | --- |

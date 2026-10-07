@@ -1,8 +1,65 @@
 # CURRENT_STATE — My Andijan
 
-## Current state — 2026-10-04 (authoritative)
+> **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-> This section is the current state. Everything from §0 down is the **2026-09-28 snapshot** with inline updates; where it disagrees with this section, this section wins. Commit and deployment ids elsewhere in these docs are **historical** — they record what was verified at that time, not what runs now.
+## Current state — 2026-10-07 (authoritative)
+
+**Repositories** (verified 2026-10-07: local clones clean, `main` = `origin/main`)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`a74acd8`** | backend PR #21 — Phase 16F.6 |
+| Frontend `myandijan-frontend` | **`69cd618`** | frontend PR #19 — Phase 16F.7 |
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-07; no live probe made)
+
+| | Last deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6` (backend PR #13 merge), status `success` 2026-10-04 12:49 UTC. **No deployment of any later commit.** | **Everything merged to the API after `2ea83b6` is NOT production-live**: backend PRs #10, #14–#21 |
+| **Frontend — Vercel** | **Not verified.** GitHub lists a Vercel Production deployment record for `69cd618` (`success`, 2026-10-06 06:01 UTC); that is not treated as proof of what is live, and the live bundle was not probed | Do not describe frontend `main` as production-live until verified. Features that need the newer API cannot work fully in production anyway (see below) |
+
+**🔴 Production release blocker: Railway.** The Railway plan / account access has expired (reported by the owner, 2026-10-07). The API cannot be deployed until the owner restores it. This is a **deployment/account blocker, not a code blocker**. While it lasts: no deploys, no Railway changes, no production variable changes, no migrations, no production database access.
+
+**Phase 16 — merged to `main`, not production-live on the API side**
+
+| Item | Backend | Frontend | Notes |
+| --- | --- | --- | --- |
+| 16C.1 claim integrity | PR #10 merged 2026-10-05 | PR #6 **open** | Backend half only |
+| 16E.1 claim review context | PR #11 **open** | PR #7 **open** | — |
+| 16E.2 admin event moderation | — | PR #8 merged 2026-10-03 | Uses pre-existing API routes |
+| 16E.3 business review drawer · 16E hours-preserve fix | — | PRs #11, #12 merged 2026-10-05 | — |
+| 16E.4 `GET /admin/businesses/:id` | PR #17 merged 2026-10-05 | — | Not live |
+| 16E.5 admin detail in drawer / edit | — | PR #14 merged 2026-10-05 | Calls 16E.4; until the API deploys it gets 404 and falls back by design (`getAdminBusinessEditDetail`, `src/lib/api.ts`) |
+| 16F.1 noindex not-found pages | — | PR #15 | — |
+| 16F.2 slug integrity · 16F.3 district+city filter | PRs #19, #20 | — | Not live |
+| 16F.4 sitemap fail-closed · 16F.5 events sitemap · 16F.7 real `lastmod` | — | PRs #16, #17, #19 | Generator code only. The committed `public/sitemap-*.xml` were last regenerated 2026-09-29, and `sitemap-events.xml` does not exist yet. Regenerate only after the API (16F.6 `updatedAt`) is live |
+| 16F.6 `updatedAt` on lists; counters stop moving it | PR #21 | PR #18 (docs) | Not live |
+
+**Security governance (SIG Gate 2) — repository artifacts only.** Backend PRs #14 (CI on PostgreSQL 18.6), #15 (database privilege boundary: runbook, SQL, CI proof), #16, #18 (runbook amendments) are merged. Executing `db/privileges/` against production requires the owner's explicit authorization. Whether that happened is **not recorded in the repositories** (the gate record lives outside them, per `RUNBOOK.md`).
+
+**Phase 15 — CLOSED / PASS (2026-10-05).** Source: the owner's canonical Notion project record, confirmed in chat 2026-10-07. **Gate A PASS:** unique production ADMIN / SUPER_ADMIN credentials verified. **Gate B PASS:** backend ruleset `24347110` and frontend ruleset `24347040` active, no bypass actors, `current_user_can_bypass = never`. **Gate C PASS:** production commit `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`, Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` SUCCESS / healthy, 16 migrations clean, 15E.4e session contract verified, staff SMS reset blocked, `multer` 2.4.0. Phase 16 work merged after this closure.
+
+**Release facts for the next API deploy:** `git diff 2ea83b6..a74acd8 -- prisma` is empty, so **no new migrations** (16 migrations, unchanged). The first deploy after the blocker ships every API change in the Phase 16 table at once.
+
+**Open PRs:** backend #11 (16E.1), #1, #2 (Dependabot) · frontend #6 (16C.1), #7 (16E.1), #1, #2 (Dependabot). Frontend #13 was closed unmerged.
+
+**Standing items (last recorded 2026-10-04, not re-verified):** production SMS unconfigured (`ESKIZ_*`), so OTP sign-in and SMS reset answer 503. Residual risks R1–R14 accepted (SECURITY §16.3).
+
+**Tests:** both repositories run unit tests and build in CI (`test-and-build`) on every PR and on `main`. The backend also runs real-PostgreSQL suites. Counts were not re-measured on 2026-10-07.
+
+**Next action**
+
+1. **Owner:** restore Railway plan / access.
+2. **Owner:** confirm SIG Gate 2 production status.
+3. Then, with the owner's authorization: let Railway deploy `main` through the normal CI-gated path, then verify in production (the 16E.4 route answers, `updatedAt` appears on the lists, the slug and district+city behaviour).
+4. Then: regenerate the sitemaps (`npm run sitemap`) in a frontend PR, and verify the admin drawer against the live 16E.4 route.
+5. Remaining Phase 16 pairs: 16C.1 frontend (PR #6), 16E.1 (backend #11 + frontend #7).
+
+---
+
+## Current state — 2026-10-04 (historical — superseded 2026-10-07)
+
+> Superseded by the 2026-10-07 section above. Kept as the record of the Phase 15 closeout. **Phase 15 was subsequently CLOSED / PASS on 2026-10-05** (gates A, B, C — top section); the "not yet closed" / "open gates" / "frozen" statements below are historical. Everything from §0 down is the **2026-09-28 snapshot** with inline updates. Commit and deployment ids elsewhere in these docs are **historical** — they record what was verified at that time, not what runs now.
 
 **Production**
 
@@ -241,7 +298,7 @@ In order, newest first:
 
 ## 9. What should logically happen next
 
-> **Current next steps (2026-10-04):** close Phase 15 — gates **A** (unique ADMIN / SUPER_ADMIN credentials), **B** (confirm ruleset bypass lists are empty) and **C** (final short closure audit) — then release Phase 16 in order: PR #10 + #6 (16C.1), then PR #11 + #7 (16E.1). The ordered list below is the 2026-09-28 plan; items 1, 4, 5, 6, 7 (CORS, throttling on `/auth/*`) and 9 are done, item 3 (Eskiz) is still open, `/docs` remains public by decision (SECURITY §16.3 R8), and items 2, 8 and 10 were not re-verified in this reconciliation.
+> *(Superseded 2026-10-07 — current next action: top section. Phase 15 closed / PASS 2026-10-05.)* **Next steps as of 2026-10-04:** close Phase 15 — gates **A** (unique ADMIN / SUPER_ADMIN credentials), **B** (confirm ruleset bypass lists are empty) and **C** (final short closure audit) — then release Phase 16 in order: PR #10 + #6 (16C.1), then PR #11 + #7 (16E.1). The ordered list below is the 2026-09-28 plan; items 1, 4, 5, 6, 7 (CORS, throttling on `/auth/*`) and 9 are done, item 3 (Eskiz) is still open, `/docs` remains public by decision (SECURITY §16.3 R8), and items 2, 8 and 10 were not re-verified in this reconciliation.
 
 Ordered. Rationale given because the order is not arbitrary.
 

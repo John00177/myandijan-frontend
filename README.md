@@ -5,7 +5,7 @@ Frontend for **MyAndijan** — a multilingual business directory and city guide 
 Built with React 19 + TypeScript on Vite, styled with Tailwind CSS.
 
 > **📖 Full project documentation — architecture, database, API, decisions, roadmap — is in [`docs/my-andijan/`](docs/my-andijan/).**
-> **New to this project (human or AI)? Start at [`docs/my-andijan/HANDOFF_INDEX.md`](docs/my-andijan/HANDOFF_INDEX.md).**
+> **New to this project (human or AI)? Start at [`docs/my-andijan/CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md) (top section)** — map: [`docs/my-andijan/intelligence/PROJECT_MEMORY.md`](docs/my-andijan/intelligence/PROJECT_MEMORY.md). AI agents: [`AGENTS.md`](AGENTS.md). Parts of this README below are as of 2026-09-28.
 
 ---
 
@@ -15,8 +15,8 @@ This is one half of the project.
 
 | Repo | Path | Role | Hosting |
 | --- | --- | --- | --- |
-| **`myandijan-frontend`** (this one) | `~/Desktop/myandijan-frontend` | React 19 SPA | Vercel — [myandijan.uz](https://myandijan.uz) |
-| **`my-andijan-api`** | `~/Desktop/my-andijan-api` | NestJS 10 + Prisma 5 + PostgreSQL | Railway — [`…up.railway.app`](https://myandijan-api-production.up.railway.app) |
+| **`myandijan-frontend`** (this one) | `D:\My-Andijan-Work\myandijan-frontend` | React 19 SPA | Vercel — [myandijan.uz](https://myandijan.uz) |
+| **`my-andijan-api`** | `D:\My-Andijan-Work\my-andijan-api` | NestJS 10 + Prisma 5 + PostgreSQL | Railway — [`…up.railway.app`](https://myandijan-api-production.up.railway.app) |
 
 There is no monorepo tooling and no shared type package, so a contract change needs both repos.
 
@@ -190,9 +190,11 @@ Inputs are 16px (`text-base`) to prevent iOS Safari zooming on focus.
 
 ## Testing
 
-**There are no tests in either repository.** No test files, no runner, no `test` script — across 118 API routes and 132 components.
+*(Updated 2026-10-07.)* Vitest suites live next to the code (`__tests__/`). CI (`test-and-build`) runs tests and the build on every pull request and on `main`, and gates merges and production deploys. The API has its own Jest unit and real-PostgreSQL suites.
 
-Until that changes, verify manually:
+```bash
+npm test
+```
 
 ```bash
 npm run build
@@ -203,8 +205,6 @@ npm run lint
 ```
 
 Then exercise the affected flow in the browser, in all three languages, and at 375px width.
-
-If you add tests, the highest-value targets are listed in [`docs/my-andijan/TODO.md`](docs/my-andijan/TODO.md) — the role hierarchy, the OTP limits, ownership scoping, and the `normalizeBusiness` API boundary.
 
 ## Deployment
 
@@ -231,13 +231,16 @@ npx.cmd vercel --prod
 
 ### Current deployment status
 
-Both are deployed and **current** as of 2026-09-28 — the API from `main` via `railway up`, and the frontend serving a bundle byte-identical to a local build of `main`. Neither platform auto-deploys from GitHub, so re-verify after any new commit. See [`CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md).
+*(Updated 2026-10-07.)* Both platforms deploy `main` from GitHub after `test-and-build` passes. **API releases are currently blocked** — the Railway plan/access has expired, and the last API deployment on record is `2ea83b6` (2026-10-04). Merged API work after it is not live. Always check [`CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md) before assuming anything is in production. *(Historical, 2026-09-28: both deployed manually via `railway up` and the Vercel CLI.)*
 
 ## Documentation
 
 | Document | Covers |
 | --- | --- |
-| [`HANDOFF_INDEX.md`](docs/my-andijan/HANDOFF_INDEX.md) | **Start here** — entry point, current status, priorities |
+| [`CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md) | **Start here** — top section is the current state |
+| [`intelligence/`](docs/my-andijan/intelligence/PROJECT_MEMORY.md) | Memory map, contract and update protocol, agent guide |
+| [`ENGINEERING_RULES.md`](docs/my-andijan/ENGINEERING_RULES.md) | Do-not-break rules, conventions, commands (both repos) |
+| [`HANDOFF_INDEX.md`](docs/my-andijan/HANDOFF_INDEX.md) | Historical 2026-09-28 handoff and audit |
 | [`MASTER_CONTEXT.md`](docs/my-andijan/MASTER_CONTEXT.md) | Product vision, users, scope, decisions, constraints |
 | [`CURRENT_STATE.md`](docs/my-andijan/CURRENT_STATE.md) | What works, what doesn't, known bugs, technical debt |
 | [`ARCHITECTURE.md`](docs/my-andijan/ARCHITECTURE.md) | Actual architecture across both repos |
