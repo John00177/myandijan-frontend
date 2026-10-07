@@ -345,7 +345,9 @@ Two practical notes, learned the hard way in this session: Python's default `cp1
 
 ## Phase 15 — security hardening and closeout (2026-10-02 → 10-04)
 
-**Current state (2026-10-04, authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
+> *The "current state" line below was current on 2026-10-04 and is superseded; **Phase 15 was CLOSED / PASS on 2026-10-05** (gates A, B, C). Current state: [`CURRENT_STATE.md`](CURRENT_STATE.md) top section.*
+
+**State as of 2026-10-04 (then authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
 
 - **15E.2** (D-76): authentication codes never logged/returned, `crypto.randomInt`, one live code per phone + purpose, per-phone wrong-guess budget, atomic single use, no OTP sign-in for staff, fail-closed SMS (503 while `ESKIZ_*` is unset — still the case).
 - **15E.3 / 15E.7.1** (D-77): CI hardened in both repositories; Railway waits for CI; Vercel production waits for the `test-and-build` status; "Protect main" rulesets.
@@ -354,3 +356,17 @@ Two practical notes, learned the hard way in this session: Python's default `cp1
 - **Phase 15 is NOT yet officially closed.** Open gates: **A** unique ADMIN / SUPER_ADMIN credentials · **B** confirm the `main` ruleset bypass lists are empty · **C** final short closure audit.
 - **Phase 16:** 16E.2 (frontend) is already on `main`; PR #10 + #6 (16C.1) then PR #11 + #7 (16E.1) stay **frozen** until Phase 15 closes.
 - **Where to look:** `CURRENT_STATE.md` (current-state section), `SECURITY.md` §15–§16, `PHASE_15E4_REFRESH_TOKEN_ARCHITECTURE.md`, `PHASE_15E4D_ACCESS_TOKEN_SESSION_BINDING_ARCHITECTURE.md`.
+
+## Phase 16 and SIG Gate 2 — merged work (2026-10-03 → 10-06)
+
+Recorded 2026-10-07 from Git history (both repositories) and GitHub's PR and Deployments APIs. Detail per item: `CURRENT_STATE.md` top section.
+
+- **Backend** (`2ea83b6` → `a74acd8`): PR #10 16C.1 claim integrity · #14 CI database suites on PostgreSQL 18.6 (SIG Gate 2, U14) · #15 SIG Gate 2 database privilege boundary (runbook, SQL, CI proof) · #16 and #18 runbook amendments (F-6/F-7, R-E4) · #17 16E.4 `GET /admin/businesses/:id` · #19 16F.2 slug integrity · #20 16F.3 district AND city filter · #21 16F.6 `updatedAt` on lists, counters no longer move it. No Prisma migration added.
+- **Frontend** (`a336787` → `69cd618`): PR #11 16E.3 business review drawer · #12 16E hours-preserve fix · #14 16E.5 admin detail integration (404 fallback until the API deploys) · #15 16F.1 noindex not-found pages · #16 16F.4 sitemap fail-closed · #17 16F.5 events sitemap · #18 16F.6 API docs · #19 16F.7 sitemap `lastmod`.
+- **Production:** the last Railway deployment on record is `2ea83b6` (2026-10-04), so none of the backend items above are live. GitHub lists a Vercel Production deployment record for `69cd618` (2026-10-06); frontend production state is not verified. On 2026-10-07 the owner reported Railway plan/access expired: a release blocker.
+- **Phase 15:** CLOSED / PASS 2026-10-05 (gates A, B, C — owner's Notion record; evidence in `CURRENT_STATE.md` top section). Phase 16 merged after it.
+- **Not recorded in the repositories:** SIG Gate 2 production execution. Owner to confirm.
+
+## 2026-10-07 — shared project memory system (D-78)
+
+Documentation/instructions only; no application code, schema, infrastructure or production change. Added root `AGENTS.md` to both repos (identical); shortened both `CLAUDE.md` files and moved their still-valid rules to `ENGINEERING_RULES.md`; added `intelligence/` (memory map, contract and update protocol, agent guide, architecture, knowledge model, planned AI Brain); made `CURRENT_STATE.md` the recovery entry point with a 2026-10-07 state section; marked superseded "current state" blocks in `HANDOFF_INDEX.md`, `MASTER_CONTEXT.md`, `CHATGPT_CONTEXT.md` and this file.
