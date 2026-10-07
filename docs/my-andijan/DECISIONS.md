@@ -54,7 +54,7 @@
 
 ### D-08 · Extract `BusinessClaim`; remove `claimedAt`/`claimedById` 🔒 LOCKED
 **Rationale (schema).** *"A business may be claimed, rejected, and re-claimed — that history is an entity, not two columns."* And: *"claim history now lives in business_claims. Ownership is expressed solely by ownerId, which is set when a claim is approved."*
-**Known gap, documented at the time.** *"'only one PENDING claim per business' cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer."* Still unenforced at the database level.
+**Known gap, documented at the time.** *"'only one PENDING claim per business' cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer."* **Closed in Phase 16H** with a raw-SQL partial unique index on `(business_id, claimant_id) WHERE status = 'PENDING'` — scoped per claimant, not per business, because competing claims are a supported flow (D-60: approving one rejects the rest).
 
 ### D-09 · Defer advertising to Phase 2, but keep the table 🔒 LOCKED
 **Rationale (schema).** *"DEFERRED TO PHASE 2 (ships with Click payments). Table retained so the module attaches without a core migration. MVP promotion is handled by Business.isPromoted / isFeatured."*

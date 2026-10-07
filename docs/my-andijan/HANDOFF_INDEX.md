@@ -202,7 +202,7 @@ Plus [`my-andijan-api/CLAUDE.md`](../../../my-andijan-api/CLAUDE.md) in the API 
 | **There is 3D / immersive content** | None. A genuine blank. |
 | **The 15-minute session timeout should be fixed by raising the TTL** | Implement client-side refresh instead — the server side already works. |
 | **Soft deletes are enforced by the database** | They are application-level only. A query that forgets `deletedAt: null` returns deleted rows. |
-| **"One pending claim per business" is enforced** | The schema says it needs a partial index and is service-layer only. |
+| **"One pending claim per business" is enforced** | Since Phase 16H it is one pending claim per **(business, claimant)**, enforced by a partial unique index; several people can still have competing pending claims on one listing. |
 | **A product spec exists** | No PRD, business plan, pricing rationale, launch plan, or design file exists in either repo. |
 
 ---

@@ -76,7 +76,7 @@ Read this section before trusting anything you see.
 | **There is no `/health` endpoint** and there never was. | Use `GET /categories` as a liveness probe. |
 | **There is no global `/api` prefix.** | Routes are `/auth/login`, not `/api/auth/login`. Several earlier specs got this wrong. |
 | **Soft deletes are not enforced by the database.** | Application-level only. A query that omits `deletedAt: null` returns deleted rows. |
-| **"One pending claim per business" is not enforced.** | The schema says it needs a partial index and is service-layer only today. |
+| ~~**"One pending claim per business" is not enforced.**~~ | ✅ Phase 16H: enforced per (business, claimant) by a partial unique index; competing claimants are allowed by design. |
 
 ---
 
