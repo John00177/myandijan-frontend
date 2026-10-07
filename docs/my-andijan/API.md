@@ -268,7 +268,7 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 > `GET /me/businesses` returns a lean shape without description or branch phone/address/district — which is why `GET /me/businesses/:id` exists and why the edit modal opens with real data rather than a partially blank form.
 
-**`POST /me/claims` (`CreateClaimDto`) — added Phase 9.** Any authenticated user (class-level `JwtAuthGuard`; no role floor — a claim is how an unverified representative first establishes a relationship to a listing). Body: `businessId` (int, required), `evidence?` (≤2000), `contactPhone?` (≤20), `contactNote?` (≤1000). Response: the new `BusinessClaim` (`status: "PENDING"`) with `business: {id, slug, name}`.
+**`POST /me/claims` (`CreateClaimDto`) — added Phase 9.** Any authenticated user (class-level `JwtAuthGuard`; no role floor — a claim is how an unverified representative first establishes a relationship to a listing). Body: `businessId` (int, required), `evidence?` (≤2000), `contactPhone?` (≤20), `contactNote?` (≤1000). Response: the new `BusinessClaim` (`status: "PENDING"`) with `business: {id, slug, name}`. **Phase 16H:** a second pending claim by the same user for the same listing is `409` *"You already have a pending claim for this business"* even when both requests race (database partial unique index); a claim that loses a race with an approval of another claim is `409` *"This business is already claimed or no longer open to claims"* (or, if it committed first, is auto-rejected by that approval).
 
 | Status | When |
 | --- | --- |
@@ -291,9 +291,9 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`). Since Phase 16F.6 the `viewCount` increment is a plain SQL update that does **not** move the business's `updatedAt` (same for favourite ±1 and RSVP `attendeeCount` +1 — `src/common/counters.ts`) | **⭕** |
-| POST | `/analytics/click` | — | Record a click (`RecordClickDto`) | **⭕** |
-| POST | `/analytics/search` | — | Record a search (`RecordSearchDto`) | **⭕** |
+| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`). Since Phase 16F.6 the `viewCount` increment is a plain SQL update that does **not** move the business's `updatedAt` (same for favourite ±1 and RSVP `attendeeCount` +1 — `src/common/counters.ts`). Since Phase 16G.1 one view per client (address + user-agent) per business per 30 min is recorded; repeats answer the same `{ success: true }` and write nothing (`AnalyticsGate`, which also caps each address at 300 events / 10 min across all three collectors) | **⭕** |
+| POST | `/analytics/click` | — | Record a click (`RecordClickDto`). Phase 16G.1: the same click again within 10 s is not recorded | **⭕** |
+| POST | `/analytics/search` | — | Record a search (`RecordSearchDto`). Phase 16G.1: the same query + filters (case/space-insensitive) within a minute is not recorded | **⭕** |
 
 > **⚠ The single most consequential gap in the API surface.** These three are the only writers for `BusinessAnalytics`, `SearchAnalytics` and `ActivityLog`, and **the frontend calls none of them.** Every owner and admin analytics screen therefore reads from tables nothing populates. Wiring these is a small change with large downstream effect.
 > They are also **unauthenticated and unthrottled** — see `SECURITY.md`.

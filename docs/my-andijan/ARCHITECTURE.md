@@ -401,7 +401,7 @@ Review (branchId, userId, rating, title?, comment, photos String[])
 
 **Per-language SEO overrides** live on the business itself (`metaTitleUz/Ru/En`, `metaDescriptionUz/Ru/En`), falling back to generated values when null.
 
-**Claims:** `BusinessClaim` captures `evidence`, `contactPhone`, `contactNote`, reviewer and rejection reason. The schema notes that *"only one PENDING claim per business" cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer.*
+**Claims:** `BusinessClaim` captures `evidence`, `contactPhone`, `contactNote`, reviewer and rejection reason. One `PENDING` claim per (business, claimant) is enforced by the partial unique index `business_claims_one_pending_per_claimant` (Phase 16H, raw-SQL migration — Prisma cannot model it); competing claims from different people are allowed and resolved at approval.
 
 ---
 
@@ -791,7 +791,7 @@ Through the existing `AdminService.writeAudit` (`AuditLog`): approve writes `UPD
 
 ### Deliberately not implemented (non-blocking)
 
-- **Duplicate-submission race** — `createClaim`'s "no PENDING claim by this user" check is check-then-insert; two simultaneous submissions could create two `PENDING` rows. Bounded: approving either auto-rejects the other. A partial unique index (`TODO.md`) would close it at the DB level.
+- ~~**Duplicate-submission race**~~ ✅ **Closed in Phase 16H** — the partial unique index refuses the second `PENDING` row (reported as `409`), and `createClaim` re-checks the listing under a `FOR SHARE` lock so a claim racing an approval is refused or auto-rejected. *Was:* check-then-insert, so two simultaneous submissions could create two `PENDING` rows.
 - **Claim-creation audit entry** — see above.
 - **`GET /admin/claims/:id`** — the list already returns full detail.
 - **Pending state on the business page after reload** — the CTA reappears (the page doesn't fetch the caller's claims); a resubmit returns the 409 conflict message. Status is authoritative on `ProfilePage`.

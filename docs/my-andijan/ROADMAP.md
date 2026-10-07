@@ -84,7 +84,7 @@ Four changes, all small, all high-value:
 - ~~**Restrict CORS** from `app.enableCors()` to the known origins~~ — ✅ **DONE, Phase 15B**
 - **Gate or disable `/docs` in production** — it currently publishes all 118 routes and every DTO
 - ~~**Add `@nestjs/throttler`**~~ — ✅ **DONE for `/auth/*`, Phase 15B** (per-address + per-phone). Still open: `/analytics/*`, `/search`, `/upload/*`, `POST /businesses`
-- **Throttle or authenticate `POST /analytics/*`** — unauthenticated writes that can poison analytics and grow tables without bound
+- ✅ ~~**Throttle or authenticate `POST /analytics/*`**~~ — Phase 16G.1: de-duplicated and capped per client/address, arrays bounded (still public by design)
 
 See `SECURITY.md` for the full ranked list.
 
@@ -184,7 +184,7 @@ Cuisine, price bucket, tags and delivery time are derived from `Math.sin(id * k)
 - **Image deletion / orphan cleanup** — uploads are public and permanent
 
 ### 31. Structural cleanups · **[OBSERVED]**
-- Add a partial unique index for **one pending claim per business** (the schema says this is service-layer-only today)
+- ✅ ~~Add a partial unique index for **one pending claim per business**~~ — Phase 16H, per (business, claimant)
 - Consolidate `Business.coverUrl` vs `coverPhoto` (three overlapping image fields)
 - Add DB constraints: `Review.rating` 1–5, `Event.endAt > startAt`
 - Convert `BusinessRecommendation.type`/`priority` and the free-string `metricType`/`actionType` to enums

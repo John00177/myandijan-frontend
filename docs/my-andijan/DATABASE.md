@@ -304,7 +304,7 @@ Indexes: `[branchId, sortOrder]`, `[branchId, isPrimary]`. Added in migration `2
 
 Indexes: `[businessId, status]`, `claimantId`, `[status, createdAt]`.
 
-> **⚠ Unenforced invariant, stated in the schema:** *"'only one PENDING claim per business' cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer."* **This is a database-level gap that depends on application discipline.** A partial unique index (`CREATE UNIQUE INDEX … WHERE status = 'PENDING'`) could be added via raw SQL in a migration.
+> **✅ Enforced since Phase 16H (API branch `feat/16h-claim-pending-unique`, ships with its migration on the next API deploy): partial unique index `business_claims_one_pending_per_claimant` on `(business_id, claimant_id) WHERE status = 'PENDING'`.** Created by raw SQL in migration `20261007090000_phase16h_claim_pending_unique` (Prisma cannot model a partial index; its drift detection skips partial indexes, so `migrate dev` leaves it alone). Several `PENDING` claims from **different** claimants remain allowed — they compete, and approving one rejects the rest. The migration first closes any existing duplicate pairs (keeps the earliest, marks the rest `REJECTED` with a reason; deletes nothing). *Previously:* service-layer only.
 
 ---
 
@@ -461,7 +461,7 @@ Read via `GET /admin/audit`. **Deliberately distinct from `ActivityLog`** — th
 ### 14.1 `BusinessAnalytics` → `business_analytics`
 **Date-grain: one row per business per day.**
 
-`businessId` (FK → `Business`, **no onDelete specified** → Prisma default `Restrict`), `date @db.Date`, then counters: `pageViews`, `callClicks`, `directionClicks`, `favoriteClicks`, `shareClicks`, `websiteClicks` (all Int default 0), plus `searchQueries String[]` (top terms that led here) and `visitorCities Int[]` (anonymized city IDs).
+`businessId` (FK → `Business`, **no onDelete specified** → Prisma default `Restrict`), `date @db.Date`, then counters: `pageViews`, `callClicks`, `directionClicks`, `favoriteClicks`, `shareClicks`, `websiteClicks` (all Int default 0), plus `searchQueries String[]` (top terms that led here) and `visitorCities Int[]` (anonymized city IDs). Since Phase 16G.1 the two arrays are appended with plain SQL only while the day's row holds fewer than **200** / **1000** elements (`MAX_SEARCH_QUERIES_PER_DAY`, `MAX_VISITOR_CITIES_PER_DAY` in `analytics.service.ts`); the counters are not capped.
 
 **Constraint:** `@@unique([businessId, date])`. Indexes: `businessId`, `date`.
 
@@ -601,7 +601,7 @@ Demo/sample content. Not wired into the `prisma.seed` key — run manually.
 
 | # | Severity | Problem |
 | --- | --- | --- |
-| 1 | Medium | **`BusinessClaim` "one PENDING claim per business" is not enforced by the database.** Needs a partial unique index; currently service-layer only. |
+| 1 | ~~Medium~~ ✅ | ~~**`BusinessClaim` "one PENDING claim per business" is not enforced by the database.**~~ **Fixed — Phase 16H:** partial unique index per (business, claimant). |
 | 2 | Medium | **`Review.rating` has no range constraint.** Nothing at the DB level prevents `rating = 99`. |
 | 3 | Medium | **`Event` has no `endAt > startAt` check**, and no constraint linking `isFree` to `price`. |
 | 4 | Medium | **Three overlapping cover-image fields on `Business`**: `logoUrl`, `coverUrl`, `coverPhoto`. `coverUrl` and `coverPhoto` duplicate each other and the frontend has to fall back between them. |
