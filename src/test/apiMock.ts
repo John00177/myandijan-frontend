@@ -13,6 +13,8 @@ import type {
   EventDetail,
   MenuItem,
   MyClaim,
+  MyStats,
+  OwnerAnalyticsOverview,
   PaginatedResponse,
   Region,
 } from "../types";
@@ -196,6 +198,25 @@ export const mockMyBusiness = {
 export const getBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinesses = vi.fn().mockResolvedValue([mockMyBusiness]);
+
+export const mockMyStats: MyStats = {
+  businessCount: 1,
+  totalReviews: 4,
+  avgRating: 4.5,
+  upcomingEvents: 0,
+  pendingClaims: 0,
+  healthScore: { average: 72, businessesScored: 1, openRecommendations: 2 },
+};
+export const getMyStats = vi.fn().mockResolvedValue(mockMyStats);
+
+export const mockOwnerOverview: OwnerAnalyticsOverview = {
+  pageViews: { current: 128, previous: 100, change: "+28%" },
+  callClicks: { current: 6, previous: 10, change: "-40%" },
+  directionClicks: { current: 0, previous: 0, change: "0%" },
+  favorites: { current: 3, previous: 0, change: "+100%" },
+  avgRating: { current: 4.5, previous: 4.4, change: "+0.1" },
+};
+export const getMyAnalyticsOverview = vi.fn().mockResolvedValue(mockOwnerOverview);
 export const createMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
 export const updateMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
 export const deleteMenuItem = vi.fn().mockResolvedValue(undefined);

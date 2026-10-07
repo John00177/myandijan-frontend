@@ -27,7 +27,7 @@ export default function BusinessDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, t } = useLanguage();
   const { user, can } = useAuth();
-  const { business, loading, notFound, error, reload } = useBusiness(slug ?? "", lang);
+  const { business, loading, notFound, error, reload } = useBusiness(slug ?? "", lang, user);
   const [activeTab, setActiveTab] = useState<DetailTab>("about");
 
   if (loading) {

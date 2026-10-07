@@ -33,6 +33,7 @@ import type {
   MyEvent,
   MyReview,
   MyStats,
+  OwnerAnalyticsOverview,
   PaginatedResponse,
   Region,
   Review,
@@ -1142,6 +1143,11 @@ export function updateAdminCategory(id: number, payload: AdminCategoryPayload): 
 
 export function getMyStats(): Promise<MyStats> {
   return request<MyStats>("/me/stats");
+}
+
+/** Last 7 days vs the previous 7, across the caller's businesses (Phase 16G.2). */
+export function getMyAnalyticsOverview(): Promise<OwnerAnalyticsOverview> {
+  return request<OwnerAnalyticsOverview>("/me/analytics/overview");
 }
 
 export function getMyBusinesses(): Promise<MyBusiness[]> {
