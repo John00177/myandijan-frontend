@@ -675,6 +675,27 @@ export interface MyStats {
   };
 }
 
+/** One metric of GET /me/analytics/overview: the last 7 days vs the 7 before. */
+export interface OverviewMetric {
+  current: number;
+  previous: number;
+  /** Server-formatted: "+12%", "0%", "-30%" (counts) or "+0.3" (rating). */
+  change: string;
+}
+
+/**
+ * GET /me/analytics/overview — AnalyticsService.getOverview on the backend.
+ * Summed over every business the caller owns. Counts are what the anonymous
+ * collectors recorded (de-duplicated per visitor since API Phase 16G.1).
+ */
+export interface OwnerAnalyticsOverview {
+  pageViews: OverviewMetric;
+  callClicks: OverviewMetric;
+  directionClicks: OverviewMetric;
+  favorites: OverviewMetric;
+  avgRating: OverviewMetric;
+}
+
 export interface MyReview {
   id: number;
   rating: number;
