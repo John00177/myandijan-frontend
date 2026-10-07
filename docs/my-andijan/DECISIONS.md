@@ -511,6 +511,20 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 
 ---
 
+## Project memory (2026-10-07)
+
+### D-78 · One canonical project memory in `myandijan-frontend/docs/my-andijan/`; explicit source-of-truth hierarchy 🔓 REVISITABLE
+**Decision (2026-10-07, pending the owner's review of the PR that adds it).**
+1. **Hierarchy:** GitHub code/history > canonical project memory (`docs/my-andijan/`) > `AGENTS.md` / `CLAUDE.md` > Notion > SAFE (`D:\My-Andijan-SAFE`) > conversational/vendor AI memory. Vendor AI memory is convenience only and never authoritative.
+2. **One home:** canonical memory for both repositories stays in `myandijan-frontend/docs/my-andijan/`. Each repository keeps its own root `AGENTS.md` (identical in both) and `CLAUDE.md` (repo-specific, short). Backend work records its memory update through a `docs/` PR in the frontend repository.
+3. **Recovery entry point:** `CURRENT_STATE.md` top section. Domain documents are read on demand. History is append-only and marked, never deleted.
+4. **Memory-update protocol** after every major implementation session: `intelligence/MEMORY_CONTRACT.md` §4.
+5. **No vector database / RAG corpus / cloud memory service.** The planned AI Brain (`intelligence/BRAIN_ARCHITECTURE.md`) is not implemented and needs its own decision.
+**Alternatives rejected:** moving memory to the API repo; mirroring it in both repos (drift); a third repository (needs the owner's approval; not justified yet); a Git submodule (tooling friction). Reasoning: `intelligence/MEMORY_ARCHITECTURE.md` §3.
+**Revisit when:** a third codebase appears, or the frontend-repo coupling becomes a real cost.
+
+---
+
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

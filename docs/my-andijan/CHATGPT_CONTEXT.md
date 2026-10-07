@@ -8,6 +8,8 @@
 
 ## 1. Read these three first, in this order
 
+> *Updated 2026-10-07:* start with [`CURRENT_STATE.md`](CURRENT_STATE.md) **top section** instead of `HANDOFF_INDEX.md`, which is now the historical 2026-09-28 handoff. Then `DECISIONS.md`. Map: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). The table below is the original 2026-09-28 order.
+
 | Order | Document | Why |
 | --- | --- | --- |
 | 1 | [`HANDOFF_INDEX.md`](HANDOFF_INDEX.md) | Status, blockers, priorities, and a full audit. ~15 min. |
@@ -191,7 +193,9 @@ Full analysis in [`SECURITY.md`](SECURITY.md).
 
 ## Phase 15 — security hardening and closeout (2026-10-02 → 10-04)
 
-**Current state (2026-10-04, authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
+> *Historical — superseded 2026-10-07.* **Phase 15 was CLOSED / PASS on 2026-10-05** (gates A, B, C); the open-gate and "frozen" lines below are historical. **For facts, read [`CURRENT_STATE.md`](CURRENT_STATE.md) top section** (backend `a74acd8`, frontend `69cd618`, Phase 16 through 16F.6 / 16F.7 merged, API not deployed past `2ea83b6` — Railway release blocker). This brief's working agreement (§6–§11) still applies; its counts and status lines (118 routes, "zero tests", "production running an older build") are 2026-09-28 values. Memory rules for a reviewer: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md).
+
+**State as of 2026-10-04 (then authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
 
 - **15E.2** (D-76): authentication codes never logged/returned, `crypto.randomInt`, one live code per phone + purpose, per-phone wrong-guess budget, atomic single use, no OTP sign-in for staff, fail-closed SMS (503 while `ESKIZ_*` is unset — still the case).
 - **15E.3 / 15E.7.1** (D-77): CI hardened in both repositories; Railway waits for CI; Vercel production waits for the `test-and-build` status; "Protect main" rulesets.

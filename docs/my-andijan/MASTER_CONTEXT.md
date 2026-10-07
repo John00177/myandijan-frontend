@@ -145,7 +145,9 @@ The schema encodes the MVP boundary explicitly with comments. **In scope now:**
 
 ## 8. Project status
 
-### 8.0 Current status — 2026-10-04 (authoritative)
+> **Current status lives in [`CURRENT_STATE.md`](CURRENT_STATE.md) (top section), not here** (since 2026-10-07, D-78). As of 2026-10-07: **Phase 15 CLOSED / PASS (2026-10-05)**; backend `main` `a74acd8`, frontend `main` `69cd618`; Phase 16 through 16F.6 / 16F.7 merged; **the API is not deployed past `2ea83b6` because Railway plan/access has expired** (owner-reported release blocker). The tables below are historical.
+
+### 8.0 Status as of 2026-10-04 (historical — superseded 2026-10-07)
 
 | Area | Status |
 | --- | --- |
