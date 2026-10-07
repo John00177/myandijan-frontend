@@ -370,3 +370,14 @@ Recorded 2026-10-07 from Git history (both repositories) and GitHub's PR and Dep
 ## 2026-10-07 — shared project memory system (D-78)
 
 Documentation/instructions only; no application code, schema, infrastructure or production change. Added root `AGENTS.md` to both repos (identical); shortened both `CLAUDE.md` files and moved their still-valid rules to `ENGINEERING_RULES.md`; added `intelligence/` (memory map, contract and update protocol, agent guide, architecture, knowledge model, planned AI Brain); made `CURRENT_STATE.md` the recovery entry point with a 2026-10-07 state section; marked superseded "current state" blocks in `HANDOFF_INDEX.md`, `MASTER_CONTEXT.md`, `CHATGPT_CONTEXT.md` and this file.
+
+## 2026-10-07 — Phase 16G and 16H: code complete, not deployed
+
+Recorded from Git, GitHub's PR / check-run / Deployments APIs (read-only). No production change.
+
+- **16H** — backend PR #24 (`7a3a7dd`): one PENDING claim per (business, claimant) enforced by a partial unique index (migration `20261007090000_phase16h_claim_pending_unique`, which first closes existing duplicates); `createClaim` maps the violation to 409 and re-checks the listing under `FOR SHARE`, so a claim racing an approval is refused or auto-rejected. CI passed including the real-PostgreSQL suites (forced races; migration on top of duplicates; zero schema drift — Prisma 5.22 skips partial indexes).
+- **16G.1** — backend PR #23 (`523d782`): `AnalyticsGate` de-duplicates the anonymous view/click/search collectors per visitor (address + user-agent), caps each address, and bounds the day's `visitorCities` / `searchQueries` arrays. Not `@nestjs/throttler` (global module; would change the auth limits).
+- **16G.2** — frontend PR #22 (`41fb0fa`): owner dashboard "So'nggi 7 kun" panel from `GET /me/analytics/overview`; no view recorded when the viewer owns the listing.
+- **Docs** — frontend PR #21 (`c03a625`).
+- **Production:** last API deployment still `2ea83b6`; none of the above is live. The next API deploy carries exactly one new migration (the 16H one). Railway access is the blocker (owner).
+- **Where to look:** `CURRENT_STATE.md` top section; `TODO.md` (16H, analytics items); `SECURITY.md` §15 table and §16.3 R1; `DATABASE.md` (`BusinessClaim`, `BusinessAnalytics`).

@@ -302,7 +302,7 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 | Method | Path | Purpose | FE |
 | --- | --- | --- | --- |
-| GET | `/me/analytics/overview` | Summary | **⭕** |
+| GET | `/me/analytics/overview` | Summary: the last 7 days vs the previous 7, over all the caller's businesses | ✅ **(Phase 16G.2)** — owner dashboard home panel |
 | GET | `/me/analytics/traffic` | Time series (`TrafficQueryDto`) | **⭕** |
 | GET | `/me/analytics/demographics` | Visitor cities | **⭕** |
 | GET | `/me/analytics/search-terms` | Terms that led to the business | **⭕** |

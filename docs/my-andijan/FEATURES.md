@@ -168,7 +168,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Multi-branch management | **PARTIALLY IMPLEMENTED** | `POST /me/businesses/:id/branches` + `PATCH /me/branches/:id` exist; branch **creation** has no UI |
 | Menu / product & service catalog management | **IMPLEMENTED (Phase 10)** | `InventoryView` on the real API (`GET /me/businesses/:id/menu` + POST/PATCH/DELETE): create/edit name, type (product/service), category, price, description, photo; publish/hide (`isActive`); delete with confirmation; business picker. Mock data and SKU/quantity removed (D-61). See `ARCHITECTURE.md` §27 |
 | Catalog on business detail page (customer) | **IMPLEMENTED** | `MenuSection` → public `GET /businesses/:id/menu` (APPROVED businesses, published items only — Phase 10). Loading, empty, and **error + retry** (Phase 10) states, localized uz/ru/en |
-| Owner analytics | **PARTIALLY IMPLEMENTED** | 6 endpoints exist; no UI, and the source tables are empty |
+| Owner analytics | **PARTIALLY IMPLEMENTED** | 6 endpoints. Collection is wired from the frontend (Phase 4) and de-duplicated/capped server-side since Phase 16G.1 (API PR #23, merged, not deployed). The 7-day overview has a UI since Phase 16G.2 (frontend PR #22); the other five endpoints have none |
 | Health score for owners | **PARTIALLY IMPLEMENTED** | Full engine + localized recommendations; **no UI** |
 | **Owner settings (hours)** | **BROKEN** | Form saves nothing |
 | Ads management | **PLANNED** | Honest "coming soon" empty state |
@@ -251,9 +251,9 @@ See `AI.md`.
 | --- | --- | --- |
 | Analytics schema | **IMPLEMENTED** | `BusinessAnalytics` (daily grain), `SearchAnalytics`, `ActivityLog`, `PlatformMetric` |
 | Ingestion endpoints | **IMPLEMENTED** | `POST /analytics/view\|click\|search` |
-| **Ingestion wiring** | **PARTIALLY IMPLEMENTED** | **Phase 4 (2026-09-29):** wired from the frontend — `useBusiness` fires a view on initial business-detail load; `ActionButtons` fires a click for CALL/DIRECTION/SHARE/FAVORITE; `useSearchBusinesses` fires a search (query + district/city + result count) whenever a text query resolves. Not yet wired: WEBSITE clicks (no website link exists in the current UI) and category-id attribution on search (the UI only has the category *slug*, not its numeric id). |
+| **Ingestion wiring** | **PARTIALLY IMPLEMENTED** | **Phase 4 (2026-09-29):** wired from the frontend — `useBusiness` fires a view on initial business-detail load; `ActionButtons` fires a click for CALL/DIRECTION/SHARE/FAVORITE; `useSearchBusinesses` fires a search (query + district/city + result count) whenever a text query resolves. Not yet wired: WEBSITE clicks (no website link exists in the current UI) and category-id attribution on search (the UI only has the category *slug*, not its numeric id). **Phase 16G.2:** no view is recorded when the signed-in viewer owns the listing (`useBusiness` + `ownsBusiness`). |
 | Owner analytics API | **IMPLEMENTED** | 6 endpoints |
-| Owner analytics UI | **PLANNED** | `TrafficChart`, `Sparkline` components exist but are not fed. Considered for Phase 4 and deferred: no owner-dashboard "Analytics" view exists to hold them — those components currently only render inside `PremiumView`'s upsell mock — so wiring this would mean adding a new dashboard view, not just connecting existing UI. Flagged for a product decision on where it belongs. |
+| Owner analytics UI | **PARTIALLY IMPLEMENTED** | **Phase 16G.2 (frontend PR #22, `41fb0fa`):** `DashboardHomeView` shows a "So'nggi 7 kun" panel — views, calls, direction requests and favourites for the last 7 days with the change vs the previous 7 — from `GET /me/analytics/overview`. Still not fed: `TrafficChart`, `Sparkline` (they render only in `PremiumView`'s upsell mock); traffic, demographics, search terms, peak hours and competitors have no UI |
 | Admin analytics | **PARTIALLY IMPLEMENTED** | 2 endpoints wired to `AnalyticsView` |
 | Command centre | **PLANNED** | 10 endpoints, no UI |
 | Daily metric aggregation | **PARTIALLY IMPLEMENTED** | `POST /admin/analytics/aggregate` exists; **nothing schedules it** |
