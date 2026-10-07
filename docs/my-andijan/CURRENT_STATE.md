@@ -2,7 +2,56 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-07 (authoritative)
+## Current state — 2026-10-07, after the 16G/16H merges (authoritative)
+
+**Repositories** (verified 2026-10-07 from Git and GitHub's PR API)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`523d782`** | backend PR #23 — Phase 16G.1 |
+| Frontend `myandijan-frontend` | **`41fb0fa`** | frontend PR #22 — Phase 16G.2 |
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-07; no live probe made)
+
+| | Last deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6` (backend PR #13 merge), `success` 2026-10-04. **No deployment of any later commit.** | **Nothing merged to the API after `2ea83b6` is production-live** — backend PRs #10, #14–#21, #23, #24 |
+| **Frontend — Vercel** | **Not verified.** A Vercel Production deployment record exists for `41fb0fa` (`success`, 2026-10-07 15:40 UTC); not treated as proof, and the live bundle was not probed | Do not describe frontend `main` as live. The 16G.2 panel reads `GET /me/analytics/overview`, which the deployed API already serves, but its counts are de-duplicated only once 16G.1 deploys |
+
+**🔴 Production release blocker: Railway.** Plan / account access expired (owner, 2026-10-07). Deployment/account blocker, not a code blocker. Until the owner restores it: no deploys, no Railway or production-variable changes, no migrations, no production database access.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C, 16D production closure pending (needs the deploy) · 16E, 16F CODE COMPLETE · **16G CODE COMPLETE** · **16H CODE COMPLETE** · 16I not started (pilot; needs production). None of 16G/16H is deployed.
+
+**Merged to `main` since the previous state section, none production-live**
+
+| Item | Backend | Frontend | Notes |
+| --- | --- | --- | --- |
+| 16H one pending claim per (business, claimant) | PR #24 merged 2026-10-07 (`7a3a7dd`, head `55711e6`) | — | Partial unique index + `FOR SHARE` re-check in `createClaim`; competing claimants still allowed. CI `test-and-build` passed on head and merge, **including "Run database tests" and "Run database tests as runtime_app_public"** (real PostgreSQL 18.6; forced-race suites `test/db/claims-concurrency.db-spec.ts`, `migration-claims-pending-unique.db-spec.ts`) |
+| 16G.1 analytics write hygiene | PR #23 merged 2026-10-07 (`523d782`, head `d73993d`) | — | `AnalyticsGate`: per-visitor de-duplication, per-address cap, bounded `visitorCities`/`searchQueries`. CI passed incl. the database suites |
+| 16G.2 owner 7-day analytics panel; owner self-views not counted | — | PR #22 merged 2026-10-07 (`41fb0fa`, head `8da7aa3`) | No API change |
+| Docs for 16G.1 + 16H | — | PR #21 merged 2026-10-07 (`c03a625`) | — |
+
+Earlier Phase 16 items (16C.1 … 16F.7) are unchanged — see the section below.
+
+**Release facts for the next API deploy:** `git diff 2ea83b6..523d782 -- prisma` = **exactly one new migration, `20261007090000_phase16h_claim_pending_unique`** (17 migrations in total), plus a comment-only `schema.prisma` change. It runs in Railway's pre-deploy `prisma migrate deploy`: locks `business_claims`, closes any duplicate PENDING pairs (keeps the earliest, marks the rest `REJECTED` with a reason, deletes nothing), then creates `business_claims_one_pending_per_claimant`. The deploy ships every API change merged since `2ea83b6` at once.
+
+**Open PRs:** backend #11 (16E.1), #1, #2 (Dependabot) · frontend #6 (16C.1), #7 (16E.1), #1, #2 (Dependabot).
+
+**Unchanged from the previous section:** SIG Gate 2 production execution not recorded in the repositories (owner to confirm) · Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+**Next action**
+
+1. **Owner:** restore Railway plan / access; confirm SIG Gate 2 production status.
+2. Then, with the owner's authorization: let Railway deploy API `main` through the CI-gated path, then **merge frontend #6 (16C.1) immediately** — approving a claim then requires a verification note.
+3. Verify in production: the 16H migration is applied (17 rows in `_prisma_migrations`, no failed row); a duplicate pending claim answers 409; a repeated view is not double-counted; `updatedAt` appears on the business/event lists; the 16E.4 route answers.
+4. Then regenerate the sitemaps (`npm run sitemap`) in a frontend PR; then the 16C/16D production closure and 16I.
+5. Remaining code pair: 16E.1 (backend #11 + frontend #7).
+
+---
+
+## Current state — 2026-10-07, before the 16G/16H merges (historical — superseded 2026-10-07)
+
+> Superseded the same day by the section above (backend PRs #23, #24 and frontend PRs #21, #22 merged). Kept for its Phase 16 table (16C.1 … 16F.7), which is still accurate. Its "no new migrations" release fact is **no longer true** — see above.
 
 **Repositories** (verified 2026-10-07: local clones clean, `main` = `origin/main`)
 
@@ -181,7 +230,7 @@ Established in the prior session's production verification (recovered, not re-ru
 | **Review reporting & moderation** | ✅ **Phase 12 (2026-10-01)** — customers report reviews (`POST /reviews/:id/report`); ADMIN+ works the queue in `AdminReportsView` (hide review / dismiss). See `ARCHITECTURE.md` §29 | MODERATOR still can't use the admin panel (D-68); no auto-hide threshold or rate limit beyond one report per user per review |
 | **Admin business operations** | ✅ **Phase 11 (2026-10-01)** — `AdminBusinessesView` can verify/unverify, suspend (APPROVED only, with reason)/restore, promote/end promotion; status filter is server-side over all statuses. New `unverify`/`unsuspend`/`unpromote` routes. See `ARCHITECTURE.md` §28 | No unhide and no hide UI (D-63); no `isFeatured` control (D-66); reports UI deferred — nothing creates reports (D-65); MODERATOR cannot open the admin UI though the API lets them approve/reject businesses |
 | **Claiming an existing listing** | ✅ **Phase 9 (2026-10-01)** — `POST /me/claims` → admin `AdminClaimsView` approve/reject → `ownerId` set atomically, `CUSTOMER` → `BUSINESS_OWNER`; status on `ProfilePage`. See `ARCHITECTURE.md` §26 | Claimed ≠ verified (D-58); rejection reason not shown to claimant; pending state not remembered on the business page after reload |
-| **Analytics** | Full ingestion + reporting API exists | ~~The frontend never calls the ingestion endpoints~~ — ✅ the frontend now calls `POST /analytics/view`, `/click` and `/search` (`recordAnalytics`, `src/lib/api.ts`). The endpoints remain public; since Phase 16G.1 (API branch, not yet deployed) they are de-duplicated and capped per client/address (SECURITY §16.3 R1). |
+| **Analytics** | Full ingestion + reporting API exists | ~~The frontend never calls the ingestion endpoints~~ — ✅ the frontend now calls `POST /analytics/view`, `/click` and `/search` (`recordAnalytics`, `src/lib/api.ts`). The endpoints remain public; since Phase 16G.1 (API PR #23, merged 2026-10-07, not deployed) they are de-duplicated and capped per client/address (SECURITY §16.3 R1). |
 | **Search module** | Sophisticated FTS/trigram/transliteration search at `GET /search` | ✅ **Wired in Phase 8** (2026-10-01) — the frontend now calls it for text queries via `type=business`; pure category/district browsing still uses `GET /businesses`. Product-type results still have no UI. See `ARCHITECTURE.md` §25. |
 | **Refresh tokens** | Issued, hashed, stored, rotated, revocable; `POST /auth/refresh` exists | ~~The frontend never stores or uses the refresh token~~ — ✅ **resolved, Phase 15E.4**: the client refreshes with cross-tab coordination (15E.4a); every sign-in is an `auth_sessions` row with race-safe rotation (4b), reuse detection (4c), `sid`-bound access tokens (4d) and a NOT NULL session contract (4e). |
 | **Health score** | Complete scoring engine, recommendation catalogue, three endpoints | No frontend calls any of them |

@@ -304,7 +304,7 @@ Indexes: `[branchId, sortOrder]`, `[branchId, isPrimary]`. Added in migration `2
 
 Indexes: `[businessId, status]`, `claimantId`, `[status, createdAt]`.
 
-> **✅ Enforced since Phase 16H (API branch `feat/16h-claim-pending-unique`, ships with its migration on the next API deploy): partial unique index `business_claims_one_pending_per_claimant` on `(business_id, claimant_id) WHERE status = 'PENDING'`.** Created by raw SQL in migration `20261007090000_phase16h_claim_pending_unique` (Prisma cannot model a partial index; its drift detection skips partial indexes, so `migrate dev` leaves it alone). Several `PENDING` claims from **different** claimants remain allowed — they compete, and approving one rejects the rest. The migration first closes any existing duplicate pairs (keeps the earliest, marks the rest `REJECTED` with a reason; deletes nothing). *Previously:* service-layer only.
+> **✅ Enforced since Phase 16H (API PR #24, merged 2026-10-07 as `7a3a7dd`; **not deployed** — its migration runs on the next API deploy): partial unique index `business_claims_one_pending_per_claimant` on `(business_id, claimant_id) WHERE status = 'PENDING'`.** Created by raw SQL in migration `20261007090000_phase16h_claim_pending_unique` (Prisma cannot model a partial index; its drift detection skips partial indexes, so `migrate dev` leaves it alone). Several `PENDING` claims from **different** claimants remain allowed — they compete, and approving one rejects the rest. The migration first closes any existing duplicate pairs (keeps the earliest, marks the rest `REJECTED` with a reason; deletes nothing). *Previously:* service-layer only.
 
 ---
 
