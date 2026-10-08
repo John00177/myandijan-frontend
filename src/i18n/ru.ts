@@ -193,6 +193,7 @@ const ru: Record<keyof typeof uz, string> = {
   "addBusiness.dayOffLabel": "Выходной день",
   "addBusiness.success": "Бизнес успешно добавлен!",
   "addBusiness.comingSoon": "Скоро",
+  "addBusiness.errorForbidden": "Добавлять новый бизнес могут только владельцы бизнеса. Если ваш бизнес уже есть в каталоге, подайте заявку на владение на его странице.",
   "addBusiness.errors.nameRequired": "Введите название бизнеса (минимум 2 символа)",
   "addBusiness.errors.categoryRequired": "Выберите категорию",
   "addBusiness.errors.phoneInvalid": "Неверный номер телефона (например: +998901234567)",
@@ -421,6 +422,8 @@ const ru: Record<keyof typeof uz, string> = {
   "businessClaim.statusRejected": "Отклонено",
   "businessClaim.myClaimsTitle": "Мои заявки",
   "businessClaim.errorConflict": "Этот бизнес уже закреплён за владельцем, или у вас уже есть заявка на рассмотрении.",
+  "businessClaim.rejectionReasonLabel": "Причина",
+  "businessClaim.pendingTitle": "Ваша заявка на рассмотрении",
 
   "common.retry": "Повторить",
   "menuLoadFailed": "Не удалось загрузить меню",

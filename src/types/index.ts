@@ -580,7 +580,10 @@ export interface AdminCategoryPayload {
  * `text` on replies, etc. Confirmed against the real API responses
  * (2026-08-14/15), not guessed.
  */
-export type BusinessStatusValue = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+// HIDDEN is a real BusinessStatus (admin hide, Phase 14) and GET /me/businesses
+// returns hidden listings to their owner — leaving it out made the owner's
+// status badge render empty (Phase 16D).
+export type BusinessStatusValue = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED" | "HIDDEN";
 export type ReviewStatusValue = "PENDING" | "PUBLISHED" | "REJECTED" | "HIDDEN";
 export type EventStatusValue = "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | "CANCELLED" | "COMPLETED";
 
@@ -617,6 +620,9 @@ export interface MyBusiness {
   slug: string;
   name: string;
   status: BusinessStatusValue;
+  // Set by an admin reject or suspend (the API reuses the column for both),
+  // cleared on approve / unsuspend. Phase 16D shows it to the owner.
+  rejectionReason?: string | null;
   coverPhoto?: string | null;
   hasDelivery?: boolean | null;
   deliveryFee?: number | null;
