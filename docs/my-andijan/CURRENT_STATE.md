@@ -2,7 +2,61 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-07, after the 16G/16H merges (authoritative)
+## Current state — 2026-10-08 (authoritative)
+
+**Repositories** (verified 2026-10-08 from Git and GitHub's PR API)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`db64496`** | backend PR #25 — SIG Gate 2 R-E4 write-pause controls |
+| Frontend `myandijan-frontend` | **`565f0e5`** | frontend PR #23 — 16G/16H memory closeout (docs) |
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-08; no live probe made)
+
+| | Deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6` (backend PR #13 merge), `success` 2026-10-04. **No deployment of any later commit.** | **Nothing merged to the API after `2ea83b6` is production-live** — backend PRs #10, #14–#21, #23–#25 |
+| **Frontend — Vercel** | Vercel is connected to GitHub and creates a Production deployment for every `main` merge (`vercel[bot]`). Record for `565f0e5`: `success` (deployment `6915534436`, 2026-10-07 16:42 UTC). Live bundle not probed, so behaviour is not verified (MEMORY_CONTRACT §5) | **Merging a frontend PR ships it to production** while the API stays at `2ea83b6`. Judge every frontend PR against the *deployed* API, not API `main` |
+
+**🔴 Production release blocker: Railway.** Plan / account access expired (owner, 2026-10-07). Deployment/account blocker, not a code blocker. Until the owner restores it: no deploys, no Railway or production-variable changes, no migrations, no production database access.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged (PR #10), frontend #6 open, production closure needs the deploy · **16D NOT STARTED** (below) · 16E, 16F CODE COMPLETE except 16E.1 (open pair) · 16G, 16H CODE COMPLETE, not deployed · 16I not started (pilot; needs production).
+
+**16D — correction.** The 2026-10-07 sections said "16C, 16D production closure pending". For 16D that was wrong: no PR implements it. Scope (Phase 16 plan, 2026-10-03): CUSTOMER `business.create`; a single create route; wizard gating, 403 handling and copy; owner status panel with rejection reason, HIDDEN and resubmit; claim-reason UX. Checked on `main` 2026-10-08: `business.create` is BUSINESS_OWNER-only (D-75; API `src/authz/capabilities.ts`); there are two create routes (`POST /businesses`, `POST /me/businesses`); the owner's business list shows no rejection reason and the API has no owner resubmit path; `DashboardHomeView`'s status labels have no HIDDEN entry (a hidden listing gets an empty badge). **Waiting on an owner decision:** granting CUSTOMER `business.create` reverses D-75. 16D does not depend on SMS.
+
+**Merged since the previous state section, not production-live**
+
+| Item | PR | Notes |
+| --- | --- | --- |
+| SIG Gate 2 R-E4 write-pause controls | backend PR #25 merged 2026-10-07 (`db64496`, head `aab1b52`) | `db/privileges/RUNBOOK.md` + `test/db/runbook-write-pause.db-spec.ts`. No migration, no application code. CI `test-and-build` passed on the merge |
+| 16G/16H memory closeout | frontend PR #23 (`565f0e5`) | Docs only |
+
+**Open Phase 16 PRs — rebased onto current `main` 2026-10-08, not merged**
+
+| PR | Rebased head | Conflicts | CI on the rebased head | Merge notes |
+| --- | --- | --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `6d6b9d8` | `src/lib/__tests__/api.test.ts` — both test suites kept | `test-and-build` passed | Merge order is an owner decision: the *deployed* approve route takes no body, so merged first, approvals keep working but the note is dropped until the API deploys; after the API deploys, approvals answer 400 until #6 ships |
+| backend #11 — 16E.1 claim review context | `59122f1` | none | `test-and-build` passed, including both real-PostgreSQL database-test steps | API-only; merging does not deploy |
+| frontend #7 — 16E.1 queue context | `2047393` | none | `test-and-build` passed | The new fields are optional: with the deployed API the queue shows no context rather than a false warning |
+
+#6 and #7 edit adjacent rows of `API.md` (`/admin/claims` and `/approve`), so whichever merges second needs a one-line rebase. Other open PRs: backend #1, #2 and frontend #1, #2 (Dependabot, not reviewed).
+
+**Release facts for the next API deploy:** `git diff --name-status 2ea83b6..db64496 -- prisma` = **exactly one new migration, `20261007090000_phase16h_claim_pending_unique`** (17 in total), plus a comment-only `schema.prisma` change — unchanged by PR #25. Migration behaviour: previous section.
+
+**Unchanged:** SIG Gate 2 production execution not recorded in the repositories (owner to confirm) · Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+**Next action**
+
+1. **Owner:** restore Railway plan / access; confirm SIG Gate 2 production status; decide CUSTOMER `business.create` (unblocks 16D) and the #6 merge order.
+2. Then, with the owner's authorization: let Railway deploy API `main` through the CI-gated path, and ship #6 as decided.
+3. Verify in production: the 16H migration is applied (17 rows in `_prisma_migrations`, no failed row); a duplicate pending claim answers 409; a repeated view is not double-counted; `updatedAt` appears on the business/event lists; the 16E.4 route answers.
+4. Then regenerate the sitemaps (`npm run sitemap`) in a frontend PR; merge the 16E.1 pair (#11, then #7); the 16C/16D production closure; then 16I (SMS live, the `RegisterDto` fix — scope not recorded in the repositories, runbook, cohort, docs refresh).
+
+---
+
+## Current state — 2026-10-07, after the 16G/16H merges (historical — superseded 2026-10-08)
+
+> Superseded the next day by the section above. Stale in it: API `main` (now `db64496`, PR #25), "16D production closure pending" (16D was never started) and the frontend production row (Vercel deploys every `main` merge; `565f0e5` has a `success` record). Kept for its 16G/16H evidence and the 16H migration's behaviour.
 
 **Repositories** (verified 2026-10-07 from Git and GitHub's PR API)
 
