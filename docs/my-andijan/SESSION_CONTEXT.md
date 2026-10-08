@@ -381,3 +381,12 @@ Recorded from Git, GitHub's PR / check-run / Deployments APIs (read-only). No pr
 - **Docs** — frontend PR #21 (`c03a625`).
 - **Production:** last API deployment still `2ea83b6`; none of the above is live. The next API deploy carries exactly one new migration (the 16H one). Railway access is the blocker (owner).
 - **Where to look:** `CURRENT_STATE.md` top section; `TODO.md` (16H, analytics items); `SECURITY.md` §15 table and §16.3 R1; `DATABASE.md` (`BusinessClaim`, `BusinessAnalytics`).
+
+## 2026-10-08 — Phase 16 audit; open PRs rebased; memory corrected
+
+Read-only audit of both `main` branches, then a rebase of the open Phase 16 PRs. No production, Railway, Notion or Todoist change; nothing merged.
+
+- **Memory corrections:** API `main` is `db64496` (backend PR #25, SIG Gate 2 R-E4 write-pause runbook + database test, merged after the 16G/16H closeout; no migration). **16D was recorded as "production closure pending" but was never started** — scope and findings in `CURRENT_STATE.md`. Vercel deploys every frontend `main` merge to production (`565f0e5` has a `success` record), so the old "do not describe frontend main as live" line was too strong — though behaviour is still unprobed.
+- **Rebased, not merged:** frontend #6 → `6d6b9d8` (test-file conflict resolved by keeping both suites), backend #11 → `59122f1`, frontend #7 → `2047393`. Local checks before pushing: frontend lint, Vitest (314 and 317 tests) and build; backend build and Jest (1147 tests).
+- **Non-obvious:** the deployed approve route (`2ea83b6`) has no body parameter, so the extra `verificationNote` from #6 is ignored rather than rejected — which is what makes merging #6 before the API deploy possible at all.
+- **Open owner decisions:** CUSTOMER `business.create` (reverses D-75; blocks 16D) and the #6 merge order.
