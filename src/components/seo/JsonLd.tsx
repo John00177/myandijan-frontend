@@ -1,5 +1,5 @@
 import { Helmet } from "react-helmet-async";
-import { absoluteUrl } from "../../lib/seo";
+import { absoluteUrl, type LocalBusinessSchemaType } from "../../lib/seo";
 
 /** Everything JSON.stringify accepts, with no `any` escape hatch. */
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
@@ -25,6 +25,8 @@ export interface OpeningHoursInput {
 }
 
 export interface LocalBusinessInput {
+  /** Defaults to "LocalBusiness"; see localBusinessSchemaType(). */
+  schemaType?: LocalBusinessSchemaType;
   name: string;
   description?: string | null;
   image?: string | null;
@@ -80,7 +82,7 @@ function buildOpeningHours(hours: OpeningHoursInput[]): JsonValue[] {
 function buildLocalBusiness(data: LocalBusinessInput): JsonValue {
   const schema: { [key: string]: JsonValue } = {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": data.schemaType ?? "LocalBusiness",
     name: data.name,
   };
 
