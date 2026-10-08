@@ -193,6 +193,7 @@ const en: Record<keyof typeof uz, string> = {
   "addBusiness.dayOffLabel": "Day off",
   "addBusiness.success": "Business added successfully!",
   "addBusiness.comingSoon": "Coming soon",
+  "addBusiness.errorForbidden": "Only business owners can add a new business. If your business is already listed, send an ownership claim from its page.",
   "addBusiness.errors.nameRequired": "Enter a business name (at least 2 characters)",
   "addBusiness.errors.categoryRequired": "Select a category",
   "addBusiness.errors.phoneInvalid": "Invalid phone number (e.g. +998901234567)",
@@ -421,6 +422,8 @@ const en: Record<keyof typeof uz, string> = {
   "businessClaim.statusRejected": "Rejected",
   "businessClaim.myClaimsTitle": "My claims",
   "businessClaim.errorConflict": "This business is already claimed, or you already have a pending claim for it.",
+  "businessClaim.rejectionReasonLabel": "Reason",
+  "businessClaim.pendingTitle": "Your claim is under review",
 
   "common.retry": "Try again",
   "menuLoadFailed": "Could not load the menu",

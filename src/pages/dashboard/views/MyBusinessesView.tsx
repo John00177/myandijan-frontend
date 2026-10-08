@@ -27,6 +27,7 @@ const STATUS_LABEL: Record<BusinessStatusValue, string> = {
   APPROVED: "Tasdiqlangan",
   REJECTED: "Rad etilgan",
   SUSPENDED: "To'xtatilgan",
+  HIDDEN: "Yashirilgan",
 };
 
 const STATUS_TONE: Record<BusinessStatusValue, "success" | "amber" | "danger" | "neutral"> = {
@@ -35,7 +36,16 @@ const STATUS_TONE: Record<BusinessStatusValue, "success" | "amber" | "danger" | 
   APPROVED: "success",
   REJECTED: "danger",
   SUSPENDED: "danger",
+  HIDDEN: "neutral",
 };
+
+// Phase 16D: the owner sees why a listing was rejected or suspended. Only for
+// those two statuses — hiding writes no reason, so on a HIDDEN listing the
+// column can still hold an older, unrelated one.
+function statusReason(business: MyBusiness): string | null {
+  if (business.status !== "REJECTED" && business.status !== "SUSPENDED") return null;
+  return business.rejectionReason?.trim() || null;
+}
 
 function toEditableBusiness(b: MyBusiness): EditableBusiness {
   const branch = b.branches[0];
@@ -212,6 +222,7 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {businesses.map((business) => {
             const branch = business.branches[0];
+            const reason = statusReason(business);
             return (
               <div key={business.id} className="bg-card border border-white/[0.08] rounded-xl overflow-hidden">
                 <div className="aspect-[16/10] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22]" />
@@ -224,6 +235,11 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
                     {business.category?.nameUz ?? "—"}
                     {branch?.district ? ` · ${branch.district.nameUz}` : ""}
                   </div>
+                  {reason && (
+                    <p className="text-xs text-danger mt-2 break-words">
+                      <span className="font-medium">Sabab:</span> {reason}
+                    </p>
+                  )}
                   <Button variant="ghost" size="sm" className="w-full mt-3" onClick={() => openEditModal(business)}>
                     Tahrirlash
                   </Button>

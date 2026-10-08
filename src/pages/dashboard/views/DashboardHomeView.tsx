@@ -22,6 +22,7 @@ const STATUS_LABEL: Record<string, string> = {
   APPROVED: "Tasdiqlangan",
   REJECTED: "Rad etilgan",
   SUSPENDED: "To'xtatilgan",
+  HIDDEN: "Yashirilgan",
 };
 
 const STATUS_TONE: Record<string, "success" | "amber" | "danger" | "neutral"> = {
@@ -30,6 +31,7 @@ const STATUS_TONE: Record<string, "success" | "amber" | "danger" | "neutral"> = 
   APPROVED: "success",
   REJECTED: "danger",
   SUSPENDED: "danger",
+  HIDDEN: "neutral",
 };
 
 // Phase 16G.2: the owner overview panel — GET /me/analytics/overview, the

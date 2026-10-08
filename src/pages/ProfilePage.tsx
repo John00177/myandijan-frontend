@@ -296,10 +296,20 @@ export default function ProfilePage() {
                       : "businessClaim.statusPending";
                 const statusTone =
                   myClaim.status === "APPROVED" ? "success" : myClaim.status === "REJECTED" ? "danger" : "amber";
+                // Phase 16D: the admin's rejection reason, shown as written
+                // (free text, so not translated).
+                const rejectionReason = myClaim.status === "REJECTED" ? myClaim.rejectionReason?.trim() : null;
                 return (
-                  <div key={myClaim.id} className="flex items-center justify-between gap-3">
-                    <span className="text-sm text-ink truncate">{myClaim.business?.name ?? "—"}</span>
-                    <Badge tone={statusTone}>{t(statusKey)}</Badge>
+                  <div key={myClaim.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-ink truncate">{myClaim.business?.name ?? "—"}</span>
+                      <Badge tone={statusTone}>{t(statusKey)}</Badge>
+                    </div>
+                    {rejectionReason && (
+                      <p className="text-xs text-ink-muted mt-1 break-words">
+                        {t("businessClaim.rejectionReasonLabel")}: {rejectionReason}
+                      </p>
+                    )}
                   </div>
                 );
               })}
