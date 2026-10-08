@@ -43,12 +43,42 @@
 
 **Release facts for the next API deploy:** `git diff --name-status 2ea83b6..db64496 -- prisma` = **exactly one new migration, `20261007090000_phase16h_claim_pending_unique`** (17 in total), plus a comment-only `schema.prisma` change — unchanged by PR #25. Migration behaviour: previous section.
 
-**Unchanged:** SIG Gate 2 production execution not recorded in the repositories (owner to confirm) · Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+**Unchanged:** Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Gate record (outside the repositories): `D:\My-Andijan\security-governance\SIG\gates\gate-02\` (REPORT §19,
+EVIDENCE G2-E-025/026, SESSION_LOG Entry 16). Runbook: `my-andijan-api/db/privileges/RUNBOOK.md`.
+
+**Verified facts — fresh read-only production preflight: PASS** (2026-10-08 05:27–05:29 UTC+05:00, reviewed by the owner):
+- **Run:** committed `00` (`9e39c5f0…3edd28`) and `30` (`fa806fc4…2da4`) from API `main@db64496`, through the approved
+  `railway ssh` guarded transport; fingerprints MATCH, exit 0.
+- **Result:** PostgreSQL **18.6**, P1–P19 **all PASS**, no drift. Row counts normalize: **33 tables, 313 rows**.
+  - The 2026-10-06 count was 307. The +6 (`audit_logs` 24→26, `refresh_tokens` 22→26) is normal live-production drift,
+    **not an R-E4 baseline**.
+  - `_prisma_migrations` 16, clean.
+- **W0 API deployment:** **`6b5f057b-ea08-4252-b5fa-79910859f8d8`** on **`2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`**,
+  `SUCCESS`, no later deployment.
+- **Railway access:** read-only API and `railway ssh` worked. Deploying was not attempted, so whether the plan blocker
+  above is resolved is **not verified**.
+- **Production mutation: NONE.** No production secrets retrieved or output; no Railway configuration or deployment
+  change.
+
+**Current status:**
+- Gate 2 is **OPEN — STOPPED BEFORE PRODUCTION MUTATION**. Write pause and R-E4: **NOT STARTED**.
+- Ready: write-pause procedure merged (backend PR #25, `db64496`); PostgreSQL 18.6 local; encrypted R-E4 container
+  present. **`R:` was not mounted on 2026-10-08:** mount it and re-verify it at the actual window start.
+- **Do not deploy API `main` while Gate 2 is open.** It carries the undeployed 16H migration; the window resumes only to
+  W0.
+
+**Next authorization gate:** John (owner) authorizes every production step. He confirms the window (E5), then
+explicitly authorizes opening R-E4 at W0 (record the deployment above, declare the merge/deploy freeze). W1–W9 are each
+authorized separately.
 
 **Next action**
 
-1. **Owner:** restore Railway plan / access; confirm SIG Gate 2 production status; decide CUSTOMER `business.create` (unblocks 16D) and the #6 merge order.
-2. Then, with the owner's authorization: let Railway deploy API `main` through the CI-gated path, and ship #6 as decided.
+1. **Owner:** restore Railway plan / access; SIG Gate 2 next authorization gate (above); decide CUSTOMER `business.create` (unblocks 16D) and the #6 merge order.
+2. Then, with the owner's authorization, and **not while SIG Gate 2 is open**: let Railway deploy API `main` through the CI-gated path, and ship #6 as decided.
 3. Verify in production: the 16H migration is applied (17 rows in `_prisma_migrations`, no failed row); a duplicate pending claim answers 409; a repeated view is not double-counted; `updatedAt` appears on the business/event lists; the 16E.4 route answers.
 4. Then regenerate the sitemaps (`npm run sitemap`) in a frontend PR; merge the 16E.1 pair (#11, then #7); the 16C/16D production closure; then 16I (SMS live, the `RegisterDto` fix — scope not recorded in the repositories, runbook, cohort, docs refresh).
 

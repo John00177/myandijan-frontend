@@ -390,3 +390,18 @@ Read-only audit of both `main` branches, then a rebase of the open Phase 16 PRs.
 - **Rebased, not merged:** frontend #6 → `6d6b9d8` (test-file conflict resolved by keeping both suites), backend #11 → `59122f1`, frontend #7 → `2047393`. Local checks before pushing: frontend lint, Vitest (314 and 317 tests) and build; backend build and Jest (1147 tests).
 - **Non-obvious:** the deployed approve route (`2ea83b6`) has no body parameter, so the extra `verificationNote` from #6 is ignored rather than rejected — which is what makes merging #6 before the API deploy possible at all.
 - **Open owner decisions:** CUSTOMER `business.create` (reverses D-75; blocks 16D) and the #6 merge order.
+
+## 2026-10-08 — SIG Gate 2: fresh read-only production preflight (PASS)
+
+SIG Gate 2 only, separate from Phase 16. The owner authorized a strictly read-only preflight; nothing else was done.
+
+- **Run:** the committed `00_preflight_readonly.sql` and `30_rowcounts_readonly.sql` from API `main@db64496`, through
+  the approved `railway ssh` guarded transport.
+- **Result:** P1–P19 all PASS. Row counts normalized: 33 tables, 313 rows.
+  - The +6 rows since 2026-10-06 (`audit_logs`, `refresh_tokens`) are normal live-production drift, not an R-E4
+    baseline.
+- **W0 verified:** deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` on `2ea83b6`.
+- **Non-obvious:** the instruction quoted the W0 ID as `…-425b-…`. Railway shows `…-4252-…`, and the typo appears in no
+  record. Production P10 (16 migrations) equals the deployed commit, not `main` (17).
+- **Not done:** no write pause, no R-E4, no deployment, no production mutation, no production secrets retrieved.
+- **Record:** `GATE_02_REPORT.md` §19 (gate folder outside the repositories); state in `CURRENT_STATE.md`.
