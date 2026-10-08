@@ -155,14 +155,14 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Owner dashboard shell | **IMPLEMENTED** | 8 views |
-| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch |
+| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch. **Phase 16D:** every status labelled (HIDDEN no longer renders an empty badge, here and on the dashboard home); a REJECTED or SUSPENDED listing shows the admin's reason (`rejectionReason`). No owner resubmit yet — the API has no owner path from REJECTED back to PENDING |
 | Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours |
 | Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
 | Reviews + reply | **IMPLEMENTED** | |
 | My events (list) | **IMPLEMENTED** | **Phase 5:** create wired — a "Yangi tadbir" modal (business picker + title/description/dates/venue) now calls `POST /me/events`, replacing the previously dead button. **Edit and delete endpoints still have no UI** — deprioritized this phase for scope, not blocked |
 | **Business claim flow** (`/uz/claim`) | **IMPLEMENTED** | 8 screens, live preview; submits a **new** listing to `POST /businesses` — despite the name, not a claim on an existing listing (see next row) |
 | **Claim an existing business** | **IMPLEMENTED (Phase 9)** | "Bu sizning biznesingizmi?" card on `BusinessDetailPage` for listings with `ownerId = null` → `POST /me/claims` (`PENDING`). Login-gated; 409 conflict message for already-owned / already-pending. See `ARCHITECTURE.md` §26 |
-| Claim status visibility | **IMPLEMENTED (Phase 9)** | `ProfilePage` "Mening da'volarim" via `GET /me/claims` — per-claim pending/approved/rejected badge. Rejection reason not yet shown to the claimant |
+| Claim status visibility | **IMPLEMENTED (Phase 9)** | `ProfilePage` "Mening da'volarim" via `GET /me/claims` — per-claim pending/approved/rejected badge. **Phase 16D:** a rejected claim shows the admin's reason; on `BusinessDetailPage` a claimant with a pending claim sees "under review" instead of the claim CTA after a reload |
 | Owner access after approval | **IMPLEMENTED (Phase 9)** | Approval sets `ownerId` and promotes a `CUSTOMER` to `BUSINESS_OWNER`; effective on the next request (role is reloaded from the DB per request). Claimed ≠ verified (D-58) |
 | Add business (3-step) | **IMPLEMENTED** | `AddBusinessPage` |
 | Multi-branch management | **PARTIALLY IMPLEMENTED** | `POST /me/businesses/:id/branches` + `PATCH /me/branches/:id` exist; branch **creation** has no UI |
