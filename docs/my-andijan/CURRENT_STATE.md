@@ -2,7 +2,86 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-08 (authoritative)
+## Current state — 2026-10-08, after the 16E.1 merges (authoritative)
+
+**Repositories** (verified 2026-10-08 from Git and GitHub's PR API)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | backend PR #26 — `.env.example` variable names (docs; after #11, 16E.1, `de9c55f`) |
+| Frontend `myandijan-frontend` | **`09900ad`** | frontend PR #25 — SIG Gate 2 preflight memory (after #27, 16D UX, `33a26ee`; #7, 16E.1, `fa2a998`) |
+
+CI `test-and-build` passed on both `main` heads.
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-08; no live probe made)
+
+| | Deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6`, `success` 2026-10-04 (deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8`, confirmed by the Gate 2 preflight below). **No later deployment.** | Nothing merged to the API since is live — backend PRs #10, #11, #14–#21, #23–#26 |
+| **Frontend — Vercel** | `09900ad`: Production deployment `success` 2026-10-08 10:18 UTC. Live bundle not probed (MEMORY_CONTRACT §5) | Vercel deploys every `main` merge, so #7 and #27 are in production. Against the deployed API its review-context fields are absent and the queue shows no context — by design (optional fields) |
+
+**🔴 Production release blocker: Railway.** Plan / account access expired (owner, 2026-10-07). Until restored: no deploys, no Railway or production-variable changes, no migrations, no production database access.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (below) · **16D PARTIAL** — claimant/owner status UX merged (frontend PR #27, `33a26ee`); the rest needs API work; CUSTOMER `business.create` dropped (D-79) · 16E, 16F, 16G, 16H CODE COMPLETE, not deployed · 16I not started — deploy-day runbook written ([`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md)).
+
+**Owner decisions 2026-10-08:** **D-79** — keep D-75: creating a listing stays BUSINESS_OWNER-only. **Frontend PR #6 merges immediately after the API deploy, not before** (runbook §4).
+
+**Open PRs**
+
+| PR / branch | Head | State |
+| --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `89e0e61` (on `fa2a998`) | CI green, mergeable. **Hold** until runbook §4 |
+| ~~frontend #27 — 16D status UX~~ | `08296a1` | **Merged** 2026-10-08 (`33a26ee`). Claimant sees a rejected claim's reason, and "under review" instead of the CTA after a reload; owner sees HIDDEN labelled and the reason on REJECTED / SUSPENDED listings; 403 copy points to the claim path. Uses only fields the deployed API already returns |
+| frontend #26 — runbook + this memory update | — | Docs only |
+| ~~backend #26 — `.env.example`~~ | `d2fa9e3` | **Merged** 2026-10-08 (`ae43648`). Docs only: the seven missing names, empty values |
+| backend #1, #2 · frontend #1, #2 | — | Dependabot (Actions `checkout` / `setup-node`), not reviewed; keep out of the release window |
+
+**Release facts for the next API deploy:** exactly one new migration, `20261007090000_phase16h_claim_pending_unique` (17 in total) — unchanged by backend #26 (docs). Steps, checks and rollback: the runbook.
+
+**Unchanged:** Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Gate record (outside the repositories): `D:\My-Andijan\security-governance\SIG\gates\gate-02\` (REPORT §19,
+EVIDENCE G2-E-025/026, SESSION_LOG Entry 16). Runbook: `my-andijan-api/db/privileges/RUNBOOK.md`.
+
+**Verified facts — fresh read-only production preflight: PASS** (2026-10-08 05:27–05:29 UTC+05:00, reviewed by the owner):
+- **Run:** committed `00` (`9e39c5f0…3edd28`) and `30` (`fa806fc4…2da4`) from API `main@db64496`, through the approved
+  `railway ssh` guarded transport; fingerprints MATCH, exit 0.
+- **Result:** PostgreSQL **18.6**, P1–P19 **all PASS**, no drift. Row counts normalize: **33 tables, 313 rows**.
+  - The 2026-10-06 count was 307. The +6 (`audit_logs` 24→26, `refresh_tokens` 22→26) is normal live-production drift,
+    **not an R-E4 baseline**.
+  - `_prisma_migrations` 16, clean.
+- **W0 API deployment:** **`6b5f057b-ea08-4252-b5fa-79910859f8d8`** on **`2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`**,
+  `SUCCESS`, no later deployment.
+- **Railway access:** read-only API and `railway ssh` worked. Deploying was not attempted, so whether the plan blocker
+  above is resolved is **not verified**.
+- **Production mutation: NONE.** No production secrets retrieved or output; no Railway configuration or deployment
+  change.
+
+**Current status:**
+- Gate 2 is **OPEN — STOPPED BEFORE PRODUCTION MUTATION**. Write pause and R-E4: **NOT STARTED**.
+- Ready: write-pause procedure merged (backend PR #25, `db64496`); PostgreSQL 18.6 local; encrypted R-E4 container
+  present. **`R:` was not mounted on 2026-10-08:** mount it and re-verify it at the actual window start.
+- **Do not deploy API `main` while Gate 2 is open.** It carries the undeployed 16H migration; the window resumes only to
+  W0.
+
+**Next authorization gate:** John (owner) authorizes every production step. He confirms the window (E5), then
+explicitly authorizes opening R-E4 at W0 (record the deployment above, declare the merge/deploy freeze). W1–W9 are each
+authorized separately.
+
+**Next action**
+
+1. **Now, without Railway:** review and merge frontend #26 (runbook + this memory) (owner).
+2. **Owner:** restore Railway; the SIG Gate 2 next authorization gate (above). **Do not deploy API `main` while Gate 2 is open** (runbook entry check E0).
+3. Then follow [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md) §1–§5: entry checks and backup → CI-gated API deploy of `main` → V1–V10 → merge #6 at once → sitemaps PR → record the deployment here.
+4. Later: the 16D API items (owner resubmit, single create route); 16I (SMS, the `RegisterDto` fix — scope not recorded, cohort).
+
+---
+
+## Current state — 2026-10-08, before the 16E.1 merges (historical — superseded 2026-10-08)
+
+> Superseded the same day by the section above (backend #11 and frontend #7 merged; D-79; runbook; 16D partial). Its "16D NOT STARTED" and its open-PR table are out of date.
 
 **Repositories** (verified 2026-10-08 from Git and GitHub's PR API)
 
