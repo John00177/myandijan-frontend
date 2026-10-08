@@ -191,6 +191,7 @@ const uz = {
   "addBusiness.dayOffLabel": "Dam olish kuni",
   "addBusiness.success": "Biznes muvaffaqiyatli qo'shildi!",
   "addBusiness.comingSoon": "Tez orada",
+  "addBusiness.errorForbidden": "Yangi biznes qo'shish faqat biznes egalari uchun. Biznesingiz katalogda bo'lsa, uning sahifasidan egalik da'vosini yuboring.",
   "addBusiness.errors.nameRequired": "Biznes nomini kiriting (kamida 2 belgi)",
   "addBusiness.errors.categoryRequired": "Turkumni tanlang",
   "addBusiness.errors.phoneInvalid": "Telefon raqami noto'g'ri (masalan: +998901234567)",
@@ -419,6 +420,8 @@ const uz = {
   "businessClaim.statusRejected": "Rad etilgan",
   "businessClaim.myClaimsTitle": "Mening da'volarim",
   "businessClaim.errorConflict": "Bu biznes allaqachon egalik qilingan yoki sizda u uchun ko'rib chiqilayotgan da'vo bor.",
+  "businessClaim.rejectionReasonLabel": "Sabab",
+  "businessClaim.pendingTitle": "Da'vongiz ko'rib chiqilmoqda",
 
   "common.retry": "Qayta urinish",
   "menuLoadFailed": "Menyuni yuklab bo'lmadi",

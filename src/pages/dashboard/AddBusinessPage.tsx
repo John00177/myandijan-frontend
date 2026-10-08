@@ -142,6 +142,12 @@ export default function AddBusinessPage() {
       if (err instanceof ApiError && err.status === 404) {
         console.log("[AddBusinessPage] POST /businesses is not live yet. Payload that would have been sent:", payload);
         setNotice({ tone: "info", text: t("addBusiness.comingSoon") });
+      } else if (err instanceof ApiError && err.status === 403) {
+        // Phase 16D: creating a listing stays BUSINESS_OWNER-only (D-75). The
+        // gate below normally stops a non-owner earlier; this covers a role
+        // that changed after sign-in. Point to the claim path instead of the
+        // raw "Forbidden".
+        setNotice({ tone: "error", text: t("addBusiness.errorForbidden") });
       } else {
         setNotice({ tone: "error", text: err instanceof ApiError ? err.message : t("common.genericError") });
       }
@@ -164,8 +170,8 @@ export default function AddBusinessPage() {
         <EmptyState
           icon={Building2}
           title="Siz biznes egasi emassiz"
-          body="Bu bo'lim faqat biznes egalari uchun mavjud."
-          actionLabel="Biznesni qo'shish"
+          body={t("addBusiness.errorForbidden")}
+          actionLabel="Biznesingizni toping"
           onAction={() => navigate(`/${lang}/search`)}
         />
       </div>

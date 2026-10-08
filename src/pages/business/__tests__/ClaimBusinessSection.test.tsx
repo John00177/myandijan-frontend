@@ -8,7 +8,13 @@ import BusinessDetailPage from "../../BusinessDetailPage";
 
 vi.mock("../../../lib/api", () => import("../../../test/apiMock"));
 
-import { ApiError, createClaim, getBusiness, getMe, mockBusiness, mockMyClaim } from "../../../test/apiMock";
+import { ApiError, createClaim, getBusiness, getMe, getMyClaims, mockBusiness, mockMyClaim } from "../../../test/apiMock";
+
+const noClaims = { data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } };
+const claimsPage = (claims: (typeof mockMyClaim)[]) => ({
+  data: claims,
+  meta: { page: 1, limit: 20, total: claims.length, totalPages: 1 },
+});
 
 /** Surfaces AuthContext's modal flag so the test can assert the auth gate fired. */
 function AuthModalProbe() {
@@ -61,6 +67,7 @@ describe("ClaimBusinessSection", () => {
 
   afterEach(() => {
     createClaim.mockReset();
+    getMyClaims.mockReset().mockResolvedValue(noClaims);
   });
 
   it("shows the claim CTA for an unclaimed business", async () => {
@@ -134,5 +141,41 @@ describe("ClaimBusinessSection", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Kutilmoqda..." })).toBeDisabled());
     resolveClaim(mockMyClaim);
     expect(await screen.findByText("Da'vo yuborildi")).toBeInTheDocument();
+  });
+
+  // Phase 16D: after a reload the pending claim is shown, not the CTA.
+  it("shows the under-review state instead of the CTA when the user already has a pending claim here", async () => {
+    signIn();
+    getMyClaims.mockResolvedValue(claimsPage([{ ...mockMyClaim, status: "PENDING" }]));
+
+    renderBusinessDetailPage();
+
+    expect(await screen.findByText("Da'vongiz ko'rib chiqilmoqda")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Egalik qilish" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the CTA when the user's claim here was rejected, or their pending claim is for another business", async () => {
+    signIn();
+    getMyClaims.mockResolvedValue(
+      claimsPage([
+        { ...mockMyClaim, id: 2, status: "REJECTED", rejectionReason: "Hujjat yetarli emas" },
+        { ...mockMyClaim, id: 3, status: "PENDING", business: { id: 99, slug: "boshqa", name: "Boshqa biznes" } },
+      ]),
+    );
+
+    renderBusinessDetailPage();
+
+    expect(await screen.findByRole("button", { name: "Egalik qilish" })).toBeInTheDocument();
+    expect(screen.queryByText("Da'vongiz ko'rib chiqilmoqda")).not.toBeInTheDocument();
+  });
+
+  it("does not ask for the user's claims when the business already has an owner", async () => {
+    signIn();
+    getBusiness.mockResolvedValue({ ...mockBusiness, ownerId: 99 });
+
+    renderBusinessDetailPage();
+
+    await screen.findByText(mockBusiness.nameUz);
+    expect(getMyClaims).not.toHaveBeenCalled();
   });
 });
