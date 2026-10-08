@@ -525,6 +525,14 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 
 ---
 
+### D-79 · Creating a listing stays BUSINESS_OWNER-only; 16D is re-scoped around it 🔒 LOCKED
+**Decision (owner, 2026-10-08).** D-75 is kept: `business.create` remains a BUSINESS_OWNER capability; a CUSTOMER cannot create a listing. A customer reaches ownership by **claiming** an existing listing (an approved claim promotes the claimant to BUSINESS_OWNER), or registers as a business owner (`RegisterDto` allows CUSTOMER or BUSINESS_OWNER).
+**Consequence for Phase 16D.** The planned "CUSTOMER `business.create`" item is dropped. 16D keeps the UX that does not depend on it — claim and listing status shown to claimants and owners, 403 copy that points to the claim path (frontend branch `feat/16d-claim-status-ux`, 2026-10-08) — and two items that need API work, not authorization: an owner path to resubmit a REJECTED listing, and one create route instead of `POST /businesses` + `POST /me/businesses`.
+**Reason:** the owner kept D-75's capability model as decided; no further reason recorded.
+**Alternative rejected:** granting CUSTOMER `business.create` (would reverse D-75).
+**Revisit when:** the owner reopens self-service listing creation.
+
+---
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.
