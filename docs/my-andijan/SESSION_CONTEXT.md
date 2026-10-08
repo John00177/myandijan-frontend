@@ -405,3 +405,14 @@ SIG Gate 2 only, separate from Phase 16. The owner authorized a strictly read-on
   record. Production P10 (16 migrations) equals the deployed commit, not `main` (17).
 - **Not done:** no write pause, no R-E4, no deployment, no production mutation, no production secrets retrieved.
 - **Record:** `GATE_02_REPORT.md` §19 (gate folder outside the repositories); state in `CURRENT_STATE.md`.
+
+## 2026-10-08 — D-79, partial 16D, deploy runbook, `.env.example`
+
+No production, Railway, Notion or Todoist change; nothing merged by Claude. Backend #11 and frontend #7 (16E.1) were merged by the owner earlier the same day.
+
+- **Decision D-79** (owner): keep D-75 — creating a listing stays BUSINESS_OWNER-only. 16D drops the CUSTOMER `business.create` item.
+- **16D, frontend part** (branch `feat/16d-claim-status-ux`, `08296a1`): the two Phase 9 claim follow-ups from `TODO.md` (rejection reason on `ProfilePage`; "under review" instead of the CTA after a reload) and the owner side (HIDDEN labelled — it had rendered an empty badge because `BusinessStatusValue` lacked it; reason on REJECTED / SUSPENDED listings), plus 403 copy. The deployed API `2ea83b6` already returns every field used. Full suite 324 tests, lint and build green.
+- **Runbook:** `PHASE_16_DEPLOY_RUNBOOK.md`. Non-obvious: the schema has no `directUrl` yet (Gate 2 Phase C not merged), so migrations run on `DATABASE_URL` — had Gate 2 Phase D run in production, the 16H migration's `LOCK TABLE` / `CREATE INDEX` would fail. Hence entry check E4.
+- **`.env.example`** (API branch `docs/env-example-names`, `d2fa9e3`): the seven missing names. Non-obvious: `ESKIZ_BASE_URL` must stay commented out (read with `??`; an empty string would replace the default), and without the `SUPABASE_*` pair the API does not boot — `ENVIRONMENT.md` had said uploads answer 500.
+- **Docs corrected:** `ENVIRONMENT.md` §1.5 still described pre-15E.2 SMS behaviour (success with no SMS sent); it now says 503 / fail closed.
+- **On rebase onto `main` after frontend PR #25:** the SIG Gate 2 block #25 had added to the then-current state section was carried into the new top section, and the runbook gained entry check E0 ("Gate 2 not open" — #25's own rule, not a new one).

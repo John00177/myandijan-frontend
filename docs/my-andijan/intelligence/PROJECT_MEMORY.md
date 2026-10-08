@@ -56,6 +56,7 @@ Local clones on the primary machine: `D:\My-Andijan-Work\myandijan-frontend`, `D
 | An architectural or product decision | `DECISIONS.md` | `DECISIONS.md` (new `D-NN`) |
 | Prerendering / SSR | `../SSG.md` | `../SSG.md` |
 | Production database privileges (SIG Gate 2) | `my-andijan-api/db/privileges/RUNBOOK.md` | that runbook (API repo) |
+| The Phase 16 API deploy (first deploy after Railway returns) | `PHASE_16_DEPLOY_RUNBOOK.md` | that runbook; record the outcome in `CURRENT_STATE.md` |
 | Refresh-token / session design history | `PHASE_15E4_REFRESH_TOKEN_ARCHITECTURE.md`, `PHASE_15E4D_ACCESS_TOKEN_SESSION_BINDING_ARCHITECTURE.md` | Historical design records — do not edit; supersede via `DECISIONS.md` |
 | Development history | `SESSION_CONTEXT.md` | `SESSION_CONTEXT.md` (append, never rewrite) |
 
