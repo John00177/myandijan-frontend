@@ -16,6 +16,7 @@ import type {
   Branch,
   Business,
   BusinessEditDetail,
+  BusinessStatusValue,
   Category,
   CreateBusinessPayload,
   CreateEventPayload,
@@ -1166,6 +1167,14 @@ export function updateMyBusiness(
   payload: { name?: string; description?: string; categoryId?: number },
 ): Promise<MyBusinessDetail> {
   return authedPatchJson<MyBusinessDetail>(`/me/businesses/${id}`, payload);
+}
+
+// Phase 16I: sends a REJECTED listing back to moderation (REJECTED -> PENDING)
+// once the owner has fixed it. The API answers 409 when the listing is no
+// longer REJECTED. It returns the bare business row (no branches), so callers
+// reload the list rather than merging this into a MyBusiness.
+export function resubmitMyBusiness(id: number): Promise<{ id: number; status: BusinessStatusValue }> {
+  return authedPostJson<{ id: number; status: BusinessStatusValue }>(`/me/businesses/${id}/resubmit`, {});
 }
 
 export function updateMyBranch(

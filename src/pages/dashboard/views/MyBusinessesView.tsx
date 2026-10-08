@@ -15,6 +15,7 @@ import {
   ApiError,
   getMyBusinessById,
   getMyBusinesses,
+  resubmitMyBusiness,
   updateBusiness,
   updateBusinessHours,
   updateMyBranch,
@@ -71,10 +72,11 @@ interface MyBusinessesViewProps {
 }
 
 export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesViewProps) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const fetcher = useCallback(() => getMyBusinesses(), []);
   const { data: businesses, state, status, reload } = useAdminResource(fetcher);
+  const [resubmittingId, setResubmittingId] = useState<number | null>(null);
 
   const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [editingBusiness, setEditingBusiness] = useState<EditableBusiness | null>(null);
@@ -168,6 +170,23 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
     }
   }
 
+  // Phase 16I: REJECTED -> PENDING once the owner has fixed the listing. The
+  // list is reloaded either way: on success it shows "Kutilmoqda", and on a
+  // 409 (already moved — another tab, or staff) it shows the real status.
+  async function handleResubmit(business: MyBusiness) {
+    setResubmittingId(business.id);
+    try {
+      await resubmitMyBusiness(business.id);
+      setToast({ tone: "success", text: t("myBusinesses.resubmitSuccess") });
+    } catch (err) {
+      const conflict = err instanceof ApiError && err.status === 409;
+      setToast({ tone: "error", text: t(conflict ? "myBusinesses.resubmitConflict" : "myBusinesses.resubmitError") });
+    } finally {
+      setResubmittingId(null);
+      reload();
+    }
+  }
+
   return (
     <div>
       {toast && (
@@ -240,9 +259,23 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
                       <span className="font-medium">Sabab:</span> {reason}
                     </p>
                   )}
+                  {business.status === "REJECTED" && (
+                    <p className="text-xs text-ink-muted mt-2">{t("myBusinesses.resubmitHint")}</p>
+                  )}
                   <Button variant="ghost" size="sm" className="w-full mt-3" onClick={() => openEditModal(business)}>
                     Tahrirlash
                   </Button>
+                  {business.status === "REJECTED" && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="w-full mt-2"
+                      disabled={resubmittingId === business.id}
+                      onClick={() => handleResubmit(business)}
+                    >
+                      {t("myBusinesses.resubmit")}
+                    </Button>
+                  )}
                 </div>
               </div>
             );

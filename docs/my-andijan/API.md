@@ -255,6 +255,7 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 | POST | `/me/businesses` | Create a business as owner | **⭕** |
 | GET | `/me/businesses/:id` | **Full** detail — backs the edit modal | ✅ |
 | PATCH | `/me/businesses/:id` | Update my business | ✅ |
+| POST | `/me/businesses/:id/resubmit` | **Phase 16I** (API branch `feat/16i-owner-resubmit`, not merged/deployed): send my **REJECTED** listing back to review → `PENDING`. No body. **409** in any other status; **404** if not mine. Keeps `rejectionReason` for the moderator; audited (`UPDATE`, `before`/`after`) | ✅ `MyBusinessesView` |
 | POST | `/me/businesses/:id/branches` | Add a branch | **⭕** |
 | PATCH | `/me/branches/:id` | Update a branch (`phone`, `address`, `districtId`) | ✅ |
 | GET | `/me/reviews` | Reviews on my businesses (paginated) | ✅ |
@@ -570,6 +571,7 @@ Authoritative and generated from the backend's committed `src/authz/route-author
 | POST | `/favorites` | authenticated |
 | POST | `/me/businesses` | `business.create` |
 | POST | `/me/businesses/:id/branches` | `business.manage_own` |
+| POST | `/me/businesses/:id/resubmit` | `business.manage_own` (Phase 16I, branch only) |
 | POST | `/me/claims` | `business.claim` |
 | POST | `/me/events` | `business.manage_own` |
 | POST | `/me/health-score/recommendations/:id/complete` | `business.manage_own` |

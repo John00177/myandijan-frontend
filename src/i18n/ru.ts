@@ -425,6 +425,13 @@ const ru: Record<keyof typeof uz, string> = {
   "businessClaim.rejectionReasonLabel": "Причина",
   "businessClaim.pendingTitle": "Ваша заявка на рассмотрении",
 
+  // Phase 16I — owner resubmits a rejected listing for review
+  "myBusinesses.resubmit": "Отправить на повторную проверку",
+  "myBusinesses.resubmitHint": "Исправьте замечания, затем отправьте бизнес на повторную проверку.",
+  "myBusinesses.resubmitSuccess": "Бизнес отправлен на повторную проверку",
+  "myBusinesses.resubmitError": "Не удалось отправить бизнес. Попробуйте ещё раз.",
+  "myBusinesses.resubmitConflict": "Этот бизнес больше не отклонён. Список обновлён.",
+
   "common.retry": "Повторить",
   "menuLoadFailed": "Не удалось загрузить меню",
   "menuLoadFailedBody": "Проблема с подключением. Попробуйте снова.",

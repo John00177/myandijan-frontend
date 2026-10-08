@@ -155,7 +155,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Owner dashboard shell | **IMPLEMENTED** | 8 views |
-| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch. **Phase 16D:** every status labelled (HIDDEN no longer renders an empty badge, here and on the dashboard home); a REJECTED or SUSPENDED listing shows the admin's reason (`rejectionReason`). No owner resubmit yet — the API has no owner path from REJECTED back to PENDING |
+| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch. **Phase 16D:** every status labelled (HIDDEN no longer renders an empty badge, here and on the dashboard home); a REJECTED or SUSPENDED listing shows the admin's reason (`rejectionReason`). **Phase 16I (PARTIALLY IMPLEMENTED — branches, not merged/deployed):** a REJECTED listing offers "Qayta ko'rib chiqishga yuborish" (uz/ru/en), calling `POST /me/businesses/:id/resubmit` (REJECTED → PENDING); a 409 refreshes the list. Until the API route is deployed the button answers 404 → the generic error toast |
 | Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours |
 | Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
 | Reviews + reply | **IMPLEMENTED** | |
