@@ -6,6 +6,7 @@ import Button from "../../components/ui/Button";
 import { getAdminBusinessById } from "../../lib/api";
 import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/motion-config";
 import type { AdminBranchDetail, AdminBusiness, AdminBusinessDetail, MyBranchHour } from "../../types";
+import { reReviewReason } from "./reReview";
 import { BusinessStatusBadge, formatDate } from "./statusLabels";
 
 // dayOfWeek is 0 = Monday … 6 = Sunday (NOT Date.getDay()) — same labels as
@@ -211,6 +212,9 @@ export default function BusinessReviewDrawer({
   const cover = business?.coverPhoto ?? business?.coverUrl ?? null;
   const extraBranches = (business?.branchCount ?? 1) - 1;
   const isPending = (business?.status ?? "").toUpperCase() === "PENDING";
+  // Back for re-review (Phase 16I.1): the earlier reason, so the moderator
+  // checks whether the owner fixed exactly that.
+  const previousReason = business ? reReviewReason(business) : null;
 
   return (
     <AnimatePresence>
@@ -251,6 +255,12 @@ export default function BusinessReviewDrawer({
             </div>
 
             <div className="flex-1 p-6 flex flex-col gap-5">
+              {previousReason && (
+                <div className="pl-3 border-l-2 border-warning/40 text-sm">
+                  <p className="font-semibold text-ink">Qayta ko'rib chiqish</p>
+                  <p className="text-ink-muted">Oldingi sabab: {previousReason}</p>
+                </div>
+              )}
               {cover && (
                 <img
                   src={cover}
