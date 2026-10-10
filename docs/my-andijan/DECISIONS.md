@@ -533,6 +533,15 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 **Revisit when:** the owner reopens self-service listing creation.
 
 ---
+
+### D-80 · SIG Gate 2 paused before Phase A; Gate 2 is no longer a Phase 16 deploy blocker 🔓 REVISITABLE
+**Decision (owner, 2026-10-10).** SIG Gate 2 is **paused before Phase A**. Phase A (`10_phase_a_boundary.sql`) was never executed; **production mutation: NONE** — production is clean (no Gate 2 roles, grants or functions). Gate 2 no longer blocks the Phase 16 API deploy.
+**Rule while paused:** **no `GRANT` to `runtime_app_public`** — in a migration, a script or manual SQL. The role does not exist in production; `RUNBOOK.md` §10 grant lines apply only after Gate 2 resumes and Phase A has run.
+**Consequence:** the Phase 16 deploy runbook entry check E0 ("Gate 2 is not open") is satisfied by this pause; the R-E4 dump kept on `R:` stays until the owner decides otherwise. Resuming Gate 2 needs a new owner decision.
+**Reason:** owner decision; no further reason recorded.
+**Revisit when:** the owner resumes Gate 2.
+
+---
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

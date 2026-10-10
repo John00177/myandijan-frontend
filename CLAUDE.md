@@ -13,6 +13,8 @@ Claude Code instructions for this repository. **Read [`AGENTS.md`](AGENTS.md) fi
 
 ## This repository
 
+- **Home path: `D:\My-Andijan-Work` only** — `D:\My-Andijan-Work\myandijan-frontend` and `D:\My-Andijan-Work\my-andijan-api`. Do not work in other clones (Desktop, `D:\My-Andijan`, Temp worktrees); `D:\My-Andijan-SAFE` and the SIG gate record are read-only references.
+- **SIG Gate 2 is paused (owner, 2026-10-10, D-80): no `GRANT` to `runtime_app_public`** — not in a migration, a script or manual SQL — until the owner resumes Gate 2 and Phase A has run (`my-andijan-api/db/privileges/RUNBOOK.md` §10).
 - **Canonical project memory for BOTH repositories lives here**, in `docs/my-andijan/`. Backend work records its memory update here, in a `docs/` PR.
 - Commands: `npm run dev` (port **5180** — never kill whatever holds 5173), `npm run build`, `npm run lint` (Oxlint), `npm test` (Vitest), `npm run sitemap` (needs the API).
 - Every network call goes through `src/lib/api.ts`; i18n source of truth is `src/i18n/uz.ts`. The full do-not-break list is in `ENGINEERING_RULES.md` §2–§3.

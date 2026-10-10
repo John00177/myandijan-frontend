@@ -2,7 +2,20 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-09, after the SIG Gate 2 R-E4 window (authoritative)
+## Current state — 2026-10-10, SIG Gate 2 paused (authoritative)
+
+Everything in the 2026-10-09 section below still holds (repositories, production, open PRs, release facts), **except SIG Gate 2**:
+
+- **SIG Gate 2: PAUSED before Phase A** (owner decision, 2026-10-10; **D-80**). Phase A never executed. **Production mutation: NONE** — production is clean.
+- **Gate 2 is no longer a Phase 16 deploy blocker.** Runbook entry check E0 is satisfied by the pause. The API release still follows [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md); a merge to API `main` still deploys without waiting for CI (`checkSuites=false`).
+- **While Gate 2 is paused: no `GRANT` to `runtime_app_public`** (migration, script or manual SQL). `RUNBOOK.md` §10 applies only after Gate 2 resumes and Phase A has run.
+- Unsaved release work from the `wt-blockers` worktree (`RELEASE_16H_PLAN.md`, deploy-runbook corrections) is preserved on draft branch `docs/release-blockers-2026-10-10` — not merged.
+
+**Next action:** owner decides the API release (Option B plan on the draft branch); Gate 2 resumes only by a new owner decision.
+
+---
+
+## Current state — 2026-10-09, after the SIG Gate 2 R-E4 window (historical — superseded 2026-10-10 for SIG Gate 2 only)
 
 **Repositories** (verified 2026-10-09 from Git and GitHub's API, read-only)
 
