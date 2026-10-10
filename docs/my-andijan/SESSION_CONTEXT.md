@@ -416,3 +416,18 @@ No production, Railway, Notion or Todoist change; nothing merged by Claude. Back
 - **`.env.example`** (API branch `docs/env-example-names`, `d2fa9e3`): the seven missing names. Non-obvious: `ESKIZ_BASE_URL` must stay commented out (read with `??`; an empty string would replace the default), and without the `SUPABASE_*` pair the API does not boot — `ENVIRONMENT.md` had said uploads answer 500.
 - **Docs corrected:** `ENVIRONMENT.md` §1.5 still described pre-15E.2 SMS behaviour (success with no SMS sent); it now says 503 / fail closed.
 - **On rebase onto `main` after frontend PR #25:** the SIG Gate 2 block #25 had added to the then-current state section was carried into the new top section, and the runbook gained entry check E0 ("Gate 2 not open" — #25's own rule, not a new one).
+
+## 2026-10-09 — SIG Gate 2: R-E4 maintenance window W0–W9 (R-E4 MET)
+
+SIG Gate 2 only, separate from Phase 16. Operator John; every step separately owner-authorized; Claude ran only read-only checks and the local restore. Record: gate-02 `SESSION_LOG.md` Entries 19–30; state in `CURRENT_STATE.md`.
+
+- **Window:** W0 15:04:53 → W9 16:46:32 UTC+05:00 (freeze held, then lifted). W2 Remove 15:56:41; API outage ~44 min.
+- **R-E4 MET:** dump under the verified pause (P4 0 rows at W3 and W5), frame intact; isolated PostgreSQL 18.6 restore matched all 33 tables / 316 rows (= W1 = W4 paused baseline).
+- **Resume:** active API deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`, `SUCCESS`, commit `2ea83b6…`, a Rollback of `6b5f057b…` (same image snapshot).
+- **Non-obvious:**
+  - Railway's Rollback creates a **new deployment ID**; read literally, runbook stop condition 11 would fail a correct resume. Owner approved Option A for this window; the runbook wording fix is a separate docs PR (not merged into the frozen window).
+  - Railway keeps Rollback for a removed deployment only during image retention (Hobby 72 h); older removed deployments show `canRollback: false` for that reason, not because of the Remove.
+  - The API service has `checkSuites=false`: a merge to API `main` deploys without waiting for CI.
+  - Two rollback deployments appeared (`61082d56…` superseded by `2e7eb32a…`); cause unconfirmed.
+- **Artifacts:** dump kept on the encrypted `R:` volume until Gate 2 closes; `remote-dump.sh`, `*.framed`, `prod.raw` moved to the `R:` Recycle Bin, then purged and verified 2026-10-09 (owner deletion; disk blocks not overwritten).
+- **Not done:** Phase A (not started), runbook change, any deployment of `main`.

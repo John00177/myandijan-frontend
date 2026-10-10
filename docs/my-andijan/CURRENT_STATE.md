@@ -2,7 +2,80 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-08, after the 16E.1 merges (authoritative)
+## Current state — 2026-10-09, after the SIG Gate 2 R-E4 window (authoritative)
+
+**Repositories** (verified 2026-10-09 from Git and GitHub's API, read-only)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | backend PR #26 — `.env.example` variable names (docs; after #11, 16E.1, `de9c55f`) |
+| Frontend `myandijan-frontend` | **`9435dcd`** | frontend PR #26 — Phase 16 deploy-day runbook + memory (merged 2026-10-08 10:56 UTC) |
+
+CI `test-and-build` `success` on both `main` heads.
+
+**Production** (evidence: Railway API and GitHub Deployments API, read-only, 2026-10-09)
+
+| | Deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | Commit **`2ea83b6`**. Active since 2026-10-09 16:40:47 UTC+05:00: **`2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`**, `SUCCESS` — a Railway **Rollback** of `6b5f057b-ea08-4252-b5fa-79910859f8d8` (same image snapshot, no build), made in the Gate 2 R-E4 window (below). `GET /categories` 200 | Nothing merged to the API after `2ea83b6` is live — backend PRs #10, #11, #14–#21, #23–#26 |
+| **Frontend — Vercel** | `9435dcd`: Production deployment `success` 2026-10-08 10:56 UTC. Live bundle not probed (MEMORY_CONTRACT §5) | Vercel deploys every frontend `main` merge to production |
+
+**Railway:** plan **Hobby** (owner's Billing screenshot, 2026-10-09); a Rollback deployment succeeded 2026-10-09, so deployments are possible. The API service deploys `main` with `source.checkSuites=false`: a merge to API `main` **deploys without waiting for CI** (verified at W0). The API release stays blocked by SIG Gate 2 (entry check E0, below).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · **16D PARTIAL** (frontend #27 merged; the rest needs API work; D-79) · 16E, 16F, 16G, 16H CODE COMPLETE, not deployed · **16I in review:** API #27 and frontend #29 (owner resubmits a rejected listing), frontend #30 (admin re-review context) — open, not merged. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Owner decisions (unchanged):** **D-79** — creating a listing stays BUSINESS_OWNER-only. **Frontend #6 merges immediately after the API deploy, not before** (runbook §4).
+
+**Open PRs** (GitHub, 2026-10-09; all `test-and-build` `success`, mergeable)
+
+| PR | Head | State |
+| --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `610f527` | **Hold** until runbook §4 |
+| API #27 — 16I owner resubmit | `558641e` | Open. Merging deploys API `main` (`checkSuites=false`): not while Gate 2 is open |
+| frontend #29 — 16I resubmit UI | `5d23630` | Open; pairs with API #27 |
+| frontend #30 — 16I.1 admin re-review context | `cd9ca6d` | Open |
+| frontend #28 — business discovery + SEO business pages | `4808f74` | Open; merging deploys to Vercel production |
+| API #1, #2 · frontend #1, #2 | — | Dependabot, not reviewed; keep out of the release window |
+
+**Release facts for the next API deploy:** exactly one new migration, `20261007090000_phase16h_claim_pending_unique` (17 on `main`; production has 16, confirmed by Gate 2 P10 on 2026-10-09).
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Gate record (outside the repositories): `D:\My-Andijan\security-governance\SIG\gates\gate-02\` (SESSION_LOG Entries 19–30).
+Runbook: `my-andijan-api/db/privileges/RUNBOOK.md` at `ae43648`, unchanged.
+
+- **Status:** Gate 2 **OPEN** · **R-E4 MET** (2026-10-09) · **Phase A NOT STARTED**.
+- **Window W0–W9** (operator John; each step owner-authorized): 15:04:53 → **16:46:32 UTC+05:00**. Merge/deploy freeze
+  held, lifted at W9. W2 Remove 15:56:41; API outage ~44 min. P4 sessions 12 → 0 → 0 → 1; health 200 → 404 → 200.
+- **R-E4:** fresh `pg_dump` under the verified pause (frame intact, `pg_dump_exit=0`); isolated **PostgreSQL 18.6**
+  restore (`restore-check.sh` exit 0) matched **all 33 tables / 316 rows** (= W1 = W4 paused baseline; counts SHA-256
+  `d6fb3e49…3afb`); disposable cluster cleaned up.
+- **Resume — Option A (owner decision for this window):** a Railway Rollback creates a new deployment ID; the resume is
+  accepted when the active deployment is verified as the Rollback of the recorded deployment (`reason: rollback`, same
+  image snapshot, no build) on the recorded commit `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`. The runbook wording fix
+  is a separate docs PR, not yet made (merging it to API `main` would deploy `main`).
+- **Anomaly:** two rollback deployments — `61082d56-96be-4504-9fac-e6b8fab20d7c` (same commit and snapshot) was
+  superseded by `2e7eb32a…`. **Cause unconfirmed.**
+- **Artifacts:** the retained dump `railway-20261009-1607.dump` on the encrypted `R:` volume is **intact** (165,974 bytes,
+  SHA-256 `52faf948…0369`, verified 2026-10-09) and kept until Gate 2 closes. `remote-dump.sh`, `*.framed` and
+  `prod.raw` were **purged and verified 2026-10-09** (owner deletion from the `R:` Recycle Bin); their disk blocks were
+  **not overwritten — no secure erasure**. Six other files on `R:` await an owner decision.
+- **Production mutation by Claude: NONE** (read-only checks; W2 and W7 were the owner's Railway UI actions).
+- **Do not deploy API `main` while Gate 2 is open** (Phase 16 runbook E0): it carries the undeployed 16H migration.
+
+**Next action**
+
+1. **Owner:** review and merge this memory PR (docs only; deploys to Vercel).
+2. **Owner:** SIG Gate 2 next authorization gate — **Phase A** (`10_phase_a_boundary.sql`, RUNBOOK §6 Step 3); Phases
+   B–E and the Gate 2 close are each authorized separately.
+3. After Gate 2 closes: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md) §1–§5. Note: the Railway deploy of
+   `main` is **not** CI-gated (`checkSuites=false`).
+4. Open follow-ups: runbook Option A wording PR; confirm the cause of the second rollback deployment; review 16I
+   (API #27, frontend #29, #30) and frontend #28.
+
+---
+
+## Current state — 2026-10-08, after the 16E.1 merges (historical — superseded 2026-10-09)
 
 **Repositories** (verified 2026-10-08 from Git and GitHub's PR API)
 
