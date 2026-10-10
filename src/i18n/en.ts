@@ -425,6 +425,13 @@ const en: Record<keyof typeof uz, string> = {
   "businessClaim.rejectionReasonLabel": "Reason",
   "businessClaim.pendingTitle": "Your claim is under review",
 
+  // Phase 16I — owner resubmits a rejected listing for review
+  "myBusinesses.resubmit": "Resubmit for review",
+  "myBusinesses.resubmitHint": "Fix the issues, then send the listing back for review.",
+  "myBusinesses.resubmitSuccess": "Listing sent back for review",
+  "myBusinesses.resubmitError": "Couldn't resubmit the listing. Please try again.",
+  "myBusinesses.resubmitConflict": "This listing is no longer rejected. The list has been refreshed.",
+
   "common.retry": "Try again",
   "menuLoadFailed": "Could not load the menu",
   "menuLoadFailedBody": "There was a connection problem. Please try again.",

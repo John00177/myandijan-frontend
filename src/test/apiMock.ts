@@ -198,6 +198,7 @@ export const mockMyBusiness = {
 export const getBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinesses = vi.fn().mockResolvedValue([mockMyBusiness]);
+export const resubmitMyBusiness = vi.fn().mockResolvedValue({ id: 1, status: "PENDING" });
 
 export const mockMyStats: MyStats = {
   businessCount: 1,
