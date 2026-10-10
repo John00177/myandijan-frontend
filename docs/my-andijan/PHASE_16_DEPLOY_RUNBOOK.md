@@ -1,6 +1,6 @@
 # Phase 16 deploy-day verification runbook
 
-> **For the first API deploy after Railway access is restored.** Written 2026-10-08 against API `main` `de9c55f` (since then only backend #26, `.env.example` docs: `ae43648`) and frontend `main` `fa2a998`. If either `main` has moved, re-check §1 before starting. Every step that touches production is the **owner's action** (or Claude's only with the owner's explicit, per-step authorization in chat — `AGENTS.md`). Name variables, never values: nothing here needs a secret written down.
+> **For the first API deploy after Railway access is restored.** Written 2026-10-08 against API `main` `de9c55f` (since then only backend #26, `.env.example` docs: `ae43648`) and frontend `main` `fa2a998`. **Corrected 2026-10-10** (release candidate `ae43648`, frontend `main` `444bd12`): while SIG Gate 2 is open this runbook runs **only** under [`RELEASE_16H_PLAN.md`](RELEASE_16H_PLAN.md) (Option B), which holds the E0 exception, the pinned-commit release operation, the backup procedure, the 16H lock options and the post-deploy evidence list. If either `main` has moved, re-check §1 before starting. Every step that touches production is the **owner's action** (or Claude's only with the owner's explicit, per-step authorization in chat — `AGENTS.md`). Name variables, never values: nothing here needs a secret written down.
 
 ## 0. What ships
 
@@ -17,7 +17,7 @@ The API has not deployed since `2ea83b6` (backend PR #13, 2026-10-04). Deploying
 | 16H | One PENDING claim per (business, claimant) — **the one new migration** | #24 |
 | SIG Gate 2 | CI database suites, privilege runbook, R-E4 write-pause tooling — **no production effect by themselves** | #14–#16, #18, #25 |
 
-**Exactly one new migration:** `20261007090000_phase16h_claim_pending_unique` (17 in total). It locks `business_claims` briefly, closes any duplicate PENDING pairs (keeps the earliest; the rest become `REJECTED` with reason *"Duplicate of an earlier pending claim by the same user (closed automatically)"*; nothing is deleted), then builds the partial unique index `business_claims_one_pending_per_claimant`. Railway runs it as the pre-deploy command (`npx prisma migrate deploy`, `railway.json`). **A rollback does not reverse it** (`ENGINEERING_RULES.md` rule 15).
+**Exactly one new migration:** `20261007090000_phase16h_claim_pending_unique` (17 in total). It takes `SHARE ROW EXCLUSIVE` on `business_claims` — reads continue, claim writes wait — and, as merged, has **no `lock_timeout`**: behind an open writer transaction it waits without limit (2026-10-10 local test; options in `RELEASE_16H_PLAN.md` §2.2). It then closes any duplicate PENDING pairs (keeps the earliest; the rest become `REJECTED` with reason *"Duplicate of an earlier pending claim by the same user (closed automatically)"*; nothing is deleted), then builds the partial unique index `business_claims_one_pending_per_claimant`. Railway runs it as the pre-deploy command (`npx prisma migrate deploy`, `railway.json`). **A rollback does not reverse it** (`ENGINEERING_RULES.md` rule 15).
 
 Frontend: `main` already deploys to Vercel production on every merge. The only frontend change tied to this deploy is **frontend PR #6** (16C.1 verification note), held until §4 (owner decision, 2026-10-08).
 
@@ -25,7 +25,7 @@ Frontend: `main` already deploys to Vercel production on every merge. The only f
 
 | # | Check | How | Pass |
 | --- | --- | --- | --- |
-| E0 | **SIG Gate 2 is not open** | `CURRENT_STATE.md` — SIG Gate 2 block (frontend PR #25) | Gate 2 closed. Its rule: **do not deploy API `main` while Gate 2 is open** — the gate's window resumes only to the recorded W0 deployment. If it is open: stop |
+| E0 | **SIG Gate 2 is not open** | `CURRENT_STATE.md` — SIG Gate 2 block (frontend PR #25) | Gate 2 closed. Its rule: **do not deploy API `main` while Gate 2 is open** — the gate's window resumes only to the recorded W0 deployment. If it is open: stop — **unless** the owner has confirmed the written E0 exception (`RELEASE_16H_PLAN.md` §3) in chat and it is recorded in `DECISIONS.md`; then only the SHA it names, only outside a Gate 2 window, and finished before the next W0 |
 | E1 | Railway plan / access restored | Owner | Dashboard usable |
 | E2 | API `main` is the commit you intend to ship, and its CI passed | GitHub: `main` head and its `test-and-build` check | `de9c55f` (or a later commit you have reviewed) with `test-and-build` = success |
 | E3 | Exactly one new migration since `2ea83b6` | `git diff --name-status 2ea83b6 <main> -- prisma` | One `A` under `prisma/migrations/` (the 16H one) + `M prisma/schema.prisma` (comment only). Anything else: stop and review |
