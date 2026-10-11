@@ -85,8 +85,16 @@ function defaultHours(): HourFormRow[] {
   }));
 }
 
-function hoursToGrid(hours: MyBranchHour[] | undefined): HourFormRow[] {
-  const grid = defaultHours();
+/**
+ * `blankUnknown` (the `preserveUnchangedHours` mode): a day with no stored row,
+ * and a stored null time (a 24-hour or closed day), start blank instead of
+ * 09:00/18:00 — so editing one half of such a day can never submit the other
+ * half from the placeholder.
+ */
+function hoursToGrid(hours: MyBranchHour[] | undefined, blankUnknown = false): HourFormRow[] {
+  const grid = blankUnknown
+    ? defaultHours().map((row) => ({ ...row, openTime: "", closeTime: "" }))
+    : defaultHours();
   if (!hours) return grid;
   for (const hour of hours) {
     const row = grid[hour.dayOfWeek];
@@ -97,6 +105,18 @@ function hoursToGrid(hours: MyBranchHour[] | undefined): HourFormRow[] {
     row.original = hour;
   }
   return grid;
+}
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** An edited open day needs both times, and they must differ; untouched days are not checked. */
+function invalidEditedDay(rows: HourFormRow[]): HourFormRow | undefined {
+  return rows.find(
+    (row) =>
+      row.touched &&
+      !row.isClosed &&
+      (!TIME_PATTERN.test(row.openTime) || !TIME_PATTERN.test(row.closeTime) || row.openTime === row.closeTime),
+  );
 }
 
 function toEmptyForm(business: EditableBusiness | null): EditBusinessFormState {
@@ -231,8 +251,10 @@ interface EditBusinessModalProps {
   submitting?: boolean;
   error?: string | null;
   /**
-   * Admin edit flow (Phase 16E): the hours grid is read-only until the real
-   * hours load, and a stored 24-hour day is labelled as such. GET
+   * Admin edit flow (Phase 16E), and since Phase 16 the owner edit flow too
+   * (MyBusinessesView): the hours grid is read-only until the real hours
+   * load, a stored 24-hour day is labelled as such, unknown times start blank
+   * and an edited day must be complete before submit. GET
    * /businesses/:id 404s for a business that is not APPROVED, so without this
    * the placeholder grid looked like real data and a save replaced the
    * business's actual hours with it. The caller decides what to submit from
@@ -286,6 +308,7 @@ export default function EditBusinessModal({
   const [status, setStatus] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
   const [hoursLoaded, setHoursLoaded] = useState(false);
+  const [hoursError, setHoursError] = useState<string | null>(null);
   const shouldAnimate = useShouldAnimate();
   const backdropTransition = useMotionTransition(TRANSITIONS.fast);
   const modalTransition = useMotionTransition(TRANSITIONS.modalSpring);
@@ -296,6 +319,7 @@ export default function EditBusinessModal({
     setBranchId(initial?.branchId ?? null);
     setStatus(initial?.status ?? null);
     setHoursLoaded(false);
+    setHoursError(null);
   }, [open, initial]);
 
   useEffect(() => {
@@ -322,7 +346,7 @@ export default function EditBusinessModal({
           instagram: detail.instagram ?? "",
           telegram: detail.telegram ?? "",
           website: detail.website ?? "",
-          hours: hoursToGrid(branch?.hours),
+          hours: hoursToGrid(branch?.hours, preserveUnchangedHours),
         });
         if (branch?.id != null) setBranchId(branch.id);
         if (detail.status != null) setStatus(detail.status);
@@ -342,7 +366,7 @@ export default function EditBusinessModal({
     return () => {
       cancelled = true;
     };
-  }, [open, businessId, loadDetail]);
+  }, [open, businessId, loadDetail, preserveUnchangedHours]);
 
   useEffect(() => {
     if (!open) return;
@@ -358,6 +382,7 @@ export default function EditBusinessModal({
   }
 
   function updateHourRow(dayOfWeek: number, patch: Partial<HourFormRow>) {
+    setHoursError(null);
     setForm((prev) => ({
       ...prev,
       hours: prev.hours.map((row) => (row.dayOfWeek === dayOfWeek ? { ...row, ...patch, touched: true } : row)),
@@ -367,6 +392,15 @@ export default function EditBusinessModal({
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
+    // Preserve mode only: an edited day is sent as typed, so it must be a
+    // complete time range — never half-blank, never the placeholder.
+    if (preserveUnchangedHours && hoursLoaded) {
+      const invalid = invalidEditedDay(form.hours);
+      if (invalid) {
+        setHoursError(`${DAY_LABELS[invalid.dayOfWeek]}: ochilish va yopilish vaqtini to'g'ri kiriting`);
+        return;
+      }
+    }
     onSave(form, { branchId, hoursLoaded });
   }
 
@@ -574,6 +608,7 @@ export default function EditBusinessModal({
                           <>
                             <input
                               type="time"
+                              aria-label={`${DAY_LABELS[row.dayOfWeek]}: ochilish vaqti`}
                               value={row.openTime}
                               onChange={(e) => updateHourRow(row.dayOfWeek, { openTime: e.target.value })}
                               className={`${inputClasses} h-9 px-2 flex-1`}
@@ -581,6 +616,7 @@ export default function EditBusinessModal({
                             <span className="text-ink-muted text-xs">—</span>
                             <input
                               type="time"
+                              aria-label={`${DAY_LABELS[row.dayOfWeek]}: yopilish vaqti`}
                               value={row.closeTime}
                               onChange={(e) => updateHourRow(row.dayOfWeek, { closeTime: e.target.value })}
                               className={`${inputClasses} h-9 px-2 flex-1`}
@@ -599,6 +635,11 @@ export default function EditBusinessModal({
                       </div>
                     ))}
                   </div>
+                  )}
+                  {hoursError && (
+                    <p role="alert" className="mt-2 text-xs text-danger">
+                      {hoursError}
+                    </p>
                   )}
                 </div>
 

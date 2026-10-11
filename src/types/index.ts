@@ -644,6 +644,12 @@ export interface MyBusiness {
 /** GET /me/businesses/:id — same as MyBusiness plus the fields the list endpoint omits. */
 export interface MyBusinessDetail extends MyBusiness {
   description?: string | null;
+  // Real Business columns, returned because OwnerService.findMyBusinessById
+  // uses Prisma `include` (every scalar comes back). Read by the owner edit
+  // modal's prefill (getMyBusinessEditDetail).
+  instagram?: string | null;
+  telegram?: string | null;
+  website?: string | null;
 }
 
 /**
