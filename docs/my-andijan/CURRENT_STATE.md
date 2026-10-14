@@ -11,7 +11,7 @@
 | Backend `my-andijan-api` | **`ae43648`** | 2026-10-08 (backend PR #26) |
 | Frontend `myandijan-frontend` | **`444bd12`** | 2026-10-09 (frontend PR #31 — Gate 2 R-E4 memory) |
 
-**Production** — on record 2026-10-09, **not re-verified 2026-10-11** (no production access this session): API on Railway runs commit **`2ea83b6`** (deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`, a Rollback made in the Gate 2 R-E4 window); frontend on Vercel — last production deployment on record `9435dcd` (2026-10-08); whether `444bd12` (docs only) was deployed is UNKNOWN. The API service deploys `main` with `checkSuites=false`, and **every frontend `main` merge deploys to Vercel production**.
+**Production** — on record 2026-10-09, **not re-verified 2026-10-11** (no production access this session): API on Railway runs commit **`2ea83b6`** (deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`, a Rollback made in the Gate 2 R-E4 window); frontend on Vercel — the latest Production deployment on record is `444bd12` (docs only; 2026-10-09T13:16:38Z, state success, per the repo's GitHub deployment records read 2026-10-14; the previous one was `9435dcd`, 2026-10-08). That is a deployment record only: no live smoke test or runtime check was done, so it does not prove the live site's behaviour. The API service deploys `main` with `checkSuites=false`, and **every frontend `main` merge deploys to Vercel production**.
 
 **New since 2026-10-09 — frontend PR #32** `fix(dashboard): never overwrite stored hours from the owner edit modal` — **open, not merged, not deployed**
 - Head **`f7776e3`** (`f7776e31aad91b023c7a8ef79e03d1c1490ec299`) plus this docs-only memory commit; base `main@444bd12`; GitHub: mergeable, `clean`.
