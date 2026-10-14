@@ -2,7 +2,56 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-09, after the SIG Gate 2 R-E4 window (authoritative)
+## Current state — 2026-10-11, owner hours-overwrite fix in review as frontend PR #32 (authoritative)
+
+**Repositories** (verified 2026-10-11 from Git and GitHub's API, read-only)
+
+| | `main` | Unchanged since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | 2026-10-08 (backend PR #26) |
+| Frontend `myandijan-frontend` | **`444bd12`** | 2026-10-09 (frontend PR #31 — Gate 2 R-E4 memory) |
+
+**Production** — on record 2026-10-09, **not re-verified 2026-10-11** (no production access this session): API on Railway runs commit **`2ea83b6`** (deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`, a Rollback made in the Gate 2 R-E4 window); frontend on Vercel — the latest Production deployment on record is `444bd12` (docs only; 2026-10-09T13:16:38Z, state success, per the repo's GitHub deployment records read 2026-10-14; the previous one was `9435dcd`, 2026-10-08). That is a deployment record only: no live smoke test or runtime check was done, so it does not prove the live site's behaviour. The API service deploys `main` with `checkSuites=false`, and **every frontend `main` merge deploys to Vercel production**.
+
+**New since 2026-10-09 — frontend PR #32** `fix(dashboard): never overwrite stored hours from the owner edit modal` — **open, not merged, not deployed**
+- Head **`f7776e3`** (`f7776e31aad91b023c7a8ef79e03d1c1490ec299`) plus this docs-only memory commit; base `main@444bd12`; GitHub: mergeable, `clean`.
+- **Checks on `f7776e3` (2026-10-11): `test-and-build` success; Vercel Preview Comments success; Vercel status success — a *preview* deployment only, not production.**
+- **Bug fixed:** the owner "My businesses" edit modal sent all 7 grid days to `PUT /businesses/:id/hours` (replaces every row) on **every** save, without `is24Hours`, prefilled from the APPROVED-only public `GET /businesses/:id` — so even a name change turned 24-hour days into 09:00–18:00, created placeholder rows, and replaced all hours of DRAFT/PENDING/REJECTED listings; a second detail fetch could also reset the loaded grid. **Production still has this bug until #32 is merged and deployed.**
+- **Fix:** prefill from `GET /me/businesses/:id` (`getMyBusinessEditDetail`, any status, fails closed without an hours list); `preserveUnchangedHours`; hours only via `adminHoursPayload` (nothing unless loaded and edited); no second fetch. Shared modal change, admin flow included: unknown times start blank and an edited day must be complete. No API/auth/migration change; both endpoints exist in the live API commit `2ea83b6` (source-checked).
+- **Validation (local, 2026-10-11, on `f7776e3`'s tree):** focused 14/14 (all 9 owner-flow tests fail on the old code); owner-dashboard + admin + modal suites 169/169; `npm run build` and `npm run lint` pass (0 errors, 17 pre-existing warnings); full suite **337/338** on the final run — the one failure was the known `App.routing` not-found timing flake (passes 5/5 ×3 in isolation; an earlier full run of the same tree was 338/338).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · 16E–16H CODE COMPLETE, not deployed · **16I in review:** API #27, frontend #29, #30 · **owner hours-overwrite fix: frontend #32 in review** · roadmap item 11 (Settings-page hours, `SettingsView`): implemented on a **local, uncommitted** branch `feat/16-settings-hours` — not on GitHub yet. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Owner decisions / release restrictions**
+- **D-79** unchanged. **Frontend #6 merges immediately after the API deploy, not before** (runbook §4).
+- **Owner, 2026-10-11 (chat):** do **not** merge or deploy (#32 included). The **SIG Gate 2 / public-release policy conflict remains unresolved**, and **security work remains deferred until public release**. No production release is authorized.
+
+**Open PRs** (GitHub, 2026-10-11)
+
+| PR | Head | State |
+| --- | --- | --- |
+| frontend #32 — owner hours-overwrite fix | `f7776e3` | Open, checks green; **do not merge** (owner hold) |
+| frontend #6 — 16C.1 verification note | `5832f10` | **Hold** until runbook §4 |
+| API #27 — 16I owner resubmit | `558641e` | Open. Merging deploys API `main` (`checkSuites=false`) |
+| frontend #29 — 16I resubmit UI | `149641b` | Open; pairs with API #27 |
+| frontend #30 — 16I.1 admin re-review context | `5c6d876` | Open |
+| frontend #28 — business discovery + SEO business pages | `8b3afe8` | Open; merging deploys to Vercel production |
+| API #28 — SIG Gate 2 Phase C (`directUrl`) | `e37e4d8` | Open; security work deferred (owner, 2026-10-11) |
+| API #1, #2 · frontend #1, #2 | — | Dependabot, not reviewed |
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Unchanged since the 2026-10-09 record below: Gate 2 **OPEN** · R-E4 **MET** (2026-10-09) · Phase A **NOT STARTED**. Gate record: `D:\My-Andijan\security-governance\SIG\gates\gate-02\`. Not touched this session; deferred per the owner's 2026-10-11 instruction above.
+
+**Next action**
+
+1. **Owner:** review frontend #32 (do not merge until a release is authorized). When merged, record its merge SHA here (a document cannot record the merge that contains it).
+2. **Owner:** resolve the SIG Gate 2 / public-release policy conflict; release order then per [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+3. Settings-page hours (`feat/16-settings-hours`): commit and open a PR when asked. It overlaps #32 only in `TODO.md` (Bugs entry — keep #32's "fixed" entry) and `src/test/apiMock.ts` (take #32's lines).
+
+---
+
+## Current state — 2026-10-09, after the SIG Gate 2 R-E4 window (historical — superseded 2026-10-11)
 
 **Repositories** (verified 2026-10-09 from Git and GitHub's API, read-only)
 
