@@ -81,7 +81,7 @@ describe("ClaimBusinessSection", () => {
 
     renderBusinessDetailPage();
 
-    await screen.findByText(mockBusiness.nameUz);
+    await screen.findByRole("heading", { name: mockBusiness.nameUz });
     expect(screen.queryByText("Bu sizning biznesingizmi?")).not.toBeInTheDocument();
   });
 
@@ -175,7 +175,7 @@ describe("ClaimBusinessSection", () => {
 
     renderBusinessDetailPage();
 
-    await screen.findByText(mockBusiness.nameUz);
+    await screen.findByRole("heading", { name: mockBusiness.nameUz });
     expect(getMyClaims).not.toHaveBeenCalled();
   });
 });
