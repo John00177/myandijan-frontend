@@ -74,7 +74,7 @@ Emitted tags:
 | `<title>` | caller |
 | `<meta name="description">` | caller |
 | `<link rel="canonical">` | `SITE_URL + pathForLang(pathname, lang)` |
-| `<meta name="robots" content="noindex, nofollow">` | when `noIndex` |
+| `<meta name="robots" content="noindex, nofollow">` | when `noIndex` — and then **no** canonical and **no** hreflang alternates (Phase 16F.1: canonical + noindex are contradictory signals) |
 | `<link rel="alternate" hreflang>` ×3 | `uz`, `ru`, `en` |
 | `<link rel="alternate" hreflang="x-default">` | points at the **`uz`** URL |
 | `og:site_name`, `og:title`, `og:description`, `og:type`, `og:url`, `og:image` (+ `width` 1200, `height` 630), `og:locale` | |
@@ -82,6 +82,8 @@ Emitted tags:
 | `twitter:card` (`summary_large_image`), `twitter:title`, `twitter:description`, `twitter:image` | |
 
 **Coverage:** `HomePage`, `SearchPage`, `CategorySearchPage`, `BusinessDetailPage`, `EventsPage`, `PricingPage`, `SignupPage`, `ClaimPage`, `FavoritesPage`, `ProfilePage`, `OwnerDashboard`, `AdminDashboard`, `AddBusinessPage` — i.e. **all public pages plus the private ones (which pass `noIndex`)**.
+
+**Not-found states (Phase 16F.1).** Because the SPA answers `200` for every URL, a missing page is kept out of the index with `noindex`, not a status code. `NotFoundState` renders the empty state plus `MetaTags noIndex` (title `"<not found> — My Andijan"`) when the absence is **confirmed** — business/category/event `404`, or a district slug matching nothing in the loaded list. A transient failure (network/5xx) emits no head tags, so a crawler that hits a blip is not told to drop a real page. Unknown paths under `/:lang` reach the `*` route (`NotFoundPage`, always noindex), and a first segment that is not `uz`/`ru`/`en` is redirected under `/uz` (`LangShell`) instead of rendering the homepage.
 
 **Supporting module `src/lib/seo.ts`:**
 - `SITE_URL` from `VITE_SITE_URL`, defaulting to `https://myandijan.uz`, trailing slash stripped. **Deploy previews should set `VITE_SITE_URL`** so they don't advertise production as their canonical — this is documented in the file and is a genuinely thoughtful detail.
@@ -182,6 +184,12 @@ The script is well-built:
 - Narrow API interfaces on purpose, so an unrelated payload change cannot break it.
 - Configurable via `SITE_URL` and `VITE_API_URL`.
 - 30 s request timeout.
+
+**Phase 16F.4 — all-or-nothing, and the full category tree.** The original generator turned any failed request into an empty list and wrote the files anyway, so running it while the API was down silently replaced the committed business/category/location sitemaps with empty ones and still exited 0. It now fetches everything first: a failed, non-2xx, malformed or truncated (> `MAX_PAGES`) response aborts **before any file is written**, prints `Sitemap generation aborted — no files were written`, and exits 1. Categories now come from `GET /categories` (every active category, nested ones included) instead of `GET /categories/homepage`, which only held the homepage tiles. Split into `scripts/sitemap/build.ts` (pure XML building) and `scripts/sitemap/generate.ts` (fetch + write, network/disk injected), both covered by `scripts/sitemap/__tests__`. **Regenerating the committed files needs the live API** (Railway) — the XML in `public/` is unchanged by this phase.
+
+**Phase 16F.5 — event detail pages.** A fifth sub-sitemap, `sitemap-events.xml`, lists every `/:lang/events/:slug` page from the paginated public `GET /events` (only PUBLISHED, non-deleted events — exactly what `GET /events/:slug` serves; past events included, since their pages still resolve). No `lastmod`: the list returns no `updatedAt`, and `startAt` is not a modification date. Fetched with the same all-or-nothing rules. The index lists the new file once the generator next runs against the live API; until then `public/` is unchanged.
+
+**Phase 16F.7 — real `lastmod` for businesses and events.** Business and event entries now carry `<lastmod>` from the API's `updatedAt` (API Phase 16F.6: views, favourites and RSVPs no longer move it, so it is the last real edit). Never `startAt`, view counts or the local clock. `toLastmod` treats the value as untrusted JSON: only a string that starts as a valid ISO calendar date (`YYYY-MM-DD…`) becomes a `YYYY-MM-DD` lastmod; a missing, non-string, non-ISO, impossible (`2026-02-30`), out-of-range or future (after the run's date) value simply omits `<lastmod>` for that URL — the URL itself is always kept, so a bad date can neither break the XML nor drop a page. Apart from those `<lastmod>` lines, the output is byte-identical to before. Still waits on Railway for the API to serve `updatedAt` and for `public/` to be regenerated.
 
 ### Why the business sitemap is empty — and the fix
 

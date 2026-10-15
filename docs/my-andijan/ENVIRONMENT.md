@@ -41,7 +41,7 @@ Local form (from `.env.example`): a `postgresql://` URL against the `docker-comp
 | `SUPABASE_SERVICE_KEY` | **Yes, for any image upload** | `upload.service.ts` | **`service_role` key — the highest-privilege Supabase credential. Bypasses Row Level Security entirely.** Must never leave the server. |
 | `SUPABASE_ANON_KEY` | **No — UNUSED by code** | **nothing** | Present in `.env` but not referenced anywhere. It was tried first and abandoned: the `anon` key made every upload fail with *"new row violates row-level security policy"*, because it is meant for browser-to-Supabase calls under RLS and this backend holds no Supabase Auth session. Harmless to keep, but it is not wired up. |
 
-> **⚠ Undocumented in `.env.example`.** All three `SUPABASE_*` variables exist in the real `.env` but are **absent from `.env.example`**. A new developer following `.env.example` gets an API where every image upload returns `500 "Image upload is not configured"`. **Add them to `.env.example` (names only, placeholder values).**
+> **`.env.example` (updated 2026-10-08):** `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are added, empty, by backend PR #26 (merged 2026-10-08, `ae43648`). Before that they were absent, and — correcting the earlier wording here — a developer following `.env.example` got an API that **does not boot**, not one whose uploads answer 500: `UploadService` checks both in its constructor and `AuthModule` provides it (footnote ¹ below). `SUPABASE_ANON_KEY` stays out: nothing reads it.
 >
 > `UploadService` throws `InternalServerErrorException` **in its constructor** when either is missing — so a misconfigured environment fails at module instantiation, i.e. the whole API refuses to boot rather than failing only on upload. Worth knowing when debugging a boot failure.
 
@@ -54,9 +54,9 @@ Local form (from `.env.example`): a `postgresql://` URL against the `docker-comp
 | `ESKIZ_FROM` | No | omitted | `sms.service.ts` | Sender ID; only appended when set |
 | `ESKIZ_BASE_URL` | No | **`https://notify.eskiz.uz/api`** | `sms.service.ts` | Override for testing |
 
-> **⚠ These four are NOT in `.env.example` AND are NOT set on Railway.** `SmsService.isConfigured` returns false when email or password is missing, and `send()` then **logs a warning and returns normally instead of throwing** — deliberately, so an SMS outage cannot fail an OTP request whose code has already been persisted.
+> **Not set on Railway** (last recorded 2026-10-04). Added to `.env.example` on 2026-10-08 by backend PR #26 (`ae43648`): `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM` empty, and `ESKIZ_BASE_URL` **commented out** — it is read with `??`, so an empty value would replace the default URL with `""`. *Superseded behaviour:* the request used to log a warning and report success; **since Phase 15E.2 (D-76) it fails closed** — `isConfigured` false → `POST /auth/otp/request` and `/auth/forgot-password` answer **503**, and no code is logged.
 >
-> **The consequence is the project's most important operational fact:** `POST /auth/otp/request` returns `{"success":true,"message":"Kod yuborildi"}` in production while **no SMS is sent**. The same applies to password-reset codes (`auth.service.ts:347` — `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`). **Signup and password reset are unusable by real users until these are set.**
+> **The consequence (current since 15E.2):** OTP sign-in and SMS password reset answer **503** in production, so neither is usable by real users until these are set. *(Historical: before 15E.2 the request returned `{"success":true}` while no SMS was sent, and reset codes were logged.)*
 >
 > Setting them is necessary but not sufficient: **the SMS template must also be registered in the Eskiz dashboard.** The intended template is `"My Andijan tasdiqlash kodi: {code}. @myandijan.uz #{code}"` — the trailing `@domain #code` line is what enables Android's WebOTP auto-read.
 
@@ -84,16 +84,17 @@ Local form (from `.env.example`): a `postgresql://` URL against the `docker-comp
 | `JWT_REFRESH_EXPIRES_IN` | opt | opt | ✅ | ✅ |
 | `JWT_REFRESH_SECRET` | — | — | ✅ | ❌ **dead** |
 | `PORT` | opt | auto | ✅ | ✅ |
-| `SUPABASE_URL` | Req¹ | **Req** | ❌ **missing** | ✅ |
-| `SUPABASE_SERVICE_KEY` | Req¹ | **Req** | ❌ **missing** | ✅ |
+| `SUPABASE_URL` | Req¹ | **Req** | ✅ (backend #26, 2026-10-08) | ✅ |
+| `SUPABASE_SERVICE_KEY` | Req¹ | **Req** | ✅ (backend #26, 2026-10-08) | ✅ |
 | `SUPABASE_ANON_KEY` | — | — | ❌ | ❌ unused |
-| `ESKIZ_EMAIL` | opt | **should be set** | ❌ **missing** | ✅ |
-| `ESKIZ_PASSWORD` | opt | **should be set** | ❌ **missing** | ✅ |
-| `ESKIZ_FROM` | opt | opt | ❌ **missing** | ✅ |
-| `ESKIZ_BASE_URL` | opt | opt | ❌ **missing** | ✅ |
+| `ESKIZ_EMAIL` | opt | **should be set** | ✅ (backend #26, 2026-10-08) | ✅ |
+| `ESKIZ_PASSWORD` | opt | **should be set** | ✅ (backend #26, 2026-10-08) | ✅ |
+| `ESKIZ_FROM` | opt | opt | ✅ (backend #26, 2026-10-08) | ✅ |
+| `ESKIZ_BASE_URL` | opt | opt | ✅ commented out (backend #26, 2026-10-08) | ✅ |
 | `SEED_ADMIN_PHONE` | seed | seed | ✅ | ✅ |
 | `SEED_ADMIN_PASSWORD` | seed | seed | ✅ | ✅ |
 | `SEED_ADMIN_EMAIL` | seed | seed | ✅ | ✅ |
+| `SEED_ROLE_PASSWORD` | script | script | ✅ (backend #26, 2026-10-08) | ✅ `scripts/seed-role-accounts.js` |
 
 ¹ Required for the API to boot at all, because `UploadService`'s constructor throws without them.
 
@@ -138,7 +139,7 @@ Used by `scripts/generate-sitemap.ts` (`npm run sitemap`), which runs in Node an
 | File | Repo | Gitignored | Holds |
 | --- | --- | --- | --- |
 | `.env` | api | ✅ (verified via `git check-ignore`) | Local dev + real secrets. **Correction 2026-09-28:** its `DATABASE_URL` points at **`localhost`**, not production — an earlier draft of this document said production, which was wrong. It does hold a real Supabase **service-role** key, both JWT secrets, and seed admin credentials. |
-| `.env.example` | api | ❌ committed | Placeholders only. **Incomplete — missing all `SUPABASE_*` and `ESKIZ_*`.** |
+| `.env.example` | api | ❌ committed | Placeholders only. **Complete since backend PR #26 (merged 2026-10-08, `ae43648`):** every variable the code reads is listed, all empty or placeholder; `ESKIZ_BASE_URL` commented out. Still lists the dead `JWT_REFRESH_SECRET` (`TODO.md`). |
 | `.env` | frontend | ✅ (`.env`, `.env*`) | `VITE_API_URL` |
 | `.env.local` | frontend | ✅ | `VERCEL_OIDC_TOKEN` |
 

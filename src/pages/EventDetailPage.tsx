@@ -1,8 +1,8 @@
-import { Calendar, CalendarCheck, MapPin, SearchX, Users } from "lucide-react";
+import { Calendar, CalendarCheck, MapPin, Users } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import MetaTags from "../components/seo/MetaTags";
-import EmptyState from "../components/ui/EmptyState";
+import NotFoundState from "../components/seo/NotFoundState";
 import Skeleton from "../components/ui/Skeleton";
 import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
@@ -43,7 +43,7 @@ export default function EventDetailPage() {
   if (notFound || error || !event) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-20">
-        <EmptyState icon={SearchX} title={t("eventNotFound")} body={t("eventNotFoundBody")} />
+        <NotFoundState title={t("eventNotFound")} body={t("eventNotFoundBody")} noIndex={notFound} />
       </div>
     );
   }

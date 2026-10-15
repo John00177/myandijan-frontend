@@ -9,7 +9,7 @@ import { useRegions } from "../../hooks/useRegions";
 import { ApiError, getBusinessById, uploadImage } from "../../lib/api";
 import { localizedName } from "../../lib/localize";
 import { TRANSITIONS, useMotionTransition, useShouldAnimate } from "../../lib/motion-config";
-import type { MyBranchHour } from "../../types";
+import type { BusinessEditDetail, MyBranchHour } from "../../types";
 
 const inputClasses =
   "h-12 bg-elevated border border-white/[0.10] rounded-xl px-4 text-ink placeholder:text-ink-muted outline-none focus:border-primary/50";
@@ -53,6 +53,10 @@ export interface HourFormRow {
   openTime: string;
   closeTime: string;
   isClosed: boolean;
+  /** The stored row this day was loaded from; absent = the day had no row (grid default). */
+  original?: MyBranchHour;
+  /** Set once the user edits this day. */
+  touched?: boolean;
 }
 
 export interface EditBusinessFormState {
@@ -81,8 +85,16 @@ function defaultHours(): HourFormRow[] {
   }));
 }
 
-function hoursToGrid(hours: MyBranchHour[] | undefined): HourFormRow[] {
-  const grid = defaultHours();
+/**
+ * `blankUnknown` (the `preserveUnchangedHours` mode): a day with no stored row,
+ * and a stored null time (a 24-hour or closed day), start blank instead of
+ * 09:00/18:00 — so editing one half of such a day can never submit the other
+ * half from the placeholder.
+ */
+function hoursToGrid(hours: MyBranchHour[] | undefined, blankUnknown = false): HourFormRow[] {
+  const grid = blankUnknown
+    ? defaultHours().map((row) => ({ ...row, openTime: "", closeTime: "" }))
+    : defaultHours();
   if (!hours) return grid;
   for (const hour of hours) {
     const row = grid[hour.dayOfWeek];
@@ -90,8 +102,21 @@ function hoursToGrid(hours: MyBranchHour[] | undefined): HourFormRow[] {
     row.openTime = hour.openTime ?? row.openTime;
     row.closeTime = hour.closeTime ?? row.closeTime;
     row.isClosed = hour.isClosed;
+    row.original = hour;
   }
   return grid;
+}
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** An edited open day needs both times, and they must differ; untouched days are not checked. */
+function invalidEditedDay(rows: HourFormRow[]): HourFormRow | undefined {
+  return rows.find(
+    (row) =>
+      row.touched &&
+      !row.isClosed &&
+      (!TIME_PATTERN.test(row.openTime) || !TIME_PATTERN.test(row.closeTime) || row.openTime === row.closeTime),
+  );
 }
 
 function toEmptyForm(business: EditableBusiness | null): EditBusinessFormState {
@@ -218,9 +243,31 @@ interface EditBusinessModalProps {
    */
   initial: EditableBusiness | null;
   onClose: () => void;
-  onSave: (form: EditBusinessFormState, meta: { branchId: number | null }) => void;
+  /**
+   * `hoursLoaded` is true only once the business's real stored hours were
+   * fetched — until then `form.hours` is the 09:00–18:00 placeholder grid.
+   */
+  onSave: (form: EditBusinessFormState, meta: { branchId: number | null; hoursLoaded: boolean }) => void;
   submitting?: boolean;
   error?: string | null;
+  /**
+   * Admin edit flow (Phase 16E), and since Phase 16 the owner edit flow too
+   * (MyBusinessesView): the hours grid is read-only until the real hours
+   * load, a stored 24-hour day is labelled as such, unknown times start blank
+   * and an edited day must be complete before submit. GET
+   * /businesses/:id 404s for a business that is not APPROVED, so without this
+   * the placeholder grid looked like real data and a save replaced the
+   * business's actual hours with it. The caller decides what to submit from
+   * `hoursLoaded` and each row's `original`/`touched`.
+   */
+  preserveUnchangedHours?: boolean;
+  /**
+   * Where the prefill comes from. Defaults to the public GET /businesses/:id
+   * (owner dashboard, unchanged). The admin flow passes
+   * getAdminBusinessEditDetail, which also serves non-APPROVED listings
+   * (Phase 16E.5). Must be a stable function — it is an effect dependency.
+   */
+  loadDetail?: (id: number) => Promise<BusinessEditDetail>;
   /**
    * Status is shown as a read-only badge everywhere. When true (admin
    * context, business currently PENDING), Approve/Reject actions appear
@@ -245,6 +292,8 @@ export default function EditBusinessModal({
   onSave,
   submitting = false,
   error = null,
+  preserveUnchangedHours = false,
+  loadDetail = getBusinessById,
   canModerate = false,
   onApprove,
   onReject,
@@ -258,6 +307,8 @@ export default function EditBusinessModal({
   const [branchId, setBranchId] = useState<number | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [fetching, setFetching] = useState(false);
+  const [hoursLoaded, setHoursLoaded] = useState(false);
+  const [hoursError, setHoursError] = useState<string | null>(null);
   const shouldAnimate = useShouldAnimate();
   const backdropTransition = useMotionTransition(TRANSITIONS.fast);
   const modalTransition = useMotionTransition(TRANSITIONS.modalSpring);
@@ -267,14 +318,17 @@ export default function EditBusinessModal({
     setForm(toEmptyForm(initial));
     setBranchId(initial?.branchId ?? null);
     setStatus(initial?.status ?? null);
+    setHoursLoaded(false);
+    setHoursError(null);
   }, [open, initial]);
 
   useEffect(() => {
     if (!open || businessId == null) return;
     let cancelled = false;
     setFetching(true);
+    setHoursLoaded(false);
 
-    getBusinessById(businessId)
+    loadDetail(businessId)
       .then((detail) => {
         if (cancelled) return;
         const branch = detail.branches?.[0] ?? null;
@@ -292,15 +346,18 @@ export default function EditBusinessModal({
           instagram: detail.instagram ?? "",
           telegram: detail.telegram ?? "",
           website: detail.website ?? "",
-          hours: hoursToGrid(branch?.hours),
+          hours: hoursToGrid(branch?.hours, preserveUnchangedHours),
         });
         if (branch?.id != null) setBranchId(branch.id);
         if (detail.status != null) setStatus(detail.status);
+        setHoursLoaded(true);
       })
       .catch(() => {
-        // Most commonly a 404 — this endpoint only serves APPROVED
-        // businesses — but any failure here just means the form stays on
+        // Most commonly a 404 from the default loader (GET /businesses/:id
+        // only serves APPROVED businesses; the admin flow's loader serves
+        // every status) — but any failure here just means the form stays on
         // the `initial` data already set above, rather than blocking.
+        // `hoursLoaded` stays false: the hours grid is still the placeholder.
       })
       .finally(() => {
         if (!cancelled) setFetching(false);
@@ -309,7 +366,7 @@ export default function EditBusinessModal({
     return () => {
       cancelled = true;
     };
-  }, [open, businessId]);
+  }, [open, businessId, loadDetail, preserveUnchangedHours]);
 
   useEffect(() => {
     if (!open) return;
@@ -325,17 +382,29 @@ export default function EditBusinessModal({
   }
 
   function updateHourRow(dayOfWeek: number, patch: Partial<HourFormRow>) {
+    setHoursError(null);
     setForm((prev) => ({
       ...prev,
-      hours: prev.hours.map((row) => (row.dayOfWeek === dayOfWeek ? { ...row, ...patch } : row)),
+      hours: prev.hours.map((row) => (row.dayOfWeek === dayOfWeek ? { ...row, ...patch, touched: true } : row)),
     }));
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    onSave(form, { branchId });
+    // Preserve mode only: an edited day is sent as typed, so it must be a
+    // complete time range — never half-blank, never the placeholder.
+    if (preserveUnchangedHours && hoursLoaded) {
+      const invalid = invalidEditedDay(form.hours);
+      if (invalid) {
+        setHoursError(`${DAY_LABELS[invalid.dayOfWeek]}: ochilish va yopilish vaqtini to'g'ri kiriting`);
+        return;
+      }
+    }
+    onSave(form, { branchId, hoursLoaded });
   }
+
+  const hoursLocked = preserveUnchangedHours && !hoursLoaded;
 
   const statusInfo = status ? STATUS_LABEL[status] : null;
 
@@ -518,16 +587,28 @@ export default function EditBusinessModal({
 
                 <div className="rounded-xl border border-white/[0.08] p-3">
                   <p className="text-sm font-medium text-ink mb-2">Ish vaqti</p>
+                  {hoursLocked ? (
+                    // Never show the placeholder grid as if it were this
+                    // business's hours — nothing here is submitted either.
+                    <p className="text-xs text-ink-muted">
+                      {fetching
+                        ? "Ish vaqti yuklanmoqda..."
+                        : "Ish vaqtini yuklab bo'lmadi. Saqlaganda ish vaqti o'zgarmaydi."}
+                    </p>
+                  ) : (
                   <div className="flex flex-col gap-2">
                     {form.hours.map((row) => (
                       <div key={row.dayOfWeek} className="flex items-center gap-2">
                         <span className="text-xs text-ink-muted w-20 shrink-0">{DAY_LABELS[row.dayOfWeek]}</span>
-                        {row.isClosed ? (
+                        {preserveUnchangedHours && row.original?.is24Hours && !row.touched ? (
+                          <span className="flex-1 text-xs text-ink-muted">24 soat ochiq</span>
+                        ) : row.isClosed ? (
                           <span className="flex-1 text-xs text-ink-muted">Dam olish kuni</span>
                         ) : (
                           <>
                             <input
                               type="time"
+                              aria-label={`${DAY_LABELS[row.dayOfWeek]}: ochilish vaqti`}
                               value={row.openTime}
                               onChange={(e) => updateHourRow(row.dayOfWeek, { openTime: e.target.value })}
                               className={`${inputClasses} h-9 px-2 flex-1`}
@@ -535,6 +616,7 @@ export default function EditBusinessModal({
                             <span className="text-ink-muted text-xs">—</span>
                             <input
                               type="time"
+                              aria-label={`${DAY_LABELS[row.dayOfWeek]}: yopilish vaqti`}
                               value={row.closeTime}
                               onChange={(e) => updateHourRow(row.dayOfWeek, { closeTime: e.target.value })}
                               className={`${inputClasses} h-9 px-2 flex-1`}
@@ -553,6 +635,12 @@ export default function EditBusinessModal({
                       </div>
                     ))}
                   </div>
+                  )}
+                  {hoursError && (
+                    <p role="alert" className="mt-2 text-xs text-danger">
+                      {hoursError}
+                    </p>
+                  )}
                 </div>
 
                 {error && <p className="text-sm text-danger">{error}</p>}

@@ -85,6 +85,23 @@ describe("ProfilePage — My Claims", () => {
     expect(within(screen.getByText("Asaka Market").parentElement!).getByText("Rad etilgan")).toBeInTheDocument();
   });
 
+  // Phase 16D
+  it("shows the admin's reason under a rejected claim, and no reason line for other statuses", async () => {
+    signIn();
+    getMyClaims.mockResolvedValue({
+      data: [
+        { ...claimFor(3, "Asaka Market", "REJECTED"), rejectionReason: "  Hujjat yetarli emas  " },
+        { ...claimFor(1, "Huzur Kafe", "PENDING"), rejectionReason: "eski izoh" },
+      ],
+      meta: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    });
+
+    renderProfilePage();
+
+    expect(await screen.findByText("Sabab: Hujjat yetarli emas")).toBeInTheDocument();
+    expect(screen.queryByText(/eski izoh/)).not.toBeInTheDocument();
+  });
+
   it("omits the My Claims section entirely when the user has no claims", async () => {
     signIn();
     getMyClaims.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });

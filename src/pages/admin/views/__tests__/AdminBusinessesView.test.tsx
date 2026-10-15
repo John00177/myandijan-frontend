@@ -1,5 +1,5 @@
 import { testUser } from "../../../../test/roleCapabilities";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../../../../contexts/AuthContext";
@@ -11,11 +11,15 @@ vi.mock("../../../../lib/api", () => import("../../../../test/apiMock"));
 import {
   ApiError,
   approveAdminBusiness,
+  getAdminBusinessById,
+  getAdminBusinessEditDetail,
   getAdminBusinesses,
+  getBusinessById,
   getMe,
   hideAdminBusiness,
   mockAdminBusiness,
   promoteAdminBusiness,
+  rejectAdminBusiness,
   suspendAdminBusiness,
   unhideAdminBusiness,
   unpromoteAdminBusiness,
@@ -378,10 +382,9 @@ describe("AdminBusinessesView — business operations", () => {
         expect.objectContaining({ reason: "Egasi telefon orqali so'radi" }),
       ),
     );
-    expect(updateAdminBusinessHours).toHaveBeenCalledWith(mockAdminBusiness.id, {
-      reason: "Egasi telefon orqali so'radi",
-      hours: expect.any(Array),
-    });
+    // Hours were not edited, so the hours PUT (which replaces every stored
+    // row) is not sent at all — see the "hours preservation" block below.
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
     expect(updateBusiness).not.toHaveBeenCalled();
     expect(updateBusinessHours).not.toHaveBeenCalled();
   });
@@ -395,5 +398,468 @@ describe("AdminBusinessesView — business operations", () => {
     expect(updateAdminBusiness).not.toHaveBeenCalled();
     expect(updateAdminBusinessHours).not.toHaveBeenCalled();
     expect(updateBusiness).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 16E: the review drawer shows what the owner submitted — straight from
+// the GET /admin/businesses row — and every reject path goes through its
+// reason form instead of window.prompt.
+describe("AdminBusinessesView — review drawer", () => {
+  const submitted = {
+    ...mockAdminBusiness,
+    status: "PENDING",
+    description: "Milliy taomlar va choyxona",
+    website: "https://soy.example",
+    telegram: "@soy_taomlar",
+    hasDelivery: true,
+    deliveryFee: 10000,
+    deliveryTime: "30-40 daqiqa",
+    branchCount: 2,
+    businessType: { id: 2, nameUz: "Restoran", slug: "restaurant" },
+    owner: { id: 7, fullName: "Sardor Aliyev", phone: "+998901112233", email: "sardor@example.com" },
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    window.prompt = vi.fn(() => null);
+    window.confirm = vi.fn(() => false);
+    listOf(submitted);
+  });
+
+  async function openDrawer(role = "ADMIN") {
+    renderView(role);
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: "Ko'rib chiqish" })[0]);
+    return screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+  }
+
+  async function openRejectForm() {
+    renderView();
+    await waitForRow();
+    fireEvent.click(screen.getByRole("button", { name: /Rad etish/ }));
+    return screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+  }
+
+  it("shows the submitted listing from the queue row, without another request", async () => {
+    const drawer = await openDrawer();
+
+    for (const text of [
+      "Milliy taomlar va choyxona",
+      "Ovqatlanish",
+      "Restoran",
+      "Andijon shahri, Andijon (+1 filial)",
+      "Sardor Aliyev",
+      "+998901112233",
+      "sardor@example.com",
+      "Bor · 10000 so'm · 30-40 daqiqa",
+    ]) {
+      expect(within(drawer).getByText(text)).toBeInTheDocument();
+    }
+    expect(getAdminBusinesses).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders owner-supplied URLs as plain text, never as links", async () => {
+    const drawer = await openDrawer();
+
+    expect(within(drawer).getByText("https://soy.example")).toBeInTheDocument();
+    expect(within(drawer).getByText("@soy_taomlar")).toBeInTheDocument();
+    expect(within(drawer).queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("shows a MODERATOR the owner's name only, as the API returns it", async () => {
+    listOf({ ...submitted, owner: { id: 7, fullName: "Sardor Aliyev" } });
+    const drawer = await openDrawer("MODERATOR");
+
+    expect(within(drawer).getByText("Sardor Aliyev")).toBeInTheDocument();
+    expect(within(drawer).queryByText("+998901112233")).not.toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: /Tasdiqlash/ })).toBeInTheDocument();
+  });
+
+  it("approves from the drawer, closes it and reloads the queue", async () => {
+    const drawer = await openDrawer();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: /Tasdiqlash/ }));
+
+    await waitFor(() => expect(approveAdminBusiness).toHaveBeenCalledWith(submitted.id));
+    expect(await screen.findByText("Biznes tasdiqlandi")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(getAdminBusinesses).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the drawer open and shows the API's refusal inside it", async () => {
+    approveAdminBusiness.mockRejectedValueOnce(new ApiError("Business 5 is not pending review", 409));
+    const drawer = await openDrawer();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: /Tasdiqlash/ }));
+
+    expect(await within(drawer).findByText("Business 5 is not pending review")).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("opens the reason form from the row's 'Rad etish' and never uses window.prompt", async () => {
+    const drawer = await openRejectForm();
+
+    expect(within(drawer).getByLabelText("Rad etish sababi")).toBeInTheDocument();
+    expect(window.prompt).not.toHaveBeenCalled();
+  });
+
+  it("rejects with the trimmed reason, closes the drawer and reports success", async () => {
+    const drawer = await openRejectForm();
+
+    fireEvent.change(within(drawer).getByLabelText("Rad etish sababi"), {
+      target: { value: "  Manzil noto'g'ri ko'rsatilgan  " },
+    });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Rad etishni tasdiqlash" }));
+
+    await waitFor(() =>
+      expect(rejectAdminBusiness).toHaveBeenCalledWith(submitted.id, "Manzil noto'g'ri ko'rsatilgan"),
+    );
+    expect(await screen.findByText("Biznes rad etildi")).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it.each([
+    ["blank", "   ", "Rad etish sababi majburiy"],
+    ["over 1000 characters", "x".repeat(1001), "Rad etish sababi 1000 belgidan oshmasligi kerak"],
+  ])("refuses a %s reason without calling the API", async (_name, value, message) => {
+    const drawer = await openRejectForm();
+
+    fireEvent.change(within(drawer).getByLabelText("Rad etish sababi"), { target: { value } });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Rad etishni tasdiqlash" }));
+
+    expect(await within(drawer).findByText(message)).toBeInTheDocument();
+    expect(rejectAdminBusiness).not.toHaveBeenCalled();
+  });
+
+  it("keeps the typed reason when the API refuses the rejection", async () => {
+    rejectAdminBusiness.mockRejectedValueOnce(new ApiError("Forbidden: you cannot review your own business", 403));
+    const drawer = await openRejectForm();
+    const field = within(drawer).getByLabelText("Rad etish sababi");
+
+    fireEvent.change(field, { target: { value: "Soxta ma'lumot" } });
+    fireEvent.click(within(drawer).getByRole("button", { name: "Rad etishni tasdiqlash" }));
+
+    expect(await within(drawer).findByText("Forbidden: you cannot review your own business")).toBeInTheDocument();
+    expect(field).toHaveValue("Soxta ma'lumot");
+  });
+
+  it("goes back from the reason form, and closes without deciding anything", async () => {
+    const drawer = await openRejectForm();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "Orqaga" }));
+    expect(within(drawer).queryByLabelText("Rad etish sababi")).not.toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: /Tasdiqlash/ })).toBeInTheDocument();
+
+    fireEvent.click(within(drawer).getByRole("button", { name: "Yopish" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(approveAdminBusiness).not.toHaveBeenCalled();
+    expect(rejectAdminBusiness).not.toHaveBeenCalled();
+  });
+
+  it("offers no review action on a listing that is not PENDING", async () => {
+    listOf({ ...submitted, status: "APPROVED" });
+    renderView();
+    await waitForRow();
+
+    expect(screen.queryByRole("button", { name: "Ko'rib chiqish" })).not.toBeInTheDocument();
+  });
+
+  it("hands the edit modal's 'Rad etish' to the drawer's reason form", async () => {
+    renderView("ADMIN");
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: /Tahrirlash/ })[0]);
+    const modal = await screen.findByRole("dialog", { name: "Biznesni tahrirlash" });
+
+    fireEvent.click(within(modal).getByRole("button", { name: /Rad etish/ }));
+
+    const drawer = await screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+    expect(within(drawer).getByLabelText("Rad etish sababi")).toBeInTheDocument();
+    expect(window.prompt).not.toHaveBeenCalled();
+    expect(rejectAdminBusiness).not.toHaveBeenCalled();
+  });
+});
+
+// Phase 16E data-integrity fix: PUT /admin/businesses/:id/hours replaces
+// every stored row, and GET /businesses/:id 404s for any non-APPROVED
+// listing. An admin edit used to submit the modal's placeholder 09:00–18:00
+// grid in that case, overwriting the business's real hours, and reset every
+// 24-hour day.
+describe("AdminBusinessesView — hours preservation in the admin edit", () => {
+  const REASON = "Egasi so'radi";
+
+  /** Stored hours: Mon 10:00–20:00, Tue 24 hours, Sun closed, Wed–Sat no row. */
+  const storedHours = [
+    { dayOfWeek: 0, openTime: "10:00", closeTime: "20:00", isClosed: false, is24Hours: false },
+    { dayOfWeek: 1, openTime: null, closeTime: null, isClosed: false, is24Hours: true },
+    { dayOfWeek: 6, openTime: null, closeTime: null, isClosed: true, is24Hours: false },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    // spyOn, like the edit tests above: once window.prompt has been spied on,
+    // a plain reassignment no longer replaces it.
+    vi.spyOn(window, "prompt").mockReturnValue(REASON);
+    window.confirm = vi.fn(() => false);
+  });
+
+  async function openEdit(business = mockAdminBusiness) {
+    listOf(business);
+    renderView("ADMIN");
+    await waitForRow(business.name as string);
+    fireEvent.click(screen.getAllByRole("button", { name: /Tahrirlash/ })[0]);
+    const modal = await screen.findByRole("dialog", { name: "Biznesni tahrirlash" });
+    const save = within(modal).getByRole("button", { name: "Saqlash" });
+    await waitFor(() => expect(save).toBeEnabled());
+    return { modal, save };
+  }
+
+  function prefillWithStoredHours() {
+    getBusinessById.mockResolvedValueOnce({
+      id: mockAdminBusiness.id,
+      slug: mockAdminBusiness.slug,
+      name: mockAdminBusiness.name,
+      status: "APPROVED",
+      branches: [{ id: 1, address: "Andijon shahri", phone: "+998901234567", hours: storedHours }],
+    });
+  }
+
+  it("does not submit hours when the prefill 404s for a non-approved business", async () => {
+    getBusinessById.mockRejectedValueOnce(new ApiError("Business \"5\" not found", 404));
+    const { modal, save } = await openEdit({ ...mockAdminBusiness, status: "PENDING" });
+
+    // The placeholder grid is not shown as if it were the business's hours.
+    expect(within(modal).getByText("Ish vaqtini yuklab bo'lmadi. Saqlaganda ish vaqti o'zgarmaydi.")).toBeInTheDocument();
+    expect(within(modal).queryByDisplayValue("09:00")).not.toBeInTheDocument();
+
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateAdminBusiness).toHaveBeenCalled());
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
+  });
+
+  it("leaves stored hours untouched when a loaded business is saved without editing them", async () => {
+    prefillWithStoredHours();
+    const { modal, save } = await openEdit();
+
+    expect(within(modal).getByDisplayValue("20:00")).toBeInTheDocument();
+    expect(within(modal).getByText("24 soat ochiq")).toBeInTheDocument();
+
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateAdminBusiness).toHaveBeenCalled());
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
+  });
+
+  it("submits an edited day, keeps the 24-hour day 24-hour, and adds no 09:00–18:00 placeholder days", async () => {
+    prefillWithStoredHours();
+    const { modal, save } = await openEdit();
+
+    fireEvent.change(within(modal).getByDisplayValue("20:00"), { target: { value: "22:00" } });
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(updateAdminBusinessHours).toHaveBeenCalledWith(mockAdminBusiness.id, {
+        reason: REASON,
+        hours: [
+          { dayOfWeek: 0, openTime: "10:00", closeTime: "22:00", isClosed: false, is24Hours: false },
+          { dayOfWeek: 1, openTime: undefined, closeTime: undefined, isClosed: false, is24Hours: true },
+          { dayOfWeek: 6, openTime: undefined, closeTime: undefined, isClosed: true, is24Hours: false },
+        ],
+      }),
+    );
+  });
+});
+
+// Phase 16E.5: GET /admin/businesses/:id (any status) feeds the review drawer
+// and the admin edit prefill. Until the API deploy that adds it, production
+// answers 404 — apiMock's default — and both fall back to the 16E.3/#12
+// behaviour covered above.
+describe("AdminBusinessesView — admin business detail (16E.5)", () => {
+  const pending = { ...mockAdminBusiness, status: "PENDING" };
+
+  const storedHours = [
+    { dayOfWeek: 0, openTime: "10:00", closeTime: "20:00", isClosed: false, is24Hours: false },
+    { dayOfWeek: 1, openTime: null, closeTime: null, isClosed: false, is24Hours: true },
+    { dayOfWeek: 6, openTime: null, closeTime: null, isClosed: true, is24Hours: false },
+  ];
+
+  /** GET /admin/businesses/:id for the PENDING listing: two branches, hours, a photo, coordinates. */
+  const adminDetail = {
+    ...pending,
+    branches: [
+      {
+        id: 11,
+        name: "Markaziy filial",
+        address: "Bobur shoh 1",
+        landmark: "Xiyobon yonida",
+        phone: "+998900000001",
+        phoneAlt: "+998900000009",
+        lat: "40.78250000",
+        lng: "72.34420000",
+        isPrimary: true,
+        isActive: true,
+        district: { id: 1, slug: "andijon", nameUz: "Andijon" },
+        city: { id: 3, slug: "andijon-shahri", nameUz: "Andijon shahri" },
+        hours: storedHours,
+        photos: [{ url: "https://cdn.example/1.jpg", thumbUrl: "https://cdn.example/1-t.jpg", caption: "Zal", isPrimary: true, sortOrder: 0 }],
+      },
+      {
+        id: 12,
+        name: "Asaka filiali",
+        address: "Asaka 5",
+        landmark: null,
+        phone: "+998900000002",
+        phoneAlt: null,
+        lat: null,
+        lng: null,
+        isPrimary: false,
+        isActive: false,
+        district: { id: 2, slug: "asaka", nameUz: "Asaka" },
+        city: null,
+        hours: [],
+        photos: [],
+      },
+    ],
+  };
+
+  /** What getAdminBusinessEditDetail maps that detail to (mapping itself: api.test.ts). */
+  const editDetail = {
+    id: pending.id,
+    slug: "soy-milliy-taomlar",
+    name: "Soy milliy taomlar",
+    status: "PENDING",
+    category: { id: 1, slug: "food", nameUz: "Ovqatlanish" },
+    branches: [
+      { id: 11, address: "Bobur shoh 1", phone: "+998900000001", isPrimary: true, district: { id: 1, slug: "andijon", nameUz: "Andijon" }, hours: storedHours },
+      { id: 12, address: "Asaka 5", phone: "+998900000002", isPrimary: false, district: { id: 2, slug: "asaka", nameUz: "Asaka" }, hours: [] },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.spyOn(window, "prompt").mockReturnValue("Egasi so'radi");
+    window.confirm = vi.fn(() => false);
+    listOf(pending);
+  });
+
+  async function openDrawer() {
+    renderView("ADMIN");
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: "Ko'rib chiqish" })[0]);
+    return screen.findByRole("dialog", { name: `Ko'rib chiqish: ${pending.name}` });
+  }
+
+  async function openEdit() {
+    renderView("ADMIN");
+    await waitForRow();
+    fireEvent.click(screen.getAllByRole("button", { name: /Tahrirlash/ })[0]);
+    const modal = await screen.findByRole("dialog", { name: "Biznesni tahrirlash" });
+    const save = within(modal).getByRole("button", { name: "Saqlash" });
+    await waitFor(() => expect(save).toBeEnabled());
+    return { modal, save };
+  }
+
+  // ---- review drawer ------------------------------------------------------------
+
+  it("fetches the admin detail when the drawer opens and shows every branch with hours, photos and coordinates", async () => {
+    getAdminBusinessById.mockResolvedValueOnce(adminDetail);
+    const drawer = await openDrawer();
+
+    const primary = await within(drawer).findByRole("region", { name: "Filial: Markaziy filial" });
+    expect(getAdminBusinessById).toHaveBeenCalledWith(pending.id);
+
+    for (const text of [
+      "Asosiy",
+      "Bobur shoh 1, Andijon, Andijon shahri",
+      "Mo'ljal: Xiyobon yonida",
+      "+998900000009",
+      "40.7825, 72.3442",
+      "10:00–20:00",
+      "24 soat",
+      "Dam olish kuni",
+    ]) {
+      expect(within(primary).getByText(text)).toBeInTheDocument();
+    }
+    expect(within(primary).getByRole("img", { name: "Zal" })).toHaveAttribute("src", "https://cdn.example/1-t.jpg");
+
+    const secondary = within(drawer).getByRole("region", { name: "Filial: Asaka filiali" });
+    expect(within(secondary).getByText("Nofaol")).toBeInTheDocument();
+    expect(within(secondary).getAllByText("—").length).toBeGreaterThanOrEqual(7); // no coordinates, no hours rows
+  });
+
+  it("keeps the list summary and says the rest is unavailable while the route 404s (not deployed yet)", async () => {
+    const drawer = await openDrawer();
+
+    expect(
+      await within(drawer).findByText("Ish vaqti, galereya va qo'shimcha filiallarni hozircha yuklab bo'lmadi."),
+    ).toBeInTheDocument();
+    expect(within(drawer).getByText("Sardor Aliyev")).toBeInTheDocument();
+    expect(within(drawer).queryByRole("region")).not.toBeInTheDocument();
+  });
+
+  it("never makes the decision wait on the detail request", async () => {
+    getAdminBusinessById.mockReturnValueOnce(new Promise(() => {}));
+    const drawer = await openDrawer();
+
+    expect(within(drawer).getByText("To'liq ma'lumot yuklanmoqda...")).toBeInTheDocument();
+    fireEvent.click(within(drawer).getByRole("button", { name: /Tasdiqlash/ }));
+
+    await waitFor(() => expect(approveAdminBusiness).toHaveBeenCalledWith(pending.id));
+  });
+
+  // ---- admin edit prefill (hours safety from #12 must hold) ----------------------
+
+  it("prefills the edit of a PENDING listing from the admin detail, unlocking its real hours", async () => {
+    getAdminBusinessEditDetail.mockResolvedValueOnce(editDetail);
+    const { modal } = await openEdit();
+
+    expect(getAdminBusinessEditDetail).toHaveBeenCalledWith(pending.id);
+    expect(getBusinessById).not.toHaveBeenCalled();
+    expect(within(modal).getByDisplayValue("20:00")).toBeInTheDocument();
+    expect(within(modal).getByText("24 soat ochiq")).toBeInTheDocument();
+    expect(within(modal).queryByText("Ish vaqtini yuklab bo'lmadi. Saqlaganda ish vaqti o'zgarmaydi.")).not.toBeInTheDocument();
+  });
+
+  it("still sends no hours when the loaded hours of a PENDING listing were not edited", async () => {
+    getAdminBusinessEditDetail.mockResolvedValueOnce(editDetail);
+    const { save } = await openEdit();
+
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateAdminBusiness).toHaveBeenCalled());
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
+  });
+
+  it("sends the edited day and keeps the stored 24-hour day for a PENDING listing", async () => {
+    getAdminBusinessEditDetail.mockResolvedValueOnce(editDetail);
+    const { modal, save } = await openEdit();
+
+    fireEvent.change(within(modal).getByDisplayValue("20:00"), { target: { value: "21:00" } });
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(updateAdminBusinessHours).toHaveBeenCalledWith(pending.id, {
+        reason: "Egasi so'radi",
+        hours: [
+          { dayOfWeek: 0, openTime: "10:00", closeTime: "21:00", isClosed: false, is24Hours: false },
+          { dayOfWeek: 1, openTime: undefined, closeTime: undefined, isClosed: false, is24Hours: true },
+          { dayOfWeek: 6, openTime: undefined, closeTime: undefined, isClosed: true, is24Hours: false },
+        ],
+      }),
+    );
+  });
+
+  it("keeps the hours locked and unsent when the admin detail fails for another reason", async () => {
+    getAdminBusinessEditDetail.mockRejectedValueOnce(new ApiError("Internal server error", 500));
+    const { modal, save } = await openEdit();
+
+    expect(within(modal).getByText("Ish vaqtini yuklab bo'lmadi. Saqlaganda ish vaqti o'zgarmaydi.")).toBeInTheDocument();
+    fireEvent.click(save);
+
+    await waitFor(() => expect(updateAdminBusiness).toHaveBeenCalled());
+    expect(updateAdminBusinessHours).not.toHaveBeenCalled();
   });
 });

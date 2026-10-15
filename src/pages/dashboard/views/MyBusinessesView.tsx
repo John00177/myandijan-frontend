@@ -13,13 +13,14 @@ import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAdminResource } from "../../../hooks/useAdminResource";
 import {
   ApiError,
-  getMyBusinessById,
+  getMyBusinessEditDetail,
   getMyBusinesses,
   updateBusiness,
   updateBusinessHours,
   updateMyBranch,
 } from "../../../lib/api";
 import type { BusinessStatusValue, MyBusiness } from "../../../types";
+import { adminHoursPayload } from "../../admin/adminHoursPayload";
 
 const STATUS_LABEL: Record<BusinessStatusValue, string> = {
   DRAFT: "Qoralama",
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<BusinessStatusValue, string> = {
   APPROVED: "Tasdiqlangan",
   REJECTED: "Rad etilgan",
   SUSPENDED: "To'xtatilgan",
+  HIDDEN: "Yashirilgan",
 };
 
 const STATUS_TONE: Record<BusinessStatusValue, "success" | "amber" | "danger" | "neutral"> = {
@@ -35,7 +37,16 @@ const STATUS_TONE: Record<BusinessStatusValue, "success" | "amber" | "danger" | 
   APPROVED: "success",
   REJECTED: "danger",
   SUSPENDED: "danger",
+  HIDDEN: "neutral",
 };
+
+// Phase 16D: the owner sees why a listing was rejected or suspended. Only for
+// those two statuses — hiding writes no reason, so on a HIDDEN listing the
+// column can still hold an older, unrelated one.
+function statusReason(business: MyBusiness): string | null {
+  if (business.status !== "REJECTED" && business.status !== "SUSPENDED") return null;
+  return business.rejectionReason?.trim() || null;
+}
 
 function toEditableBusiness(b: MyBusiness): EditableBusiness {
   const branch = b.branches[0];
@@ -69,7 +80,6 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
   const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [editingBusiness, setEditingBusiness] = useState<EditableBusiness | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [autoOpenedId, setAutoOpenedId] = useState<number | null>(null);
@@ -85,30 +95,23 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
     const match = businesses.find((b) => b.id === autoOpenBusinessId);
     if (match) {
       setAutoOpenedId(autoOpenBusinessId);
-      void openEditModal(match);
+      openEditModal(match);
     }
   }, [autoOpenBusinessId, businesses, autoOpenedId]);
 
-  async function openEditModal(business: MyBusiness) {
-    // The list response is a lean summary (no description, no branch
-    // phone/address/district) — fetch the full detail so the form doesn't
-    // open silently missing fields the business actually has.
+  function openEditModal(business: MyBusiness) {
+    // The list response is a lean summary; the modal itself loads the full
+    // listing (getMyBusinessEditDetail — description, branch, real hours, any
+    // status). There is deliberately no second detail fetch here: replacing
+    // `editingBusiness` after the modal has loaded re-runs the modal's reset
+    // (it depends on `initial`), which discarded the loaded hours — before
+    // this fix the placeholder grid then overwrote the real hours on save.
     setEditingBusiness(toEditableBusiness(business));
     setEditError(null);
     setEditModalOpen(true);
-    setEditLoading(true);
-    try {
-      const full = await getMyBusinessById(business.id);
-      setEditingBusiness({ ...toEditableBusiness(full), description: full.description ?? null });
-    } catch {
-      // Keep the summary-derived data already shown rather than blocking
-      // the form on a failed detail fetch.
-    } finally {
-      setEditLoading(false);
-    }
   }
 
-  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null }) {
+  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null; hoursLoaded: boolean }) {
     if (!editingBusiness) return;
     setEditSaving(true);
     setEditError(null);
@@ -127,15 +130,14 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
         website: form.website.trim() || undefined,
       });
 
-      await updateBusinessHours(
-        editingBusiness.id,
-        form.hours.map((row) => ({
-          dayOfWeek: row.dayOfWeek,
-          openTime: row.isClosed ? undefined : row.openTime,
-          closeTime: row.isClosed ? undefined : row.closeTime,
-          isClosed: row.isClosed,
-        })),
-      );
+      // PUT /businesses/:id/hours deletes every hour row on the primary branch
+      // and inserts exactly what it receives, and PATCH /businesses/:id never
+      // touches hours. So hours are sent only when they were loaded AND the
+      // owner edited a day — then every stored day verbatim (is24Hours kept)
+      // plus the edited days, never a placeholder day (Phase 16E rule, owner
+      // side). A details-only save leaves the stored hours exactly as they are.
+      const hours = adminHoursPayload(form.hours, meta.hoursLoaded);
+      if (hours) await updateBusinessHours(editingBusiness.id, hours);
 
       const branchId = meta.branchId ?? editingBusiness.branchId;
       if (branchId && (form.phone.trim() || form.address.trim() || form.districtId)) {
@@ -212,6 +214,7 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {businesses.map((business) => {
             const branch = business.branches[0];
+            const reason = statusReason(business);
             return (
               <div key={business.id} className="bg-card border border-white/[0.08] rounded-xl overflow-hidden">
                 <div className="aspect-[16/10] w-full bg-gradient-to-br from-[#1F2C38] to-[#121A22]" />
@@ -224,6 +227,11 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
                     {business.category?.nameUz ?? "—"}
                     {branch?.district ? ` · ${branch.district.nameUz}` : ""}
                   </div>
+                  {reason && (
+                    <p className="text-xs text-danger mt-2 break-words">
+                      <span className="font-medium">Sabab:</span> {reason}
+                    </p>
+                  )}
                   <Button variant="ghost" size="sm" className="w-full mt-3" onClick={() => openEditModal(business)}>
                     Tahrirlash
                   </Button>
@@ -240,8 +248,10 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
         initial={editingBusiness}
         onClose={() => setEditModalOpen(false)}
         onSave={handleSaveEdit}
-        submitting={editSaving || editLoading}
+        submitting={editSaving}
         error={editError}
+        preserveUnchangedHours
+        loadDetail={getMyBusinessEditDetail}
       />
     </div>
   );

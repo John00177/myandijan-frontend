@@ -55,6 +55,22 @@ export function ReportStatusBadge({ status }: { status: string | null | undefine
   return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
 }
 
+/** EventStatus: DRAFT/PENDING/PUBLISHED/REJECTED/CANCELLED/COMPLETED (schema.prisma). */
+const EVENT_STATUS: Record<string, { label: string; tone: Tone }> = {
+  draft: { label: "Qoralama", tone: "neutral" },
+  pending: { label: "Kutilmoqda", tone: "amber" },
+  published: { label: "Chop etilgan", tone: "success" },
+  rejected: { label: "Rad etilgan", tone: "danger" },
+  cancelled: { label: "Bekor qilingan", tone: "neutral" },
+  completed: { label: "Yakunlangan", tone: "blue" },
+};
+
+export function EventStatusBadge({ status }: { status: string | null | undefined }) {
+  if (!status) return <Badge tone="neutral">—</Badge>;
+  const entry = EVENT_STATUS[status.toLowerCase()];
+  return <Badge tone={entry?.tone ?? "neutral"}>{entry?.label ?? status}</Badge>;
+}
+
 const CLAIM_STATUS: Record<string, { label: string; tone: Tone }> = {
   pending: { label: "Kutilmoqda", tone: "amber" },
   approved: { label: "Tasdiqlangan", tone: "success" },

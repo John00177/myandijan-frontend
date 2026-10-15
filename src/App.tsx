@@ -56,6 +56,7 @@ const ClaimPage = lazy(() => import("./pages/ClaimPage"));
 const OwnerDashboard = lazy(() => import("./pages/OwnerDashboard"));
 const AddBusinessPage = lazy(() => import("./pages/dashboard/AddBusinessPage"));
 const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
 export default function App() {
   return (
@@ -94,6 +95,10 @@ export default function App() {
                         modal's register tab and any external links point at it,
                         so it resolves here rather than 404ing. */}
                     <Route path="register" element={<RedirectToSignup />} />
+                    {/* Phase 16F.1: anything else under /:lang is a noindex
+                        not-found page, not an empty Layout. Ranked below every
+                        route above, including the dashboard/admin siblings. */}
+                    <Route path="*" element={<NotFoundPage />} />
                   </Route>
 
                   {/*

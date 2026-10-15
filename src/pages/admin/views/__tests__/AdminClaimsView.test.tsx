@@ -42,24 +42,75 @@ describe("AdminClaimsView", () => {
     await waitFor(() => expect(getAdminClaims).toHaveBeenLastCalledWith({ status: "APPROVED", limit: 50 }));
   });
 
-  it("approves a pending claim, reports success, and reloads the list", async () => {
+  it("approves a pending claim with the trimmed verification note, reports success, and reloads the list", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("  Ro'yxatdagi raqamga qo'ng'iroq qilindi  ");
     approveAdminClaim.mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
 
     render(<AdminClaimsView />);
     fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
 
-    await waitFor(() => expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id));
+    await waitFor(() =>
+      expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id, "Ro'yxatdagi raqamga qo'ng'iroq qilindi"),
+    );
     expect(await screen.findByText("Da'vo tasdiqlandi — biznes egasi tayinlandi")).toBeInTheDocument();
     expect(getAdminClaims).toHaveBeenCalledTimes(2);
   });
 
   it("surfaces the backend error when approval conflicts (e.g. business already owned)", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("Qo'ng'iroq qilindi");
     approveAdminClaim.mockRejectedValue(new ApiError("Business 1 already has an owner", 409));
 
     render(<AdminClaimsView />);
     fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
 
     expect(await screen.findByText("Business 1 already has an owner")).toBeInTheDocument();
+  });
+
+  it("does not approve, and shows nothing, when the verification-note prompt is cancelled", async () => {
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue(null);
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(approveAdminClaim).not.toHaveBeenCalled();
+    expect(screen.queryByText("Tekshiruv izohi majburiy")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["empty", ""],
+    ["whitespace-only", "   \n\t "],
+  ])("refuses an %s verification note with a clear error and does not call the API", async (_name, note) => {
+    vi.spyOn(window, "prompt").mockReturnValue(note);
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    expect(await screen.findByText("Tekshiruv izohi majburiy")).toBeInTheDocument();
+    expect(approveAdminClaim).not.toHaveBeenCalled();
+  });
+
+  it("refuses a verification note over 1000 characters and does not call the API", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("x".repeat(1001));
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    expect(await screen.findByText("Tekshiruv izohi 1000 belgidan oshmasligi kerak")).toBeInTheDocument();
+    expect(approveAdminClaim).not.toHaveBeenCalled();
+  });
+
+  it("accepts a verification note of exactly 1000 characters", async () => {
+    const note = "x".repeat(1000);
+    vi.spyOn(window, "prompt").mockReturnValue(note);
+    approveAdminClaim.mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
+
+    render(<AdminClaimsView />);
+    fireEvent.click(await screen.findByRole("button", { name: /tasdiqlash/i }));
+
+    await waitFor(() => expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id, note));
+    // Let the post-approval reload settle before afterEach resets the mocks.
+    expect(await screen.findByText("Da'vo tasdiqlandi — biznes egasi tayinlandi")).toBeInTheDocument();
   });
 
   it("rejects a pending claim with the reason entered in the prompt", async () => {
@@ -96,6 +147,99 @@ describe("AdminClaimsView", () => {
     expect(await screen.findByText("Hujjat yetarli emas")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /tasdiqlash/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /rad etish/i })).not.toBeInTheDocument();
+  });
+
+  describe("review context (Phase 16E.1)", () => {
+    const withContext = (
+      business: Partial<NonNullable<typeof mockAdminClaim.business>> = {},
+      claimant: Partial<NonNullable<typeof mockAdminClaim.claimant>> = {},
+      status: typeof mockAdminClaim.status = "PENDING",
+    ) => ({
+      ...mockAdminClaim,
+      status,
+      business: { ...mockAdminClaim.business!, status: "APPROVED", deletedAt: null, _count: { claims: 1 }, ...business },
+      claimant: { ...mockAdminClaim.claimant!, status: "ACTIVE", ...claimant },
+    });
+    const approveButton = () => screen.findByRole("button", { name: /tasdiqlash/i });
+
+    it("shows no warning and keeps approval available for a clean, uncontested claim", async () => {
+      getAdminClaims.mockResolvedValue({ items: [withContext()], total: 1 });
+      approveAdminClaim.mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
+      // Approval still goes through the 16C.1 verification-note prompt.
+      vi.spyOn(window, "prompt").mockReturnValue("Qo'ng'iroq qilindi");
+
+      render(<AdminClaimsView />);
+      fireEvent.click(await approveButton());
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText(/raqobatdosh/)).not.toBeInTheDocument();
+      await waitFor(() => expect(approveAdminClaim).toHaveBeenCalledWith(mockAdminClaim.id, "Qo'ng'iroq qilindi"));
+      expect(await screen.findByText("Da'vo tasdiqlandi — biznes egasi tayinlandi")).toBeInTheDocument();
+    });
+
+    it.each([
+      ["the business is no longer approved", withContext({ status: "SUSPENDED" }), "Biznes tasdiqlangan holatda emas (holati: SUSPENDED)"],
+      ["the business is deleted", withContext({ deletedAt: "2026-10-01T00:00:00.000Z" }), "Biznes o'chirilgan"],
+      ["the business already has an owner", withContext({ ownerId: 99 }), "Biznesning egasi allaqachon bor"],
+      ["the claimant is suspended", withContext({}, { status: "SUSPENDED" }), "Da'vogar hisobi faol emas (holati: SUSPENDED)"],
+    ])("warns and disables approval when %s, leaving reject available", async (_name, claim, reason) => {
+      getAdminClaims.mockResolvedValue({ items: [claim], total: 1 });
+
+      render(<AdminClaimsView />);
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("Tasdiqlab bo'lmaydi:");
+      expect(alert).toHaveTextContent(reason);
+      const approve = await approveButton();
+      expect(approve).toBeDisabled();
+      fireEvent.click(approve);
+      expect(approveAdminClaim).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /rad etish/i })).toBeEnabled();
+    });
+
+    it("lists every blocker at once", async () => {
+      getAdminClaims.mockResolvedValue({
+        items: [withContext({ status: "HIDDEN", ownerId: 99 }, { status: "SUSPENDED" })],
+        total: 1,
+      });
+
+      render(<AdminClaimsView />);
+
+      const items = (await screen.findByRole("alert")).querySelectorAll("li");
+      expect(items).toHaveLength(3);
+    });
+
+    it("flags competing pending claims on the same business without blocking approval", async () => {
+      getAdminClaims.mockResolvedValue({ items: [withContext({ _count: { claims: 3 } })], total: 1 });
+
+      render(<AdminClaimsView />);
+
+      expect(await screen.findByText("+2 raqobatdosh da'vo")).toBeInTheDocument();
+      expect(screen.getByText(/Shu biznesga yana 2 ta kutilayotgan da'vo bor/)).toBeInTheDocument();
+      expect(await approveButton()).toBeEnabled();
+    });
+
+    it("shows no context and no false warnings when the API omits the context fields (older API)", async () => {
+      // mockAdminClaim carries none of the 16E.1 fields.
+      render(<AdminClaimsView />);
+
+      expect(await approveButton()).toBeEnabled();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText(/raqobatdosh/)).not.toBeInTheDocument();
+    });
+
+    it("does not judge an already-reviewed claim against its business's current state", async () => {
+      getAdminClaims.mockResolvedValue({
+        items: [withContext({ status: "SUSPENDED", ownerId: 7, _count: { claims: 2 } }, {}, "APPROVED")],
+        total: 1,
+      });
+
+      render(<AdminClaimsView />);
+
+      await screen.findByText(mockAdminClaim.business!.name);
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText(/raqobatdosh/)).not.toBeInTheDocument();
+    });
   });
 
   it("shows an empty state when there are no claims", async () => {

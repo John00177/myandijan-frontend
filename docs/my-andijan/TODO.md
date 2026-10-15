@@ -1,6 +1,6 @@
 # TODO — My Andijan consolidated task list
 
-> Compiled 2026-09-28 from code `TODO`s, unfinished features, the pending-task list recovered from the final session, and this review's findings.
+> **Reconciled 2026-10-04** with the current state (see `CURRENT_STATE.md`, top). Compiled 2026-09-28 from code `TODO`s, unfinished features, the pending-task list recovered from the final session, and this review's findings.
 >
 > **Markers:** `[ ]` TODO · `[~]` IN PROGRESS · `[x]` DONE · `[?]` UNKNOWN / needs investigation
 >
@@ -13,14 +13,17 @@
 - [x] **Rotate the seed-script password in production** — DONE 2026-09-28: 192-bit random secret stored in Railway `SEED_ROLE_PASSWORD`, applied to all six accounts, verified — `api/scripts/seed-role-accounts.js:14`. Hardcoded plaintext password applied to `SUPER_ADMIN` (`+998994796431`), `ADMIN`, `MODERATOR`, `SUPPORT`, `BUSINESS_OWNER`, `CUSTOMER`; printed to stdout; documented as run against production via `railway ssh`; `upsert` re-applies it on every run. **[SESSION]** — flagged at commit time, never done
 - [x] **Parameterize** that script to `process.env.SEED_ROLE_PASSWORD` with **no default**, and remove the `console.log` of the password — done 2026-09-28 **[SESSION]**
 - [x] **Purge the credential from git history before adding any git remote** — done 2026-09-28: `4e3c6bc` rebuilt as `002fca9`; verified absent from all reachable commits before the first push. **Rotation in production is still outstanding.** **[REVIEW]**
-- [ ] **Sessions die after ~15 minutes.** Frontend never stores `refreshToken` and never calls `POST /auth/refresh`. A user can be signed out mid-claim-flow and lose the submission. Fix on the client — do **not** just raise `JWT_ACCESS_EXPIRES_IN` **[REVIEW]**
-- [ ] **OTP codes are never delivered.** `ESKIZ_*` unset on Railway; `SmsService` logs and returns **success**, so the failure is invisible to callers. Signup is unusable by real users **[SESSION]**
-- [ ] **Password-reset codes are logged, not sent** — `api/src/auth/auth.service.ts:347` `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`. **Configuring Eskiz does not fix this**; it needs a code change **[CODE]**
-- [ ] **Analytics tables are never written.** Frontend calls none of `POST /analytics/view|click|search`, so owner analytics, the command centre, `AnalyticsView` and the health score's `visibilityScore` all read empty tables **[REVIEW]**
+- [x] ✅ **Fixed, Phase 15E.4a** (client refresh with cross-tab coordination; server sessions 15E.4b–4e). *Original:* **Sessions die after ~15 minutes.** Frontend never stores `refreshToken` and never calls `POST /auth/refresh`. A user can be signed out mid-claim-flow and lose the submission. Fix on the client — do **not** just raise `JWT_ACCESS_EXPIRES_IN` **[REVIEW]**
+- [ ] **OTP codes are never delivered.** `ESKIZ_*` unset on Railway (still true 2026-10-04). *Since 15E.2 the request fails closed with 503 instead of logging and returning success.* OTP signup stays unusable by real users until the owner configures Eskiz **[SESSION]**
+- [x] ✅ **Fixed, Phase 15E.2** — reset codes are never logged; without SMS the request answers 503. Since the Phase 15 closeout (PR #13) staff accounts cannot reset by SMS at all. *Original:* **Password-reset codes are logged, not sent** — `api/src/auth/auth.service.ts:347` `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`. **Configuring Eskiz does not fix this**; it needs a code change **[CODE]**
+- [x] ✅ **Fixed** — the frontend calls `recordAnalytics` (`src/lib/api.ts`). *Original:* **Analytics tables are never written.** Frontend calls none of `POST /analytics/view|click|search`, so owner analytics, the command centre, `AnalyticsView` and the health score's `visibilityScore` all read empty tables **[REVIEW]**
 
 ## 🚧 Blocking issues
 
-- [~] **Frontend deploy blocked.** Root cause is local: PowerShell's execution policy blocks `D:\Node.js\npx.ps1`, so `vercel login`, `vercel link` and four `npm i -g vercel` attempts all failed before Vercel was invoked **[SESSION]**
+- [ ] **🔴 Railway plan / account access expired — API production releases blocked** (owner-reported 2026-10-07). Nothing after backend `2ea83b6` is deployed. **Owner action**; agents must not deploy, change Railway or touch production while it lasts. See `CURRENT_STATE.md` top section.
+- [x] **Phase 15 closure** — CLOSED / PASS 2026-10-05 (gates A, B, C; evidence in `CURRENT_STATE.md` top section).
+- [?] **SIG Gate 2 production status** — not recorded in the repositories; owner to confirm.
+- [x] ✅ *Resolved 2026-09-28 (historical item below).* **Frontend deploy blocked.** Root cause is local: PowerShell's execution policy blocks `D:\Node.js\npx.ps1`, so `vercel login`, `vercel link` and four `npm i -g vercel` attempts all failed before Vercel was invoked **[SESSION]**
   - [ ] Run `npx.cmd vercel login` (interactive — **must be the human**, not an agent)
   - [ ] Run `npx.cmd vercel --prod`
   - [x] **Do NOT run `vercel link`** — verified against the Vercel API; the link is correct and the earlier "stale orgId" diagnosis was retracted
@@ -43,18 +46,19 @@
 ### Unwired capability — endpoints exist, nothing calls them
 - [x] `GET /search` — the `pg_trgm`/tsvector/transliteration search. **Done, Phase 8** — wired into `SearchPage` for text queries via `type=business`; product-type results still have no UI (see `ARCHITECTURE.md` §25) **[REVIEW]**
 - [ ] **10 command-centre endpoints** — no UI at all **[REVIEW]**
-- [ ] **6 `/me/analytics/*` endpoints** — no UI **[REVIEW]**
+- [ ] **6 `/me/analytics/*` endpoints** — *partly done:* `overview` has a UI since **Phase 16G.2** (frontend PR #22 — the owner dashboard's "So'nggi 7 kun" panel); `traffic`, `demographics`, `search-terms`, `peak-hours`, `competitors` still have none **[REVIEW]**
 - [ ] **3 health-score endpoints** — no UI **[REVIEW]**
 - [ ] **Admin endpoints still without UI** — hide (SUPER_ADMIN; no unhide, D-63), events approve/reject, category delete + reorder, district/city edit, user suspend/activate **[REVIEW]**. Review hide/restore: **done — Phase 6**. Claims list/approve/reject: **done — Phase 9**. Business verify/suspend/promote (+ new unverify/unsuspend/unpromote): **done — Phase 11**, via `AdminBusinessesView`
 - [x] **Enable Railway auto-deploy (owner action)** — **done and verified 2026-10-01**: auto-deploy `enabled=true` + Wait for CI; push of `ded7b7a` auto-deployed as `6b81b152`. Original root cause (Phase 13): `autoDeploy.enabled=false, canEnable=false, reason=NO_PROJECT_MEMBER_ACCESS`. Connect a GitHub account with access to `John00177/my-andijan-api` to Railway, grant the Railway GitHub App access to the repo, turn Auto Deploy (+ Wait for CI) on, then verify with a harmless push. Exact steps: `ENVIRONMENT.md` → "Deployment pipeline" **[VERIFIED]**
-- [ ] **Gate Vercel production on CI** — Vercel deploys on push independently of GitHub Actions (Phase 15A measured production READY 23 s before CI finished). **Owner action (dashboard):** Vercel → `myandijan-frontend` → Settings → Deployment Checks → require `test-and-build` for Production; optionally GitHub branch protection on `main` **[REVIEW]**
+- [x] **Gate Vercel production on CI** — configured by the owner 2026-10-02: Production Deployment Check `Vercel - myandijan-frontend: test-and-build` (the CI job reports that commit status); `main` rulesets active — see the 15E.3 items below **[REVIEW]**
 - [x] **Business unhide** — **done, Phase 14**: restores the status recorded at hide time, else PENDING (D-73) **[REVIEW]**
 - [x] **User-side "report this review"** + admin reports queue — **done, Phase 12** (D-70) **[REVIEW]**
 - [ ] **`isFeatured` (Editor's Pick) has no admin setter** (D-66) **[REVIEW]**
 - [ ] **Expired promotions still sort first in `GET /businesses`** — `orderBy isPromoted desc` ignores `promotedUntil` (ranking change, out of Phase 11 scope) **[CODE]**
 - [x] **MODERATOR admin access** — **done, Phase 14**: least-privilege moderation surface with owner/reporter PII redacted (D-72) **[REVIEW]**
 - [x] `GET /me/claims` — **done, Phase 9**: claim status on `ProfilePage`; `POST /me/claims` added so claims can actually be created **[REVIEW]**
-- [ ] **Claims follow-ups (non-blocking, Phase 9):** show the rejection reason to the claimant on `ProfilePage`; show "pending" on `BusinessDetailPage` after reload instead of the CTA; audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
+- [ ] **Claims follow-ups (non-blocking, Phase 9):** ~~show the rejection reason to the claimant on `ProfilePage`~~ and ~~show "pending" on `BusinessDetailPage` after reload instead of the CTA~~ — **done, Phase 16D**; still open: audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
+- [ ] **16D remainder (needs API work, not authorization):** an owner path to resubmit a REJECTED listing for review; a single create route instead of `POST /businesses` + `POST /me/businesses`. CUSTOMER `business.create` stays closed — D-75 kept (owner decision, 2026-10-08) **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**
 - [ ] `GET /events/:slug`, `POST /events/:slug/attend` — no detail page, no RSVP **[REVIEW]**
 - [ ] `GET /businesses/promoted`, `GET /categories/homepage`, `GET /categories/:slug`, 4 `/geography/*` routes — unused **[REVIEW]**
@@ -71,7 +75,7 @@
 - [ ] **Nothing schedules `POST /admin/analytics/aggregate`** — the only writer for `PlatformMetric`. No cron exists in the API **[REVIEW]**
 - [ ] `api` `lint` and `format` scripts reference **`eslint` and `prettier`, neither installed** — both fail on a clean checkout **[REVIEW]**
 - [ ] Add a **global exception filter** — currently `UploadService` forwards Supabase's error message verbatim to clients **[REVIEW]**
-- [ ] Populate `RefreshToken.userAgent` / `ipAddress` — columns exist, `issueTokens()` never sets them, so session management and anomaly detection are impossible **[REVIEW]**
+- [x] ~~Populate `RefreshToken.userAgent` / `ipAddress`~~ — superseded: device attribution lives on `auth_sessions` (15E.4b) and the token columns were dropped in 15E.4e.2 **[REVIEW]**
 - [ ] Add `@nestjs/config` with a validation schema so a missing required variable fails at **boot**, not at first use **[REVIEW]**
 - [?] Does `AuditLog.before`/`after` ever snapshot `passwordHash` or other sensitive fields? **Needs checking** **[REVIEW]**
 - [?] Is `Review.rating` bounded `@Min(1) @Max(5)` in its DTO? The column is a bare `Int` with no DB constraint **[REVIEW]**
@@ -91,8 +95,12 @@
 - [ ] **`AdsView`** — honest "coming soon" empty state (acceptable as-is) **[REVIEW]**
 
 ### Bugs
+- [x] ~~**Owner edit modal could overwrite stored hours**~~ — **fixed — merged as PR #32 (`dd1e84b`, 2026-10-14); Production deployment record: success. The live owner flow has not been tested.** Root cause: `MyBusinessesView` saved through `EditBusinessModal` without `preserveUnchangedHours`, prefilled from the public `GET /businesses/:id` (APPROVED only), and always sent all 7 grid days to `PUT /businesses/:id/hours` (which replaces every row) without `is24Hours`. So any save — even a name change — turned 24-hour days into 09:00–18:00, created rows for days without hours, and for DRAFT/PENDING/REJECTED listings replaced every day with the placeholder. A second path: `openEditModal` re-fetched the detail and replaced the modal's `initial`, which reset the loaded grid back to the placeholder. Fix: owner prefill from `GET /me/businesses/:id` (`getMyBusinessEditDetail`, any status, fails closed without an hours list); `preserveUnchangedHours`; hours sent only via `adminHoursPayload` (nothing when unloaded or unedited; else stored days verbatim + edited days); no second fetch; in preserve mode unknown times start blank and an edited day must be complete. `PATCH /businesses/:id` carries no hours (verified in `UpdateBusinessDto`). Tests: `MyBusinessesView.ownerEdit.test.tsx` (9) and `api.ownerEditDetail.test.ts` (5) **[CODE]**
+- [ ] **Live-check the owner edit hours fix** — partly done 2026-10-14 (read-only: modal open on a PENDING listing with no stored hours — 200, blank grid, no `/hours` request). Still pending: a test business with a 24-hour, a closed and a timed day, then one details-only save (a production write — needs the owner's explicit authorization and a test account).
+- [ ] **Verify the live database after the 2026-10-15 API deploy (migration `20261007090000_phase16h_claim_pending_unique`)** — Railway logs say applied; still pending: the `_prisma_migrations` row, the live partial unique index `business_claims_one_pending_per_claimant`, and the count of duplicate claims auto-rejected. Needs owner-authorized read-only SQL (Gate 2 runbook `db/privileges/20_verify_readonly.sql`).
+- [ ] **Claim flow end to end on production** (file a claim, double-submit, approve/reject) — writes data; owner authorization and a test fixture required.
 - [ ] **HEIC uploads fail.** `api.ts` allows `image/heic`/`image/heif`; the server's allow-list does not. iPhone photos pass the client check and 400 **[REVIEW]**
-- [ ] **No 404 route.** An unmatched path under `/:lang` renders an empty `Layout` **[REVIEW]**
+- [x] **No 404 route.** — **done, Phase 16F.1.** An unmatched path under `/:lang` now renders `NotFoundPage` (noindex); a path with no supported language prefix is redirected under `/uz`; business/category/district/event not-found states are noindex when the absence is confirmed (`NotFoundState`). The SPA still answers HTTP 200 for every URL (`vercel.json`), so `noindex` — not a status code — is what keeps these out of the index **[REVIEW]**
 - [ ] **Dashboard sub-views are not deep-linkable** and the back button does not move between them (view state, not routes) **[REVIEW]**
 - [?] **`replyToReview()` uses `PATCH /reviews/:id/reply`** (edit) rather than `POST` (create) — verify it works when no reply exists yet **[REVIEW]**
 - [ ] **Nothing adapts above `lg` (1024px)** — zero `xl:`/`2xl:` usage **[REVIEW]**
@@ -116,7 +124,7 @@
 
 ## Database
 
-- [ ] **Add a partial unique index for one PENDING claim per business.** The schema states this *"cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer"* — so it is application-discipline-only today. Since Phase 9 this is the only remaining claim race: approval is now compare-and-set (D-60), but `createClaim`'s duplicate check is still check-then-insert, so two simultaneous submissions by one user can create two `PENDING` rows (bounded — approving one auto-rejects the other) **[CODE]**
+- [x] ✅ **Done — Phase 16H** (API PR #24, merged 2026-10-07 as `7a3a7dd`; CI incl. the real-PostgreSQL suites passed; **not deployed** — the migration runs on the next API deploy). Partial unique index `business_claims_one_pending_per_claimant` on `(business_id, claimant_id) WHERE status = 'PENDING'` — per *claimant*, because competing claims from different people are intended; the migration first closes any existing duplicates (keeps the earliest, rejects the rest with a reason, deletes nothing). `createClaim` maps the violation to the same `409` and re-checks the listing under a `FOR SHARE` row lock, so a claim racing an approval is refused or auto-rejected, never left `PENDING` on an owned listing. Proven on real PostgreSQL with forced races (`test/db/claims-concurrency.db-spec.ts`, `migration-claims-pending-unique.db-spec.ts`). *Original:* **Add a partial unique index for one PENDING claim per business.** The schema states this *"cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer"* — so it is application-discipline-only today. Since Phase 9 this is the only remaining claim race: approval is now compare-and-set (D-60), but `createClaim`'s duplicate check is still check-then-insert, so two simultaneous submissions by one user can create two `PENDING` rows (bounded — approving one auto-rejects the other) **[CODE]**
 - [ ] **Drop `SearchQueryLog`** after confirming the backfill into `SearchAnalytics` — *"safe to drop once you've confirmed the backfill"* **[CODE]**
 - [ ] **Consolidate three overlapping cover-image fields** on `Business`: `logoUrl`, `coverUrl`, `coverPhoto` (the last two duplicate each other and the frontend falls back between them) **[REVIEW]**
 - [ ] Add DB constraints: `Review.rating` 1–5, `Event.endAt > startAt`, `isFree`/`price` consistency **[REVIEW]**
@@ -180,10 +188,10 @@
 
 ## Testing
 
-- [ ] **Zero tests exist.** No test files, no runner, no `test` script, in either repo — across 118 API routes and 132 components **[REVIEW]**
-- [ ] Choose runners: Vitest (frontend), Jest + Supertest (API) **[REVIEW]**
+- [x] ✅ **Resolved** — backend Jest (1010 unit tests) + real-PostgreSQL suites, frontend Vitest; CI gates every merge. *Original:* **Zero tests exist** across 118 API routes and 132 components **[REVIEW]**
+- [x] Choose runners — Vitest (frontend), Jest (API; HTTP-level specs use a real Nest server) **[REVIEW]**
 - [ ] **Cover first, in this order** (highest cost of silent regression) **[REVIEW]**
-  - [ ] `RolesGuard` hierarchy — a floor-vs-exact-match mistake would be catastrophic and invisible
+  - [x] ~~`RolesGuard` hierarchy~~ — superseded: the rank model was removed in 15D; `route-authorization.spec.ts`, `no-rank-model.spec.ts` and the per-area authorization specs cover the capability model
   - [ ] OTP: TTL, single-use, max attempts, the 3-per-10-min rate limit
   - [ ] Ownership scoping in `OwnerService`
   - [ ] `normalizeBusiness` / `normalizeBranch` at the API boundary
@@ -201,12 +209,12 @@
 > Full ranked analysis in `SECURITY.md`. Highest-severity items are under **Critical bugs** above.
 
 - [x] **Restrict CORS** — allowlist since Phase 15B (`src/common/cors.ts`) **[REVIEW]**
-- [ ] **Gate or disable `/docs` in production** — returns 200, publishing all 118 routes and every DTO **[REVIEW]**
+- [ ] **Gate or disable `/docs` in production** — still returns 200; accepted as low residual risk because both repositories are public (SECURITY §16.3 R8) **[REVIEW]**
 - [x] **Add `@nestjs/throttler`** — Phase 15B: `/auth/*` per-address + per-phone **[REVIEW]**
   - [ ] Extend throttling to `/analytics/*`, `/search`, `/upload/*`, `POST /businesses`
-- [ ] **Throttle or authenticate `POST /analytics/*`** — unauthenticated writes that poison analytics and grow tables without bound **[REVIEW]**
+- [x] ✅ **Mostly done — Phase 16G.1** (API PR #23, merged 2026-10-07 as `523d782`; **not deployed**): `AnalyticsGate` drops repeats per client (address + user-agent) — one view per business per 30 min, one identical click per 10 s, one identical search per minute — and caps each address at 300 recorded events per 10 min; the day's `visitorCities`/`searchQueries` arrays are capped (1000 / 200). Answers stay `{ success: true }`. In-process like the auth throttler (single replica). Owner self-views: fixed in **Phase 16G.2** (frontend PR #22, `41fb0fa`) — no view is recorded when the signed-in viewer owns the listing. **Still open:** no origin/signature check. *Original:* **Throttle or authenticate `POST /analytics/*`** — unauthenticated writes that poison analytics and grow tables without bound **[REVIEW]**
 - [ ] **Add `helmet`** **[REVIEW]**
-- [ ] **Verify `JWT_ACCESS_SECRET` is set on Railway** — no default, no boot validation **[REVIEW]**
+- [x] **Verify `JWT_ACCESS_SECRET` is set on Railway** — present (checked by name, 2026-10-04); a missing secret makes passport-jwt refuse to start, so it fails at boot, not open (SECURITY §16.1) **[REVIEW]**
 - [ ] **Strip EXIF / re-encode uploads** — **GPS coordinates may currently be published** with review and avatar photos **[REVIEW]**
 - [ ] **Add an upload quota per user** — 5 MB per file, unlimited files **[REVIEW]**
 - [ ] **Add an image deletion / orphan-cleanup path** — uploads are public and permanent **[REVIEW]**
@@ -220,14 +228,20 @@
 - [x] **15E.2 — authentication-code security** (SECURITY §13 #3a, D-76): codes never logged, `crypto.randomInt`, one live code, per-phone failure budget, atomic single use, no staff OTP sign-in, timing equalized, fail-closed SMS
 - [ ] **Owner: configure Eskiz SMS on Railway** (`ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, optional `ESKIZ_FROM`) — OTP sign-in and password reset answer 503 until then
 - [x] **15E.3 — CI hardening (repository side):** `permissions: contents: read`, actions pinned to SHAs, `persist-credentials: false`, Dependabot for actions — both repos; backend Railway gate verified
-- [ ] **Owner: enable Vercel Deployment Checks** (project `myandijan-frontend` → Settings → Deployment Checks → require the commit status `Vercel - myandijan-frontend: test-and-build`) — the frontend is NOT gated until then (SECURITY §15)
-- [ ] **Owner: add a `main` branch ruleset in both repos** — no deletion, no force push, PR + required check `test-and-build` (up to date), bypass: repository admin (SECURITY §15)
-- [ ] **After the Vercel gate is on:** push the held frontend-repo commits (CI hardening + 15E.3 docs) and confirm the production deployment waits for `test-and-build`
-- [ ] **Security Hardening phase (remaining):** refresh-token families + reuse detection (15E.4); rate-limit coverage — analytics, search, upload, per-user buckets (15E.5); headers/CSP, Swagger off in production, security-event audit (15E.6); distributed rate limiting if replicas increase
-- [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth); populate `RefreshToken.ipAddress/userAgent`; refresh-token reuse detection
+- [x] **Owner: enable the Vercel Production Deployment Check** `Vercel - myandijan-frontend: test-and-build` — configured 2026-10-02 (SECURITY §15)
+- [x] **Owner: add a `main` ruleset in both repos** — "Protect main" active (backend `24347110`, frontend `24347040`): no deletion, no force push, PR + `test-and-build` (up to date)
+- [x] **Push the held frontend-repo commits** — pushed with `3e8219f`
+- [x] **Prove the frontend gate** — observed on `7de35c6`: Vercel reported success one second after the `test-and-build` status (SECURITY §16.1)
+- [ ] **Phase 15 gate B — Owner: confirm both ruleset bypass lists are empty** (Settings → Rules → Rulesets — not readable via the public API)
+- [ ] **Phase 15 gate A — Owner: give ADMIN and SUPER_ADMIN unique credentials** (today all six role accounts share `SEED_ROLE_PASSWORD`; SECURITY §16.3 R3)
+- [ ] **Phase 15 gate C — final short Phase 15 closure audit**, after A and B; Phase 15 is not officially closed until it passes
+- [x] **15E.4 — refresh-token hardening** (4a–4e.2): sessions, rotation, reuse detection, `sid` binding, NOT NULL contract, legacy cleanup — **CLOSED / PASS** (production verified 2026-10-04)
+- [x] **Phase 15 final audit HIGH findings** — staff SMS password reset blocked, `multer` 2.4.0 — merged in PR #13 (`2ea83b6`), deployed (Railway `6b5f057b-ea08-4252-b5fa-79910859f8d8`), production verification PASS
+- [ ] **Security Hardening phase (remaining):** ~~refresh-token families + reuse detection (15E.4)~~ done; rate-limit coverage — analytics, search, upload, per-user buckets (15E.5); headers/CSP, Swagger off in production, security-event audit (15E.6); distributed rate limiting if replicas increase
+- [ ] **PLATFORM_OWNER governance phase (deferred):** PLATFORM_OWNER governance (lift/confirm ADMIN emergency freeze, appoint/remove ADMIN/SUPER_ADMIN, ownership transfer, step-up re-auth). *(Populating `RefreshToken.ipAddress/userAgent` and refresh-token reuse detection were removed from this list — superseded/done in 15E.4.)*
 - [ ] **Remove the dead `JWT_REFRESH_SECRET`** from `.env`/`.env.example` — nothing reads it, and it implies refresh tokens are signed JWTs (they are opaque random bytes) **[REVIEW]**
-- [ ] **Add the seven missing variables to `.env.example`** — `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`, `ESKIZ_BASE_URL` (+ remove `SUPABASE_ANON_KEY` if unneeded). Onboarding from it currently yields an API that will not boot **[REVIEW]**
-- [ ] **Run `npm audit`; enable Dependabot; remove the undeclared `sonner`** **[REVIEW]**
+- [x] **Add the seven missing variables to `.env.example`** — **done 2026-10-08**, backend PR #26 (`ae43648`). The seven the code reads and the template lacked: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`, `ESKIZ_FROM`, `ESKIZ_BASE_URL` (commented out — an empty value would override its `??` default) and `SEED_ROLE_PASSWORD`. `SUPABASE_ANON_KEY` stays out (unused). Without the `SUPABASE_*` pair the API does not boot **[REVIEW]**
+- [ ] **Run `npm audit`; enable Dependabot; remove the undeclared `sonner`** — *partly done:* `npm audit` run in the Phase 15 closeout (remaining backend items: SECURITY §16.3 R6); Dependabot covers GitHub Actions only; `sonner` not re-checked **[REVIEW]**
 - [?] **⚠️ Answer the data-residency question.** The schema's vanilla-PostgreSQL constraint exists so the DB is *"relocatable to an Uzbek host"* — but the DB is on **Railway** and images on **Supabase**, neither Uzbek. Portability is preserved; **residency is not.** If residency is a legal requirement, current hosting does not satisfy it **[REVIEW]**
 - [?] **Has the API's `.env` ever been shared, pasted or backed up?** It holds the Supabase `service_role` key and the production `DATABASE_URL`. Rotate if in any doubt **[REVIEW]**
 
@@ -235,15 +249,16 @@
 
 ## Deployment
 
-- [~] **Frontend deploy** — see Blocking issues
-- [x] **API deployed and verified** on Railway, zero downtime
-- [ ] **No CI/CD in either repo** — no GitHub Actions, no pipeline **[REVIEW]**
+- [ ] **API releases blocked by Railway plan/access (2026-10-07)** — see Blocking issues
+- [x] ~~**Frontend deploy**~~ — resolved 2026-09-28; since Phase 13/15E.3 Vercel deploys `main` from GitHub, gated on `test-and-build`
+- [x] **API deployed and verified** on Railway, zero downtime *(2026-09-28; last API deployment on record: `2ea83b6`, 2026-10-04)*
+- [x] ~~**No CI/CD in either repo**~~ — resolved: GitHub Actions `test-and-build` gates merges and deploys in both repos (D-71, D-77) **[REVIEW]**
 - [ ] **No staging environment** **[REVIEW]**
 - [ ] **No error tracking** (no Sentry) — a production frontend exception is invisible unless a user reports it **[REVIEW]**
 - [ ] **No uptime monitoring** — and no `/health` endpoint to monitor **[REVIEW]**
-- [ ] **Vercel project is not Git-connected**, so deploys depend on one developer's local CLI auth on a machine whose shell policy blocks the tooling — a single point of failure **[REVIEW]**
+- [x] ~~**Vercel project is not Git-connected**~~ — resolved: Vercel deploys from GitHub (deployment records on every `main` merge). *Original:* **Vercel project is not Git-connected**, so deploys depend on one developer's local CLI auth on a machine whose shell policy blocks the tooling — a single point of failure **[REVIEW]**
 - [ ] **Node version mismatch** — API pins `"engines": {"node": "22.x"}`; the dev machine runs 24.18 **[REVIEW]**
-- [ ] **Single `master` branch in both repos**, no PR flow, large multi-concern commits (e.g. `1d53f7f` = "Restaurant search, premium monetization UI, and reliability fixes") **[REVIEW]**
+- [x] ~~**Single `master` branch in both repos**~~ — resolved: `main` + PR flow + "Protect main" ruleset. *Original:* **Single `master` branch in both repos**, no PR flow, large multi-concern commits (e.g. `1d53f7f` = "Restaurant search, premium monetization UI, and reliability fixes") **[REVIEW]**
 - [ ] **Decide monorepo / shared types** — two repos, parallel hand-maintained type definitions, different TypeScript majors (6.0 vs 5.9) **[REVIEW]**
 - [?] **Domain/DNS** — a session prompt says `myandijan.uz (UzCloud)`; registrar and DNS host are **not verifiable from the repos** **[REVIEW]**
 
@@ -264,6 +279,8 @@
 ---
 
 ## Counts
+
+> Counts below are the 2026-09-28 tally and were not recomputed after later reconciliations.
 
 | Group | Open `[ ]` | In progress `[~]` | Done `[x]` | Unknown `[?]` |
 | --- | --- | --- | --- | --- |

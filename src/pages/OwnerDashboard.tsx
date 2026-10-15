@@ -50,7 +50,9 @@ export default function OwnerDashboard() {
           icon={Building2}
           title="Siz biznes egasi emassiz"
           body="Bu bo'lim faqat biznes egalari uchun mavjud."
-          actionLabel="Biznesni qo'shish"
+          // Goes to search, where a listing can be claimed — "add" was
+          // misleading: creating stays owner-only (D-75, Phase 16D).
+          actionLabel="Biznesingizni toping"
           onAction={() => navigate(`/${lang}/search`)}
         />
       </div>
