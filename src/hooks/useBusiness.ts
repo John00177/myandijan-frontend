@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ApiError, getBusiness, recordBusinessView } from "../lib/api";
+import { ownsBusiness } from "../lib/ownership";
 import type { Business, Lang } from "../types";
 
 interface UseBusinessResult {
@@ -11,7 +12,14 @@ interface UseBusinessResult {
   reload: () => void;
 }
 
-export function useBusiness(slug: string, lang: Lang): UseBusinessResult {
+/**
+ * `viewer` is the signed-in user, if any. An owner opening their own listing
+ * is not a visit (Phase 16G.2): counting it would inflate the very numbers
+ * the owner dashboard shows them, and owners check their page more than
+ * anyone. The user is restored from storage before the first render, so it
+ * is already known when the view is recorded.
+ */
+export function useBusiness(slug: string, lang: Lang, viewer?: { id: number } | null): UseBusinessResult {
   const [business, setBusiness] = useState<Business | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -33,7 +41,7 @@ export function useBusiness(slug: string, lang: Lang): UseBusinessResult {
           setBusiness(data);
           // Only the initial load counts as a "view" — a reload after posting
           // a review/reply is the same visit, not a second one.
-          if (reloadTick === 0) recordBusinessView(data.id);
+          if (reloadTick === 0 && !ownsBusiness(viewer, data.ownerId)) recordBusinessView(data.id);
         }
       })
       .catch((err: unknown) => {

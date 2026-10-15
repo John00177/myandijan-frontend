@@ -1,12 +1,520 @@
 # CURRENT_STATE — My Andijan
 
-> Snapshot taken **2026-09-28**. Verified against: both repositories at their current `HEAD`, git history, read-only probes of the live API (`myandijan-api-production.up.railway.app`) and the live site (`myandijan.uz`), and the recovered Claude Code session transcript.
+> **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
+
+## Current state — 2026-10-15, frontend #32/#34 and API #29 merged; API deployed with migration 16H (authoritative)
+
+**Repositories**
+
+| | `main` | Since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`1b8a0e13da83d2cf372f27a8fd81f88a3dc8546a`** | 2026-10-15 — PR #29 (D-80 agent rules; docs only). Previous `ae43648` |
+| Frontend `myandijan-frontend` | **`372a3e50f7dd9c63a0e13a44b02c4b76034a9d5b`** | 2026-10-15 — PR #34 (D-80 memory rule; docs only). Before it: `dd1e84b` = PR #32 (owner hours-overwrite fix, 2026-10-14) |
+
+**CI and deployment evidence (records only, read 2026-10-15)**
+- **Frontend `372a3e5`:** `test-and-build` success; GitHub Production deployment `7084301893`, success (2026-10-15T05:01Z). PR #32's `dd1e84b` has Production record `7068012896`, success (2026-10-14).
+- **API `1b8a0e1`:** `test-and-build` success; Railway production deployment **`5dce7cfe-d5aa-4a9d-8f4d-5bd240bad2b4`** (reason `deploy`, branch `main`) **SUCCESS**, 2026-10-15 05:00–05:04 UTC; GitHub record `7084289611`. The previous production commit **`2ea83b6` is stale** — its Railway deployment `2e7eb32a-…` is now REMOVED. Who authorized this deployment is **not recorded here**.
+- **A docs-only merge deployed all of API `main`.** Railway auto-deploys `main` and runs `npx prisma migrate deploy` as the pre-deploy command (`railway.json`). So production now runs everything in `main` since `2ea83b6` (58 files: the Phase 16C.1–16H backend changes, the authz route snapshot, and one migration), not just the docs.
+- **Migration (log-confirmed):** Railway's pre-deploy log reports "Applying migration `20261007090000_phase16h_claim_pending_unique`" and "All migrations have been successfully applied" (17 migrations found; this was the only one applied); Nest then started successfully. The migration (1) locks `business_claims`, (2) rejects duplicate PENDING claims for the same business and claimant (keeping the earliest; reason "Duplicate of an earlier pending claim by the same user (closed automatically)"), (3) creates the partial unique index `business_claims_one_pending_per_claimant`. A rollback would not undo it or its data change.
+
+**Read-only probes that passed (2026-10-15):** `GET /categories` 200, valid JSON; `GET /businesses?limit=2` 200; unauthenticated `GET /me/claims` and `GET /admin/claims` 401 (not 5xx). The signed-in owner dashboard rendered live data. Read-only check of the owner edit modal (2026-10-14) on a PENDING listing with no stored hours: `GET /me/businesses/<id>` 200, blank hours grid (no placeholder times), no `/hours` request on open.
+
+**STILL UNVERIFIED — pending (do not treat as done):**
+- The `_prisma_migrations` row and its `finished_at` / `rolled_back_at` (log lines only so far).
+- That the partial unique index exists live, and its definition.
+- How many claims the cleanup rejected (needs the database).
+- End-to-end claim filing and approval behaviour.
+- The owner edit flow with a stored 24-hour day, a closed day and a timed day, and any save (a save is a production write and needs the owner's explicit authorization).
+- Vercel and Railway runtime logs beyond the deployment's own.
+- No production database access exists for the agent; the documented read-only route is the Gate 2 runbook (`db/privileges/20_verify_readonly.sql`), owner-authorized per step.
+
+**Release restrictions — NOT cleared.** Owner, 2026-10-11 (chat): do not merge or deploy; the **SIG Gate 2 / public-release policy conflict remains unresolved**; security work remains deferred until public release. Frontend #32, #34 and API #29 were merged afterwards and Vercel/Railway deployed them (every `main` merge does) — recorded here as fact only. **No release authorization is recorded, and the hold is not cleared:** Gate 2 is still OPEN (R-E4 MET 2026-10-09, Phase A NOT STARTED).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · **API `main` including the 16C.1–16H backend changes is deployed per Railway; live behaviour of those flows unverified** · frontend 16E–16H changes still in the state recorded below · owner hours-overwrite fix MERGED (#32) and deployed per the record, live flow partly checked (above) · 16I in review: API #27, frontend #29, #30 · `feat/16-settings-hours` still local. The runbook's order (API deploy, then frontend #6) is now at the point where #6 would follow: **owner decision**, not inferred here. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Open PRs** (last checked 2026-10-11 except where noted; **not re-checked 2026-10-15**): frontend #33 (this record, docs only); frontend #6 **held**; frontend #28, #29, #30; API #27 (merging deploys API `main`), API #28 (security, deferred); Dependabot #1, #2 in both repos. Open frontend branches may now conflict with `main` on `docs/my-andijan/`, `AGENTS.md` and `CLAUDE.md`; check before merging.
+
+**Rules now in force:** D-80 — a memory-impact check after every material change, and `memory impact: updated|none` in every final report (`intelligence/MEMORY_CONTRACT.md` §4.1; `AGENTS.md` identical in both repos).
+
+**Next action**
+1. **Owner:** authorize, or run, the read-only database verification (migration row, index definition, cleanup count) and record the result here.
+2. **Owner:** decide whether to test claim filing/approval and the owner-hours save on a throwaway business (writes data; explicit authorization per action).
+3. **Owner:** decide the frontend #6 / runbook order, and resolve the SIG Gate 2 / public-release policy conflict.
+4. Settings-page hours (`feat/16-settings-hours`): rebase onto `main`; PR when asked.
+
+---
+
+## Current state — 2026-10-14, frontend PR #32 merged and deployed (historical — superseded 2026-10-15)
+
+**Repositories**
+
+| | `main` | Since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | 2026-10-08 (backend PR #26) — last verified 2026-10-11, **not re-checked 2026-10-14** |
+| Frontend `myandijan-frontend` | **`dd1e84bae34feb0e0c65c9928dc2bdf5f10061ed`** | 2026-10-14 19:21 +05 — merge of frontend PR #32 (previous `444bd12`) |
+
+**Merge (fact).** PR #32 `fix(dashboard): never overwrite stored hours from the owner edit modal` is **merged** into frontend `main` as `dd1e84b`. Its content is the 12 files reviewed pre-merge, ending at head `8a7b072`; `8a7b072` is an ancestor of `main`. `8a7b072` (docs only) corrected the earlier "444bd12 deployment UNKNOWN" wording.
+
+**Production — deployment evidence only (read-only, 2026-10-14):**
+- **Production** deployment record (GitHub deployments API): id `7068012896`, environment `Production`, sha **`dd1e84b`**, created 2026-10-14T14:22:10Z, latest status **success**. The previous Production record was `444bd12` (2026-10-09). The `8a7b072` and earlier records are **Preview** deployments, not Production.
+- `https://myandijan.uz/uz` returned HTTP 200 (HTML, served by Vercel, `Last-Modified` 2026-10-14 14:25:27 GMT, i.e. after the merge). The served bundles contain strings added by PR #32 (the edited-day validation message in the shared modal chunk; the loader's fail-closed error in the main bundle). That shows the new code is being served.
+- **Not done / not available:** the owner-edit hours workflow has **NOT been live-tested** (no owner account, no test business, no write to production). Vercel dashboard, build logs and runtime logs were **not accessible** (the Vercel API returned 403 to the tools available), so no deployment error log was read. A successful deployment record plus matching bundle strings is **not** proof that the workflow works live.
+- API on Railway: unchanged on record (`2ea83b6`, deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`), **not re-verified**. No API, auth or migration change in PR #32.
+
+**Release restrictions — NOT cleared.**
+- Owner, 2026-10-11 (chat): do not merge or deploy (#32 included); the **SIG Gate 2 / public-release policy conflict remains unresolved**, and **security work remains deferred until public release**.
+- PR #32 was then merged on 2026-10-14 and Vercel deployed it to Production (every frontend `main` merge does). This record states that as fact. It does **not** clear the hold: Gate 2 is still **OPEN** (R-E4 MET 2026-10-09, Phase A NOT STARTED), and the policy conflict is unresolved. Any release authorization for the merge is not recorded here. Nothing else is authorized to merge or deploy because of it.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · 16E–16H CODE COMPLETE · **owner hours-overwrite fix: MERGED (#32) and deployed per the Production record; live workflow untested** · 16I in review: API #27, frontend #29, #30 · roadmap item 11 (Settings-page hours, `SettingsView`): local uncommitted branch `feat/16-settings-hours`, not on GitHub. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Open PRs** (last checked 2026-10-11, **not re-checked 2026-10-14**; #32 removed because merged)
+
+| PR | Head | State |
+| --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `5832f10` | **Hold** until runbook §4 |
+| API #27 — 16I owner resubmit | `558641e` | Open. Merging deploys API `main` (`checkSuites=false`) |
+| frontend #29 — 16I resubmit UI | `149641b` | Open; pairs with API #27 |
+| frontend #30 — 16I.1 admin re-review context | `5c6d876` | Open |
+| frontend #28 — business discovery + SEO business pages | `8b3afe8` | Open; merging deploys to Vercel production |
+| API #28 — SIG Gate 2 Phase C (`directUrl`) | `e37e4d8` | Open; security work deferred |
+| API #1, #2 · frontend #1, #2 | — | Dependabot, not reviewed |
+
+Open frontend branches that touched `docs/my-andijan/` or `src/test/apiMock.ts` may now conflict with `main` (#29, #30, `feat/16-settings-hours`); check before merging.
+
+**Next action**
+
+1. **Owner:** decide whether to run a live check of the owner hours flow on a test business (details-only save must leave stored hours, including a 24-hour day, unchanged), and record the result here.
+2. **Owner:** resolve the SIG Gate 2 / public-release policy conflict; release order then per the runbook.
+3. Settings-page hours (`feat/16-settings-hours`): rebase onto `main` and commit/open a PR when asked. The expected conflicts with #32 (`TODO.md` Bugs entry; `src/test/apiMock.ts`) now resolve in favour of what is on `main`.
+
+---
+
+## Current state — 2026-10-11, owner hours-overwrite fix in review as frontend PR #32 (historical — superseded 2026-10-14)
+
+**Repositories** (verified 2026-10-11 from Git and GitHub's API, read-only)
+
+| | `main` | Unchanged since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | 2026-10-08 (backend PR #26) |
+| Frontend `myandijan-frontend` | **`444bd12`** | 2026-10-09 (frontend PR #31 — Gate 2 R-E4 memory) |
+
+**Production** — on record 2026-10-09, **not re-verified 2026-10-11** (no production access this session): API on Railway runs commit **`2ea83b6`** (deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`, a Rollback made in the Gate 2 R-E4 window); frontend on Vercel — the latest Production deployment on record is `444bd12` (docs only; 2026-10-09T13:16:38Z, state success, per the repo's GitHub deployment records read 2026-10-14; the previous one was `9435dcd`, 2026-10-08). That is a deployment record only: no live smoke test or runtime check was done, so it does not prove the live site's behaviour. The API service deploys `main` with `checkSuites=false`, and **every frontend `main` merge deploys to Vercel production**.
+
+**New since 2026-10-09 — frontend PR #32** `fix(dashboard): never overwrite stored hours from the owner edit modal` — **open, not merged, not deployed**
+- Head **`f7776e3`** (`f7776e31aad91b023c7a8ef79e03d1c1490ec299`) plus this docs-only memory commit; base `main@444bd12`; GitHub: mergeable, `clean`.
+- **Checks on `f7776e3` (2026-10-11): `test-and-build` success; Vercel Preview Comments success; Vercel status success — a *preview* deployment only, not production.**
+- **Bug fixed:** the owner "My businesses" edit modal sent all 7 grid days to `PUT /businesses/:id/hours` (replaces every row) on **every** save, without `is24Hours`, prefilled from the APPROVED-only public `GET /businesses/:id` — so even a name change turned 24-hour days into 09:00–18:00, created placeholder rows, and replaced all hours of DRAFT/PENDING/REJECTED listings; a second detail fetch could also reset the loaded grid. **Production still has this bug until #32 is merged and deployed.**
+- **Fix:** prefill from `GET /me/businesses/:id` (`getMyBusinessEditDetail`, any status, fails closed without an hours list); `preserveUnchangedHours`; hours only via `adminHoursPayload` (nothing unless loaded and edited); no second fetch. Shared modal change, admin flow included: unknown times start blank and an edited day must be complete. No API/auth/migration change; both endpoints exist in the live API commit `2ea83b6` (source-checked).
+- **Validation (local, 2026-10-11, on `f7776e3`'s tree):** focused 14/14 (all 9 owner-flow tests fail on the old code); owner-dashboard + admin + modal suites 169/169; `npm run build` and `npm run lint` pass (0 errors, 17 pre-existing warnings); full suite **337/338** on the final run — the one failure was the known `App.routing` not-found timing flake (passes 5/5 ×3 in isolation; an earlier full run of the same tree was 338/338).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · 16E–16H CODE COMPLETE, not deployed · **16I in review:** API #27, frontend #29, #30 · **owner hours-overwrite fix: frontend #32 in review** · roadmap item 11 (Settings-page hours, `SettingsView`): implemented on a **local, uncommitted** branch `feat/16-settings-hours` — not on GitHub yet. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Owner decisions / release restrictions**
+- **D-79** unchanged. **Frontend #6 merges immediately after the API deploy, not before** (runbook §4).
+- **Owner, 2026-10-11 (chat):** do **not** merge or deploy (#32 included). The **SIG Gate 2 / public-release policy conflict remains unresolved**, and **security work remains deferred until public release**. No production release is authorized.
+
+**Open PRs** (GitHub, 2026-10-11)
+
+| PR | Head | State |
+| --- | --- | --- |
+| frontend #32 — owner hours-overwrite fix | `f7776e3` | Open, checks green; **do not merge** (owner hold) |
+| frontend #6 — 16C.1 verification note | `5832f10` | **Hold** until runbook §4 |
+| API #27 — 16I owner resubmit | `558641e` | Open. Merging deploys API `main` (`checkSuites=false`) |
+| frontend #29 — 16I resubmit UI | `149641b` | Open; pairs with API #27 |
+| frontend #30 — 16I.1 admin re-review context | `5c6d876` | Open |
+| frontend #28 — business discovery + SEO business pages | `8b3afe8` | Open; merging deploys to Vercel production |
+| API #28 — SIG Gate 2 Phase C (`directUrl`) | `e37e4d8` | Open; security work deferred (owner, 2026-10-11) |
+| API #1, #2 · frontend #1, #2 | — | Dependabot, not reviewed |
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Unchanged since the 2026-10-09 record below: Gate 2 **OPEN** · R-E4 **MET** (2026-10-09) · Phase A **NOT STARTED**. Gate record: `D:\My-Andijan\security-governance\SIG\gates\gate-02\`. Not touched this session; deferred per the owner's 2026-10-11 instruction above.
+
+**Next action**
+
+1. **Owner:** review frontend #32 (do not merge until a release is authorized). When merged, record its merge SHA here (a document cannot record the merge that contains it).
+2. **Owner:** resolve the SIG Gate 2 / public-release policy conflict; release order then per [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+3. Settings-page hours (`feat/16-settings-hours`): commit and open a PR when asked. It overlaps #32 only in `TODO.md` (Bugs entry — keep #32's "fixed" entry) and `src/test/apiMock.ts` (take #32's lines).
+
+---
+
+## Current state — 2026-10-09, after the SIG Gate 2 R-E4 window (historical — superseded 2026-10-11)
+
+**Repositories** (verified 2026-10-09 from Git and GitHub's API, read-only)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | backend PR #26 — `.env.example` variable names (docs; after #11, 16E.1, `de9c55f`) |
+| Frontend `myandijan-frontend` | **`9435dcd`** | frontend PR #26 — Phase 16 deploy-day runbook + memory (merged 2026-10-08 10:56 UTC) |
+
+CI `test-and-build` `success` on both `main` heads.
+
+**Production** (evidence: Railway API and GitHub Deployments API, read-only, 2026-10-09)
+
+| | Deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | Commit **`2ea83b6`**. Active since 2026-10-09 16:40:47 UTC+05:00: **`2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`**, `SUCCESS` — a Railway **Rollback** of `6b5f057b-ea08-4252-b5fa-79910859f8d8` (same image snapshot, no build), made in the Gate 2 R-E4 window (below). `GET /categories` 200 | Nothing merged to the API after `2ea83b6` is live — backend PRs #10, #11, #14–#21, #23–#26 |
+| **Frontend — Vercel** | `9435dcd`: Production deployment `success` 2026-10-08 10:56 UTC. Live bundle not probed (MEMORY_CONTRACT §5) | Vercel deploys every frontend `main` merge to production |
+
+**Railway:** plan **Hobby** (owner's Billing screenshot, 2026-10-09); a Rollback deployment succeeded 2026-10-09, so deployments are possible. The API service deploys `main` with `source.checkSuites=false`: a merge to API `main` **deploys without waiting for CI** (verified at W0). The API release stays blocked by SIG Gate 2 (entry check E0, below).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · **16D PARTIAL** (frontend #27 merged; the rest needs API work; D-79) · 16E, 16F, 16G, 16H CODE COMPLETE, not deployed · **16I in review:** API #27 and frontend #29 (owner resubmits a rejected listing), frontend #30 (admin re-review context) — open, not merged. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Owner decisions (unchanged):** **D-79** — creating a listing stays BUSINESS_OWNER-only. **Frontend #6 merges immediately after the API deploy, not before** (runbook §4).
+
+**Open PRs** (GitHub, 2026-10-09; all `test-and-build` `success`, mergeable)
+
+| PR | Head | State |
+| --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `610f527` | **Hold** until runbook §4 |
+| API #27 — 16I owner resubmit | `558641e` | Open. Merging deploys API `main` (`checkSuites=false`): not while Gate 2 is open |
+| frontend #29 — 16I resubmit UI | `5d23630` | Open; pairs with API #27 |
+| frontend #30 — 16I.1 admin re-review context | `cd9ca6d` | Open |
+| frontend #28 — business discovery + SEO business pages | `4808f74` | Open; merging deploys to Vercel production |
+| API #1, #2 · frontend #1, #2 | — | Dependabot, not reviewed; keep out of the release window |
+
+**Release facts for the next API deploy:** exactly one new migration, `20261007090000_phase16h_claim_pending_unique` (17 on `main`; production has 16, confirmed by Gate 2 P10 on 2026-10-09).
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Gate record (outside the repositories): `D:\My-Andijan\security-governance\SIG\gates\gate-02\` (SESSION_LOG Entries 19–30).
+Runbook: `my-andijan-api/db/privileges/RUNBOOK.md` at `ae43648`, unchanged.
+
+- **Status:** Gate 2 **OPEN** · **R-E4 MET** (2026-10-09) · **Phase A NOT STARTED**.
+- **Window W0–W9** (operator John; each step owner-authorized): 15:04:53 → **16:46:32 UTC+05:00**. Merge/deploy freeze
+  held, lifted at W9. W2 Remove 15:56:41; API outage ~44 min. P4 sessions 12 → 0 → 0 → 1; health 200 → 404 → 200.
+- **R-E4:** fresh `pg_dump` under the verified pause (frame intact, `pg_dump_exit=0`); isolated **PostgreSQL 18.6**
+  restore (`restore-check.sh` exit 0) matched **all 33 tables / 316 rows** (= W1 = W4 paused baseline; counts SHA-256
+  `d6fb3e49…3afb`); disposable cluster cleaned up.
+- **Resume — Option A (owner decision for this window):** a Railway Rollback creates a new deployment ID; the resume is
+  accepted when the active deployment is verified as the Rollback of the recorded deployment (`reason: rollback`, same
+  image snapshot, no build) on the recorded commit `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`. The runbook wording fix
+  is a separate docs PR, not yet made (merging it to API `main` would deploy `main`).
+- **Anomaly:** two rollback deployments — `61082d56-96be-4504-9fac-e6b8fab20d7c` (same commit and snapshot) was
+  superseded by `2e7eb32a…`. **Cause unconfirmed.**
+- **Artifacts:** the retained dump `railway-20261009-1607.dump` on the encrypted `R:` volume is **intact** (165,974 bytes,
+  SHA-256 `52faf948…0369`, verified 2026-10-09) and kept until Gate 2 closes. `remote-dump.sh`, `*.framed` and
+  `prod.raw` were **purged and verified 2026-10-09** (owner deletion from the `R:` Recycle Bin); their disk blocks were
+  **not overwritten — no secure erasure**. Six other files on `R:` await an owner decision.
+- **Production mutation by Claude: NONE** (read-only checks; W2 and W7 were the owner's Railway UI actions).
+- **Do not deploy API `main` while Gate 2 is open** (Phase 16 runbook E0): it carries the undeployed 16H migration.
+
+**Next action**
+
+1. **Owner:** review and merge this memory PR (docs only; deploys to Vercel).
+2. **Owner:** SIG Gate 2 next authorization gate — **Phase A** (`10_phase_a_boundary.sql`, RUNBOOK §6 Step 3); Phases
+   B–E and the Gate 2 close are each authorized separately.
+3. After Gate 2 closes: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md) §1–§5. Note: the Railway deploy of
+   `main` is **not** CI-gated (`checkSuites=false`).
+4. Open follow-ups: runbook Option A wording PR; confirm the cause of the second rollback deployment; review 16I
+   (API #27, frontend #29, #30) and frontend #28.
+
+---
+
+## Current state — 2026-10-08, after the 16E.1 merges (historical — superseded 2026-10-09)
+
+**Repositories** (verified 2026-10-08 from Git and GitHub's PR API)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | backend PR #26 — `.env.example` variable names (docs; after #11, 16E.1, `de9c55f`) |
+| Frontend `myandijan-frontend` | **`09900ad`** | frontend PR #25 — SIG Gate 2 preflight memory (after #27, 16D UX, `33a26ee`; #7, 16E.1, `fa2a998`) |
+
+CI `test-and-build` passed on both `main` heads.
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-08; no live probe made)
+
+| | Deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6`, `success` 2026-10-04 (deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8`, confirmed by the Gate 2 preflight below). **No later deployment.** | Nothing merged to the API since is live — backend PRs #10, #11, #14–#21, #23–#26 |
+| **Frontend — Vercel** | `09900ad`: Production deployment `success` 2026-10-08 10:18 UTC. Live bundle not probed (MEMORY_CONTRACT §5) | Vercel deploys every `main` merge, so #7 and #27 are in production. Against the deployed API its review-context fields are absent and the queue shows no context — by design (optional fields) |
+
+**🔴 Production release blocker: Railway.** Plan / account access expired (owner, 2026-10-07). Until restored: no deploys, no Railway or production-variable changes, no migrations, no production database access.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (below) · **16D PARTIAL** — claimant/owner status UX merged (frontend PR #27, `33a26ee`); the rest needs API work; CUSTOMER `business.create` dropped (D-79) · 16E, 16F, 16G, 16H CODE COMPLETE, not deployed · 16I not started — deploy-day runbook written ([`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md)).
+
+**Owner decisions 2026-10-08:** **D-79** — keep D-75: creating a listing stays BUSINESS_OWNER-only. **Frontend PR #6 merges immediately after the API deploy, not before** (runbook §4).
+
+**Open PRs**
+
+| PR / branch | Head | State |
+| --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `89e0e61` (on `fa2a998`) | CI green, mergeable. **Hold** until runbook §4 |
+| ~~frontend #27 — 16D status UX~~ | `08296a1` | **Merged** 2026-10-08 (`33a26ee`). Claimant sees a rejected claim's reason, and "under review" instead of the CTA after a reload; owner sees HIDDEN labelled and the reason on REJECTED / SUSPENDED listings; 403 copy points to the claim path. Uses only fields the deployed API already returns |
+| frontend #26 — runbook + this memory update | — | Docs only |
+| ~~backend #26 — `.env.example`~~ | `d2fa9e3` | **Merged** 2026-10-08 (`ae43648`). Docs only: the seven missing names, empty values |
+| backend #1, #2 · frontend #1, #2 | — | Dependabot (Actions `checkout` / `setup-node`), not reviewed; keep out of the release window |
+
+**Release facts for the next API deploy:** exactly one new migration, `20261007090000_phase16h_claim_pending_unique` (17 in total) — unchanged by backend #26 (docs). Steps, checks and rollback: the runbook.
+
+**Unchanged:** Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Gate record (outside the repositories): `D:\My-Andijan\security-governance\SIG\gates\gate-02\` (REPORT §19,
+EVIDENCE G2-E-025/026, SESSION_LOG Entry 16). Runbook: `my-andijan-api/db/privileges/RUNBOOK.md`.
+
+**Verified facts — fresh read-only production preflight: PASS** (2026-10-08 05:27–05:29 UTC+05:00, reviewed by the owner):
+- **Run:** committed `00` (`9e39c5f0…3edd28`) and `30` (`fa806fc4…2da4`) from API `main@db64496`, through the approved
+  `railway ssh` guarded transport; fingerprints MATCH, exit 0.
+- **Result:** PostgreSQL **18.6**, P1–P19 **all PASS**, no drift. Row counts normalize: **33 tables, 313 rows**.
+  - The 2026-10-06 count was 307. The +6 (`audit_logs` 24→26, `refresh_tokens` 22→26) is normal live-production drift,
+    **not an R-E4 baseline**.
+  - `_prisma_migrations` 16, clean.
+- **W0 API deployment:** **`6b5f057b-ea08-4252-b5fa-79910859f8d8`** on **`2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`**,
+  `SUCCESS`, no later deployment.
+- **Railway access:** read-only API and `railway ssh` worked. Deploying was not attempted, so whether the plan blocker
+  above is resolved is **not verified**.
+- **Production mutation: NONE.** No production secrets retrieved or output; no Railway configuration or deployment
+  change.
+
+**Current status:**
+- Gate 2 is **OPEN — STOPPED BEFORE PRODUCTION MUTATION**. Write pause and R-E4: **NOT STARTED**.
+- Ready: write-pause procedure merged (backend PR #25, `db64496`); PostgreSQL 18.6 local; encrypted R-E4 container
+  present. **`R:` was not mounted on 2026-10-08:** mount it and re-verify it at the actual window start.
+- **Do not deploy API `main` while Gate 2 is open.** It carries the undeployed 16H migration; the window resumes only to
+  W0.
+
+**Next authorization gate:** John (owner) authorizes every production step. He confirms the window (E5), then
+explicitly authorizes opening R-E4 at W0 (record the deployment above, declare the merge/deploy freeze). W1–W9 are each
+authorized separately.
+
+**Next action**
+
+1. **Now, without Railway:** review and merge frontend #26 (runbook + this memory) (owner).
+2. **Owner:** restore Railway; the SIG Gate 2 next authorization gate (above). **Do not deploy API `main` while Gate 2 is open** (runbook entry check E0).
+3. Then follow [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md) §1–§5: entry checks and backup → CI-gated API deploy of `main` → V1–V10 → merge #6 at once → sitemaps PR → record the deployment here.
+4. Later: the 16D API items (owner resubmit, single create route); 16I (SMS, the `RegisterDto` fix — scope not recorded, cohort).
+
+---
+
+## Current state — 2026-10-08, before the 16E.1 merges (historical — superseded 2026-10-08)
+
+> Superseded the same day by the section above (backend #11 and frontend #7 merged; D-79; runbook; 16D partial). Its "16D NOT STARTED" and its open-PR table are out of date.
+
+**Repositories** (verified 2026-10-08 from Git and GitHub's PR API)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`db64496`** | backend PR #25 — SIG Gate 2 R-E4 write-pause controls |
+| Frontend `myandijan-frontend` | **`565f0e5`** | frontend PR #23 — 16G/16H memory closeout (docs) |
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-08; no live probe made)
+
+| | Deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6` (backend PR #13 merge), `success` 2026-10-04. **No deployment of any later commit.** | **Nothing merged to the API after `2ea83b6` is production-live** — backend PRs #10, #14–#21, #23–#25 |
+| **Frontend — Vercel** | Vercel is connected to GitHub and creates a Production deployment for every `main` merge (`vercel[bot]`). Record for `565f0e5`: `success` (deployment `6915534436`, 2026-10-07 16:42 UTC). Live bundle not probed, so behaviour is not verified (MEMORY_CONTRACT §5) | **Merging a frontend PR ships it to production** while the API stays at `2ea83b6`. Judge every frontend PR against the *deployed* API, not API `main` |
+
+**🔴 Production release blocker: Railway.** Plan / account access expired (owner, 2026-10-07). Deployment/account blocker, not a code blocker. Until the owner restores it: no deploys, no Railway or production-variable changes, no migrations, no production database access.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged (PR #10), frontend #6 open, production closure needs the deploy · **16D NOT STARTED** (below) · 16E, 16F CODE COMPLETE except 16E.1 (open pair) · 16G, 16H CODE COMPLETE, not deployed · 16I not started (pilot; needs production).
+
+**16D — correction.** The 2026-10-07 sections said "16C, 16D production closure pending". For 16D that was wrong: no PR implements it. Scope (Phase 16 plan, 2026-10-03): CUSTOMER `business.create`; a single create route; wizard gating, 403 handling and copy; owner status panel with rejection reason, HIDDEN and resubmit; claim-reason UX. Checked on `main` 2026-10-08: `business.create` is BUSINESS_OWNER-only (D-75; API `src/authz/capabilities.ts`); there are two create routes (`POST /businesses`, `POST /me/businesses`); the owner's business list shows no rejection reason and the API has no owner resubmit path; `DashboardHomeView`'s status labels have no HIDDEN entry (a hidden listing gets an empty badge). **Waiting on an owner decision:** granting CUSTOMER `business.create` reverses D-75. 16D does not depend on SMS.
+
+**Merged since the previous state section, not production-live**
+
+| Item | PR | Notes |
+| --- | --- | --- |
+| SIG Gate 2 R-E4 write-pause controls | backend PR #25 merged 2026-10-07 (`db64496`, head `aab1b52`) | `db/privileges/RUNBOOK.md` + `test/db/runbook-write-pause.db-spec.ts`. No migration, no application code. CI `test-and-build` passed on the merge |
+| 16G/16H memory closeout | frontend PR #23 (`565f0e5`) | Docs only |
+
+**Open Phase 16 PRs — rebased onto current `main` 2026-10-08, not merged**
+
+| PR | Rebased head | Conflicts | CI on the rebased head | Merge notes |
+| --- | --- | --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `6d6b9d8` | `src/lib/__tests__/api.test.ts` — both test suites kept | `test-and-build` passed | Merge order is an owner decision: the *deployed* approve route takes no body, so merged first, approvals keep working but the note is dropped until the API deploys; after the API deploys, approvals answer 400 until #6 ships |
+| backend #11 — 16E.1 claim review context | `59122f1` | none | `test-and-build` passed, including both real-PostgreSQL database-test steps | API-only; merging does not deploy |
+| frontend #7 — 16E.1 queue context | `2047393` | none | `test-and-build` passed | The new fields are optional: with the deployed API the queue shows no context rather than a false warning |
+
+#6 and #7 edit adjacent rows of `API.md` (`/admin/claims` and `/approve`), so whichever merges second needs a one-line rebase. Other open PRs: backend #1, #2 and frontend #1, #2 (Dependabot, not reviewed).
+
+**Release facts for the next API deploy:** `git diff --name-status 2ea83b6..db64496 -- prisma` = **exactly one new migration, `20261007090000_phase16h_claim_pending_unique`** (17 in total), plus a comment-only `schema.prisma` change — unchanged by PR #25. Migration behaviour: previous section.
+
+**Unchanged:** Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+### SIG Gate 2 — security governance (separate from Phase 16)
+
+Gate record (outside the repositories): `D:\My-Andijan\security-governance\SIG\gates\gate-02\` (REPORT §19,
+EVIDENCE G2-E-025/026, SESSION_LOG Entry 16). Runbook: `my-andijan-api/db/privileges/RUNBOOK.md`.
+
+**Verified facts — fresh read-only production preflight: PASS** (2026-10-08 05:27–05:29 UTC+05:00, reviewed by the owner):
+- **Run:** committed `00` (`9e39c5f0…3edd28`) and `30` (`fa806fc4…2da4`) from API `main@db64496`, through the approved
+  `railway ssh` guarded transport; fingerprints MATCH, exit 0.
+- **Result:** PostgreSQL **18.6**, P1–P19 **all PASS**, no drift. Row counts normalize: **33 tables, 313 rows**.
+  - The 2026-10-06 count was 307. The +6 (`audit_logs` 24→26, `refresh_tokens` 22→26) is normal live-production drift,
+    **not an R-E4 baseline**.
+  - `_prisma_migrations` 16, clean.
+- **W0 API deployment:** **`6b5f057b-ea08-4252-b5fa-79910859f8d8`** on **`2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`**,
+  `SUCCESS`, no later deployment.
+- **Railway access:** read-only API and `railway ssh` worked. Deploying was not attempted, so whether the plan blocker
+  above is resolved is **not verified**.
+- **Production mutation: NONE.** No production secrets retrieved or output; no Railway configuration or deployment
+  change.
+
+**Current status:**
+- Gate 2 is **OPEN — STOPPED BEFORE PRODUCTION MUTATION**. Write pause and R-E4: **NOT STARTED**.
+- Ready: write-pause procedure merged (backend PR #25, `db64496`); PostgreSQL 18.6 local; encrypted R-E4 container
+  present. **`R:` was not mounted on 2026-10-08:** mount it and re-verify it at the actual window start.
+- **Do not deploy API `main` while Gate 2 is open.** It carries the undeployed 16H migration; the window resumes only to
+  W0.
+
+**Next authorization gate:** John (owner) authorizes every production step. He confirms the window (E5), then
+explicitly authorizes opening R-E4 at W0 (record the deployment above, declare the merge/deploy freeze). W1–W9 are each
+authorized separately.
+
+**Next action**
+
+1. **Owner:** restore Railway plan / access; SIG Gate 2 next authorization gate (above); decide CUSTOMER `business.create` (unblocks 16D) and the #6 merge order.
+2. Then, with the owner's authorization, and **not while SIG Gate 2 is open**: let Railway deploy API `main` through the CI-gated path, and ship #6 as decided.
+3. Verify in production: the 16H migration is applied (17 rows in `_prisma_migrations`, no failed row); a duplicate pending claim answers 409; a repeated view is not double-counted; `updatedAt` appears on the business/event lists; the 16E.4 route answers.
+4. Then regenerate the sitemaps (`npm run sitemap`) in a frontend PR; merge the 16E.1 pair (#11, then #7); the 16C/16D production closure; then 16I (SMS live, the `RegisterDto` fix — scope not recorded in the repositories, runbook, cohort, docs refresh).
+
+---
+
+## Current state — 2026-10-07, after the 16G/16H merges (historical — superseded 2026-10-08)
+
+> Superseded the next day by the section above. Stale in it: API `main` (now `db64496`, PR #25), "16D production closure pending" (16D was never started) and the frontend production row (Vercel deploys every `main` merge; `565f0e5` has a `success` record). Kept for its 16G/16H evidence and the 16H migration's behaviour.
+
+**Repositories** (verified 2026-10-07 from Git and GitHub's PR API)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`523d782`** | backend PR #23 — Phase 16G.1 |
+| Frontend `myandijan-frontend` | **`41fb0fa`** | frontend PR #22 — Phase 16G.2 |
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-07; no live probe made)
+
+| | Last deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6` (backend PR #13 merge), `success` 2026-10-04. **No deployment of any later commit.** | **Nothing merged to the API after `2ea83b6` is production-live** — backend PRs #10, #14–#21, #23, #24 |
+| **Frontend — Vercel** | **Not verified.** A Vercel Production deployment record exists for `41fb0fa` (`success`, 2026-10-07 15:40 UTC); not treated as proof, and the live bundle was not probed | Do not describe frontend `main` as live. The 16G.2 panel reads `GET /me/analytics/overview`, which the deployed API already serves, but its counts are de-duplicated only once 16G.1 deploys |
+
+**🔴 Production release blocker: Railway.** Plan / account access expired (owner, 2026-10-07). Deployment/account blocker, not a code blocker. Until the owner restores it: no deploys, no Railway or production-variable changes, no migrations, no production database access.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C, 16D production closure pending (needs the deploy) · 16E, 16F CODE COMPLETE · **16G CODE COMPLETE** · **16H CODE COMPLETE** · 16I not started (pilot; needs production). None of 16G/16H is deployed.
+
+**Merged to `main` since the previous state section, none production-live**
+
+| Item | Backend | Frontend | Notes |
+| --- | --- | --- | --- |
+| 16H one pending claim per (business, claimant) | PR #24 merged 2026-10-07 (`7a3a7dd`, head `55711e6`) | — | Partial unique index + `FOR SHARE` re-check in `createClaim`; competing claimants still allowed. CI `test-and-build` passed on head and merge, **including "Run database tests" and "Run database tests as runtime_app_public"** (real PostgreSQL 18.6; forced-race suites `test/db/claims-concurrency.db-spec.ts`, `migration-claims-pending-unique.db-spec.ts`) |
+| 16G.1 analytics write hygiene | PR #23 merged 2026-10-07 (`523d782`, head `d73993d`) | — | `AnalyticsGate`: per-visitor de-duplication, per-address cap, bounded `visitorCities`/`searchQueries`. CI passed incl. the database suites |
+| 16G.2 owner 7-day analytics panel; owner self-views not counted | — | PR #22 merged 2026-10-07 (`41fb0fa`, head `8da7aa3`) | No API change |
+| Docs for 16G.1 + 16H | — | PR #21 merged 2026-10-07 (`c03a625`) | — |
+
+Earlier Phase 16 items (16C.1 … 16F.7) are unchanged — see the section below.
+
+**Release facts for the next API deploy:** `git diff 2ea83b6..523d782 -- prisma` = **exactly one new migration, `20261007090000_phase16h_claim_pending_unique`** (17 migrations in total), plus a comment-only `schema.prisma` change. It runs in Railway's pre-deploy `prisma migrate deploy`: locks `business_claims`, closes any duplicate PENDING pairs (keeps the earliest, marks the rest `REJECTED` with a reason, deletes nothing), then creates `business_claims_one_pending_per_claimant`. The deploy ships every API change merged since `2ea83b6` at once.
+
+**Open PRs:** backend #11 (16E.1), #1, #2 (Dependabot) · frontend #6 (16C.1), #7 (16E.1), #1, #2 (Dependabot).
+
+**Unchanged from the previous section:** SIG Gate 2 production execution not recorded in the repositories (owner to confirm) · Phase 15 CLOSED / PASS 2026-10-05 · production SMS unconfigured (`ESKIZ_*`).
+
+**Next action**
+
+1. **Owner:** restore Railway plan / access; confirm SIG Gate 2 production status.
+2. Then, with the owner's authorization: let Railway deploy API `main` through the CI-gated path, then **merge frontend #6 (16C.1) immediately** — approving a claim then requires a verification note.
+3. Verify in production: the 16H migration is applied (17 rows in `_prisma_migrations`, no failed row); a duplicate pending claim answers 409; a repeated view is not double-counted; `updatedAt` appears on the business/event lists; the 16E.4 route answers.
+4. Then regenerate the sitemaps (`npm run sitemap`) in a frontend PR; then the 16C/16D production closure and 16I.
+5. Remaining code pair: 16E.1 (backend #11 + frontend #7).
+
+---
+
+## Current state — 2026-10-07, before the 16G/16H merges (historical — superseded 2026-10-07)
+
+> Superseded the same day by the section above (backend PRs #23, #24 and frontend PRs #21, #22 merged). Kept for its Phase 16 table (16C.1 … 16F.7), which is still accurate. Its "no new migrations" release fact is **no longer true** — see above.
+
+**Repositories** (verified 2026-10-07: local clones clean, `main` = `origin/main`)
+
+| | `main` | Merge of |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`a74acd8`** | backend PR #21 — Phase 16F.6 |
+| Frontend `myandijan-frontend` | **`69cd618`** | frontend PR #19 — Phase 16F.7 |
+
+**Production** (evidence: GitHub Deployments API, read-only, 2026-10-07; no live probe made)
+
+| | Last deployment on record | Consequence |
+| --- | --- | --- |
+| **API — Railway** | `2ea83b6` (backend PR #13 merge), status `success` 2026-10-04 12:49 UTC. **No deployment of any later commit.** | **Everything merged to the API after `2ea83b6` is NOT production-live**: backend PRs #10, #14–#21 |
+| **Frontend — Vercel** | **Not verified.** GitHub lists a Vercel Production deployment record for `69cd618` (`success`, 2026-10-06 06:01 UTC); that is not treated as proof of what is live, and the live bundle was not probed | Do not describe frontend `main` as production-live until verified. Features that need the newer API cannot work fully in production anyway (see below) |
+
+**🔴 Production release blocker: Railway.** The Railway plan / account access has expired (reported by the owner, 2026-10-07). The API cannot be deployed until the owner restores it. This is a **deployment/account blocker, not a code blocker**. While it lasts: no deploys, no Railway changes, no production variable changes, no migrations, no production database access.
+
+**Phase 16 — merged to `main`, not production-live on the API side**
+
+| Item | Backend | Frontend | Notes |
+| --- | --- | --- | --- |
+| 16C.1 claim integrity | PR #10 merged 2026-10-05 | PR #6 **open** | Backend half only |
+| 16E.1 claim review context | PR #11 **open** | PR #7 **open** | — |
+| 16E.2 admin event moderation | — | PR #8 merged 2026-10-03 | Uses pre-existing API routes |
+| 16E.3 business review drawer · 16E hours-preserve fix | — | PRs #11, #12 merged 2026-10-05 | — |
+| 16E.4 `GET /admin/businesses/:id` | PR #17 merged 2026-10-05 | — | Not live |
+| 16E.5 admin detail in drawer / edit | — | PR #14 merged 2026-10-05 | Calls 16E.4; until the API deploys it gets 404 and falls back by design (`getAdminBusinessEditDetail`, `src/lib/api.ts`) |
+| 16F.1 noindex not-found pages | — | PR #15 | — |
+| 16F.2 slug integrity · 16F.3 district+city filter | PRs #19, #20 | — | Not live |
+| 16F.4 sitemap fail-closed · 16F.5 events sitemap · 16F.7 real `lastmod` | — | PRs #16, #17, #19 | Generator code only. The committed `public/sitemap-*.xml` were last regenerated 2026-09-29, and `sitemap-events.xml` does not exist yet. Regenerate only after the API (16F.6 `updatedAt`) is live |
+| 16F.6 `updatedAt` on lists; counters stop moving it | PR #21 | PR #18 (docs) | Not live |
+
+**Security governance (SIG Gate 2) — repository artifacts only.** Backend PRs #14 (CI on PostgreSQL 18.6), #15 (database privilege boundary: runbook, SQL, CI proof), #16, #18 (runbook amendments) are merged. Executing `db/privileges/` against production requires the owner's explicit authorization. Whether that happened is **not recorded in the repositories** (the gate record lives outside them, per `RUNBOOK.md`).
+
+**Phase 15 — CLOSED / PASS (2026-10-05).** Source: the owner's canonical Notion project record, confirmed in chat 2026-10-07. **Gate A PASS:** unique production ADMIN / SUPER_ADMIN credentials verified. **Gate B PASS:** backend ruleset `24347110` and frontend ruleset `24347040` active, no bypass actors, `current_user_can_bypass = never`. **Gate C PASS:** production commit `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13`, Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` SUCCESS / healthy, 16 migrations clean, 15E.4e session contract verified, staff SMS reset blocked, `multer` 2.4.0. Phase 16 work merged after this closure.
+
+**Release facts for the next API deploy:** `git diff 2ea83b6..a74acd8 -- prisma` is empty, so **no new migrations** (16 migrations, unchanged). The first deploy after the blocker ships every API change in the Phase 16 table at once.
+
+**Open PRs:** backend #11 (16E.1), #1, #2 (Dependabot) · frontend #6 (16C.1), #7 (16E.1), #1, #2 (Dependabot). Frontend #13 was closed unmerged.
+
+**Standing items (last recorded 2026-10-04, not re-verified):** production SMS unconfigured (`ESKIZ_*`), so OTP sign-in and SMS reset answer 503. Residual risks R1–R14 accepted (SECURITY §16.3).
+
+**Tests:** both repositories run unit tests and build in CI (`test-and-build`) on every PR and on `main`. The backend also runs real-PostgreSQL suites. Counts were not re-measured on 2026-10-07.
+
+**Next action**
+
+1. **Owner:** restore Railway plan / access.
+2. **Owner:** confirm SIG Gate 2 production status.
+3. Then, with the owner's authorization: let Railway deploy `main` through the normal CI-gated path, then verify in production (the 16E.4 route answers, `updatedAt` appears on the lists, the slug and district+city behaviour).
+4. Then: regenerate the sitemaps (`npm run sitemap`) in a frontend PR, and verify the admin drawer against the live 16E.4 route.
+5. Remaining Phase 16 pairs: 16C.1 frontend (PR #6), 16E.1 (backend #11 + frontend #7).
+
+---
+
+## Current state — 2026-10-04 (historical — superseded 2026-10-07)
+
+> Superseded by the 2026-10-07 section above. Kept as the record of the Phase 15 closeout. **Phase 15 was subsequently CLOSED / PASS on 2026-10-05** (gates A, B, C — top section); the "not yet closed" / "open gates" / "frozen" statements below are historical. Everything from §0 down is the **2026-09-28 snapshot** with inline updates. Commit and deployment ids elsewhere in these docs are **historical** — they record what was verified at that time, not what runs now.
+
+**Production**
+
+| | Current |
+| --- | --- |
+| Backend `main` | `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` — merge of PR #13 (Phase 15 closeout security fixes) |
+| Backend production | Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` — SUCCESS, 1/1 replicas; deployed only after CI `test-and-build` passed; `prisma migrate deploy` runs pre-deploy (16 migrations, none pending) |
+| Frontend `main` | `f80ee8d` — merge of PR #9 (head `a534f41155f6dde42e9ce348533d95c74a83a8cb`, SECURITY.md §16; documentation only) on top of `7de35c6` |
+| Frontend production | Vercel, promoted only after the `test-and-build` commit status passes (SECURITY §16.1) |
+
+**Phase 15 (security) — NOT YET officially closed**
+
+| Part | Status |
+| --- | --- |
+| 15B authorization stabilization · 15D capability authorization · 15D.2 staff hold no owner capability · 15E.2 authentication-code security · 15E.3 / 15E.7.1 deployment gating | Done (D-74 … D-77; SECURITY §2, §3, §15) |
+| 15E.4 refresh-token hardening — 4a client refresh + cross-tab coordination, 4b AuthSession per sign-in, 4c reuse detection, 4d access-token `sid` binding, 4e.0 Railway pre-deploy migrations, 4e.1 session contract, 4e.2 legacy cleanup | **CLOSED / PASS** — 15E.4e.2 production verification PASS on 2026-10-04 (`session_id` NOT NULL, 0 sessionless tokens, legacy columns and `LEGACY_MIGRATION` removed, E5–E14 = 0) |
+| Phase 15 final security audit (2026-10-04) | Two HIGH findings **remediated in production** via PR #13: staff SMS password recovery blocked for SUPPORT / MODERATOR / ADMIN / SUPER_ADMIN; `multer` 2.4.0. Production verification PASS. Residual risks R1–R14 accepted and assigned (SECURITY §16.3) |
+| **Remaining Phase 15 gates** | **A.** unique ADMIN / SUPER_ADMIN credentials (owner) · **B.** confirm the `main` ruleset bypass lists are empty in both repositories (owner, UI only) · **C.** final short Phase 15 closure audit — **all three open** |
+
+**Phase 16:** frontend 16E.2 (admin event moderation, frontend PR #8) is already on frontend `main` (`7de35c6`). The security-gated pairs — backend PR #10 + frontend PR #6 (16C.1), then backend PR #11 + frontend PR #7 (16E.1) — **remain frozen** until Phase 15 is closed, and are released in that order.
+
+**Tests:** backend 1010 unit tests (41 suites) plus real-PostgreSQL suites (`npm run test:db`), both run by CI on every pull request and on `main`; frontend Vitest (23 test files). Both repositories gate merges on `test-and-build`.
+
+---
+
+> Snapshot taken **2026-09-28** (historical — see the current-state section above). Verified against: both repositories at their then-current `HEAD`, git history, read-only probes of the live API (`myandijan-api-production.up.railway.app`) and the live site (`myandijan.uz`), and the recovered Claude Code session transcript.
 
 ---
 
 ## 0. One-paragraph summary
 
 The **backend is essentially complete and deployed** — 118 routes, 17 feature modules, 31 database models, 11 migrations applied, live and responding. The **frontend is also largely complete locally** (168 source files, 132 components, all three languages at full key parity, build passing) **but production is running an older bundle** that lacks the signup, claim, pricing and premium features. The single blocker is a local Windows PowerShell execution-policy problem that prevents the developer from authenticating the Vercel CLI. Beyond that, the two largest real gaps are: **no tests at all**, and **a substantial amount of built backend capability that no frontend code calls** (search, analytics ingestion, command centre, health score, most admin actions).
+
+> **Update 2026-10-04:** "no tests at all" no longer holds (see the current-state section); the frontend now refreshes tokens (15E.4a) and calls the analytics ingestion endpoints (`recordAnalytics` in `src/lib/api.ts`). Route, module and migration counts above are 2026-09-28 values (now 127 routes, 16 migrations).
 
 ---
 
@@ -78,25 +586,25 @@ Established in the prior session's production verification (recovered, not re-ru
 
 | Thing | What works | What does not |
 | --- | --- | --- |
-| **OTP signup end-to-end** | Code generated, stored hashed, rate-limited, verified; account created; JWT issued | **No SMS is delivered** — `ESKIZ_*` unset on Railway, so `SmsService` logs instead of sending. The endpoint still returns success. |
+| **OTP signup end-to-end** | Code generated, stored hashed, rate-limited, verified; account created; JWT issued | **No SMS is delivered** — `ESKIZ_*` unset on Railway. *Update (15E.2):* the request now fails closed with **503** instead of logging the code and reporting success. |
 | **Admin dashboard** | 8 of 10 views read real data | `AdminReviewsView` is mock (no `GET` review-list endpoint exists); `AdminSettingsView` is a local-state-only form that persists nothing |
 | **Owner dashboard** | Businesses, stats, reviews, events are real; ✅ **`InventoryView` real since Phase 10 (2026-10-01)** — product/service catalog CRUD + publish/hide via `GET /me/businesses/:id/menu`, `POST/PATCH/DELETE`; see `ARCHITECTURE.md` §27 | `AdsView` is an honest "coming soon" empty state; `SettingsView` hours form is local-state only and does not save |
-| **Password reset** | All three backend endpoints exist and are wired in `api.ts` | The reset code is **logged, not sent** (`auth.service.ts:347` — `TODO(production): send via Eskiz SMS instead of logging. DEV MODE only`) |
+| **Password reset** | All three backend endpoints exist and are wired in `api.ts` | ~~The reset code is **logged, not sent**~~ — ✅ **fixed 15E.2**: codes are never logged; without SMS the request answers 503. ✅ **Phase 15 closeout (PR #13):** SMS password reset is refused for SUPPORT / MODERATOR / ADMIN / SUPER_ADMIN — staff recovery is owner-controlled, out of band |
 | **Sitemaps** | `sitemap-pages.xml` (9), `sitemap-categories.xml` (24), `sitemap-locations.xml` (42 as of Phase 7 — city URLs removed since no `/:lang/city/:slug` route exists; see `DECISIONS.md` D-56) all populated, and category/location URLs now resolve to real Phase 7 landing pages instead of the generic search page | **`sitemap-businesses.xml` contains zero URLs** — the highest-SEO-value file is empty |
 | **Business claim** | 8-screen flow complete, submits to `POST /businesses` | Screen 3 is specced as "address (optional)" but `CreateBusinessDto` hard-requires `address` (min 5) and `districtId`, so it had to be made required — a known spec/implementation divergence |
-| **Deployment pipeline** | ✅ Both repos deploy automatically from `main` (verified 2026-10-01): Vercel on push; Railway on push **after CI passes** (Wait for CI). Backend live on `ded7b7a` (deployment `6b81b152`, auto-triggered) | Vercel does not wait for CI (Deployment Checks unverified — API 403); no staging environment |
-| **Deployment gating** | 🟡 **Phase 15E.3 (2026-10-02)** — CI hardened in both repos (`permissions: contents: read`, actions pinned to SHAs, `persist-credentials: false`, Dependabot for actions); required check is `test-and-build`. **Backend gated** — Railway waits for CI (verified on `c048ff9`: WAITING → CI green → build). See SECURITY §15, D-77 | ❌ **Frontend NOT gated** — Vercel promotes before CI finishes until the owner enables Deployment Checks; no `main` ruleset on either repo yet (owner action) |
-| **Authentication-code security** | ✅ **Phase 15E.2 (2026-10-02)** — codes never logged/returned/thrown; `crypto.randomInt`; one live code per phone + purpose; 5 wrong guesses per phone + purpose per hour across all code rows; atomic single use; no OTP sign-in for SUPPORT/MODERATOR/ADMIN/SUPER_ADMIN; timing equalized; SMS delivery fails closed (503). Backend `0b63889`, Railway `e8379f7b`. See SECURITY §2, D-76 | ⚠️ **Production SMS not configured** (`ESKIZ_EMAIL`/`ESKIZ_PASSWORD` absent): OTP sign-in and password reset answer 503 until the owner sets them |
+| **Deployment pipeline** | ✅ Both repos deploy automatically from `main` (verified 2026-10-01): Vercel on push; Railway on push **after CI passes** (Wait for CI). Backend live on `ded7b7a` (deployment `6b81b152`, auto-triggered) *(historical — current: see the current-state section)* | ~~Vercel does not wait for CI~~ — ✅ gated since 15E.3 / 15E.7.1 (see the next row); no staging environment |
+| **Deployment gating** | ✅ **Phase 15E.3 / 15E.7.1 (2026-10-02)** — CI hardened in both repos (`permissions: contents: read`, actions pinned to SHAs, `persist-credentials: false`, Dependabot for actions). **Backend gated** — Railway waits for CI (verified on `c048ff9`). **`main` ruleset "Protect main" active in both repos** (no deletion, no force push, PR + `test-and-build` up to date). **Frontend:** Vercel Production Deployment Check `Vercel - myandijan-frontend: test-and-build` configured by the owner. See SECURITY §15, D-77 | ✅ Frontend gate observed working (SECURITY §16.1: on `7de35c6` Vercel reported success one second after the `test-and-build` status). ⚠️ Ruleset bypass lists not readable via API — **open Phase 15 gate B** (owner confirms empty in the UI) |
+| **Authentication-code security** | ✅ **Phase 15E.2 (2026-10-02)** — codes never logged/returned/thrown; `crypto.randomInt`; one live code per phone + purpose; 5 wrong guesses per phone + purpose per hour across all code rows; atomic single use; no OTP sign-in for SUPPORT/MODERATOR/ADMIN/SUPER_ADMIN (and, since the Phase 15 closeout — PR #13 — no SMS password reset for them either); timing equalized; SMS delivery fails closed (503). Backend `0b63889`, Railway `e8379f7b`. See SECURITY §2, D-76 | ⚠️ **Production SMS not configured** (`ESKIZ_EMAIL`/`ESKIZ_PASSWORD` absent): OTP sign-in and password reset answer 503 until the owner sets them |
 | **Staff hold no owner capability** | ✅ **Phase 15D.2 (2026-10-02)** — ADMIN and SUPER_ADMIN lost `business.claim` / `business.create` / `business.manage_own`; they are refused at the route on the 29 owner routes, `POST /businesses`, `POST /me/businesses` and `/me/claims`, and the owner dashboard disappears for them (capability-driven UI). Staff keep administering listings via `/admin` (`business.edit_any` etc.). Pre-check: 0 ADMIN- / 0 SUPER_ADMIN-owned businesses in production. See D-75 point 7, `ARCHITECTURE.md` §32.1 | Business Staff (membership) and PLATFORM_OWNER governance are future phases |
-| **Capability authorization** | ✅ **Phase 15D (2026-10-02)** — every route declares `@Public` / `@Authenticated` / `@RequireCapability` under a global deny-by-default guard; 20 capabilities in one explicit role table (no inheritance); ownership and conflict-of-interest policies; rank model deleted; route-inventory test + committed snapshot in CI; frontend renders from server-issued capabilities. See `ARCHITECTURE.md` §32, D-75 | PLATFORM_OWNER governance not implemented; Security Hardening backlog (reset-code logging, Vercel CI gate, distributed rate limits, refresh-token reuse detection, remaining rate-limit coverage) untouched |
-| **Authorization stabilization** | ✅ **Phase 15B (2026-10-01)** — business profile, hours, catalog and review replies are owner-only (MODERATOR/SUPPORT lost their rank bypass); staff edit other businesses only via audited `/admin` routes with a reason; account suspension follows an explicit table (no self, no SUPER_ADMIN target, SUPER_ADMIN may emergency-freeze an ADMIN); password reset and suspension revoke all sessions; `/auth/*` rate limited; CORS allowlist; audit rows record role/request id/IP/user agent. See `ARCHITECTURE.md` §31, D-74 | PLATFORM_OWNER governance, role management, capability map and step-up re-auth are later phases; Vercel still deploys without waiting for CI (owner dashboard action); the password-reset code is still logged to stdout (SECURITY §13 #3a) |
+| **Capability authorization** | ✅ **Phase 15D (2026-10-02)** — every route declares `@Public` / `@Authenticated` / `@RequireCapability` under a global deny-by-default guard; 20 capabilities in one explicit role table (no inheritance); ownership and conflict-of-interest policies; rank model deleted; route-inventory test + committed snapshot in CI; frontend renders from server-issued capabilities. See `ARCHITECTURE.md` §32, D-75 | PLATFORM_OWNER governance not implemented. *Update 2026-10-04:* reset-code logging (15E.2), the Vercel CI gate (15E.3 / 15E.7.1) and refresh-token reuse detection (15E.4c) are done; distributed rate limits and the remaining rate-limit coverage are accepted residual risk (SECURITY §16.3 R1, R2) |
+| **Authorization stabilization** | ✅ **Phase 15B (2026-10-01)** — business profile, hours, catalog and review replies are owner-only (MODERATOR/SUPPORT lost their rank bypass); staff edit other businesses only via audited `/admin` routes with a reason; account suspension follows an explicit table (no self, no SUPER_ADMIN target, SUPER_ADMIN may emergency-freeze an ADMIN); password reset and suspension revoke all sessions; `/auth/*` rate limited; CORS allowlist; audit rows record role/request id/IP/user agent. See `ARCHITECTURE.md` §31, D-74 | PLATFORM_OWNER governance, role management and step-up re-auth are later phases (the capability map shipped in 15D). ~~Vercel still deploys without waiting for CI; the password-reset code is still logged to stdout~~ — both ✅ resolved (15E.3 / 15E.7.1, 15E.2) |
 | **Moderator access & business restoration** | ✅ **Phase 14 (2026-10-01)** — MODERATOR can use the admin panel for business approval and review/report moderation, with owner contact and reporter names withheld; SUPER_ADMIN can hide and restore listings, restoring the exact pre-hide status (new `statusBeforeHide` column) or PENDING. See `ARCHITECTURE.md` §30, D-72/D-73 | Businesses hidden before Phase 14 restore to PENDING (no recorded status); moderators have no stats/home view |
 | **Review reporting & moderation** | ✅ **Phase 12 (2026-10-01)** — customers report reviews (`POST /reviews/:id/report`); ADMIN+ works the queue in `AdminReportsView` (hide review / dismiss). See `ARCHITECTURE.md` §29 | MODERATOR still can't use the admin panel (D-68); no auto-hide threshold or rate limit beyond one report per user per review |
 | **Admin business operations** | ✅ **Phase 11 (2026-10-01)** — `AdminBusinessesView` can verify/unverify, suspend (APPROVED only, with reason)/restore, promote/end promotion; status filter is server-side over all statuses. New `unverify`/`unsuspend`/`unpromote` routes. See `ARCHITECTURE.md` §28 | No unhide and no hide UI (D-63); no `isFeatured` control (D-66); reports UI deferred — nothing creates reports (D-65); MODERATOR cannot open the admin UI though the API lets them approve/reject businesses |
 | **Claiming an existing listing** | ✅ **Phase 9 (2026-10-01)** — `POST /me/claims` → admin `AdminClaimsView` approve/reject → `ownerId` set atomically, `CUSTOMER` → `BUSINESS_OWNER`; status on `ProfilePage`. See `ARCHITECTURE.md` §26 | Claimed ≠ verified (D-58); rejection reason not shown to claimant; pending state not remembered on the business page after reload |
-| **Analytics** | Full ingestion + reporting API exists | **The frontend never calls `POST /analytics/view|click|search`**, so `BusinessAnalytics`, `SearchAnalytics` and `ActivityLog` receive no data from the web app. Every owner/admin analytics screen is therefore reading from tables nothing populates. |
+| **Analytics** | Full ingestion + reporting API exists | ~~The frontend never calls the ingestion endpoints~~ — ✅ the frontend now calls `POST /analytics/view`, `/click` and `/search` (`recordAnalytics`, `src/lib/api.ts`). The endpoints remain public; since Phase 16G.1 (API PR #23, merged 2026-10-07, not deployed) they are de-duplicated and capped per client/address (SECURITY §16.3 R1). |
 | **Search module** | Sophisticated FTS/trigram/transliteration search at `GET /search` | ✅ **Wired in Phase 8** (2026-10-01) — the frontend now calls it for text queries via `type=business`; pure category/district browsing still uses `GET /businesses`. Product-type results still have no UI. See `ARCHITECTURE.md` §25. |
-| **Refresh tokens** | Issued, hashed, stored, rotated, revocable; `POST /auth/refresh` exists | **The frontend never stores or uses the refresh token and never calls `/auth/refresh` or `/auth/logout`.** With `JWT_ACCESS_EXPIRES_IN` defaulting to `15m`, users are silently logged out after ~15 minutes. |
+| **Refresh tokens** | Issued, hashed, stored, rotated, revocable; `POST /auth/refresh` exists | ~~The frontend never stores or uses the refresh token~~ — ✅ **resolved, Phase 15E.4**: the client refreshes with cross-tab coordination (15E.4a); every sign-in is an `auth_sessions` row with race-safe rotation (4b), reuse detection (4c), `sid`-bound access tokens (4d) and a NOT NULL session contract (4e). |
 | **Health score** | Complete scoring engine, recommendation catalogue, three endpoints | No frontend calls any of them |
 | **Command centre** | 10 founder-analytics endpoints | No frontend calls any of them |
 
@@ -117,7 +625,7 @@ Established in the prior session's production verification (recovered, not re-ru
 
 ## 4. What is unfinished
 
-- **Tests — nothing at all.** Zero test files in either repo, and no runner installed (no Jest, Vitest, Playwright). The API's `package.json` has no `test` script.
+- ~~**Tests — nothing at all.**~~ ✅ **Resolved** — backend Jest (1010 unit tests, 41 suites) plus real-PostgreSQL suites; frontend Vitest (23 test files); both run in CI on every pull request and gate merges (see the current-state section).
 - **Advertising module** — `Advertisement` table and `AdStatus`/`AdPlacement` enums exist; no controller, service, or module. Explicitly deferred to Phase 2 with Click payments.
 - **Notifications** — `Notification` table and `NotificationType` enum exist; **no notifications module, no endpoints, nothing writes to the table**.
 - **`PlatformSetting`** — table exists; no module reads or writes it. This is what `AdminSettingsView` should be persisting to.
@@ -135,15 +643,15 @@ Ordered by impact. All are verified in code, not speculative.
 
 | # | Severity | Bug | Evidence |
 | --- | --- | --- | --- |
-| 1 | **High** | **Sessions die after ~15 minutes.** Refresh tokens are issued but the frontend never stores or uses them; `/auth/refresh` is never called. Only 6 mentions of "refresh" exist in the whole frontend, none of them the token. | `src/contexts/AuthContext.tsx`, `src/lib/api.ts`, `.env.example` `JWT_ACCESS_EXPIRES_IN="15m"` |
-| 2 | **High** | **OTP/reset codes are never delivered.** `SmsService.send()` returns silently when unconfigured, and the OTP endpoint still reports success — so the failure is invisible to the caller. | `src/sms/sms.service.ts`, `auth.service.ts:347` |
-| 3 | **High** | **Analytics tables are never written from the web app**, so every analytics view renders from empty tables. | No `/analytics/` POST calls anywhere in `src/` |
+| 1 | ~~**High**~~ | ~~**Sessions die after ~15 minutes.**~~ ✅ **Fixed, Phase 15E.4a** — the client refreshes, coordinated across tabs (`src/lib/auth/refreshCoordinator.ts`). | `src/contexts/AuthContext.tsx`, `src/lib/api.ts` |
+| 2 | **High** | **OTP/reset codes are never delivered** — still true while `ESKIZ_*` is unset, but ✅ **no longer invisible (15E.2)**: both routes answer 503 and no code is logged. | `src/sms/sms.service.ts`, `auth.service.ts` |
+| 3 | ~~**High**~~ | ~~**Analytics tables are never written from the web app**~~ ✅ **Fixed** — the frontend calls `POST /analytics/view`, `/click`, `/search`. | `recordAnalytics` in `src/lib/api.ts` |
 | 4 | Medium | **Empty `sitemap-businesses.xml`** submitted via `sitemap.xml` index — crawlers are pointed at an empty file. | `public/sitemap-businesses.xml`: 0 `<url>` entries |
 | 5 | Medium | **Stale sitemap `lastmod` dates** — all four sub-sitemaps say `2026-08-13`. | `public/sitemap.xml` |
 | 6 | Medium | **Two settings forms silently discard input.** | `AdminSettingsView.tsx`, `pages/dashboard/views/SettingsView.tsx` |
 | 7 | ~~Medium~~ | ~~**Inventory shows mock data while a real API exists.**~~ ✅ **Fixed Phase 10** — also fixed: public `GET /businesses/:id/menu` served catalogs of non-APPROVED businesses (now 404, D-62); `MenuSection` showed "no menu" when the request had actually failed (now an error state with retry). | `mockData.ts` deleted; `products.service.ts` |
 | 8 | Low | **Hardcoded weather placeholder on the home hero.** | `src/pages/home/HeroSection.tsx:30` — `// TODO: Replace with real weather API` |
-| 9 | Low | **`SUPPORT` role outranks `BUSINESS_OWNER`** in the hierarchy (3 > 2), so any `@Roles(BUSINESS_OWNER)` route — e.g. `POST /events`, `POST /reviews/:id/reply` — is also open to `SUPPORT`. May be intended; it is not stated anywhere. **Phase 10 note:** catalog writes are still safe — `SUPPORT` clears the role floor but `ProductsService.assertCanManage` requires owner or ≥ `MODERATOR` (pinned by `catalog.authorization.spec.ts`). Hierarchy left unchanged (app-wide impact). | `role-hierarchy.ts`, `roles.guard.ts` |
+| 9 | ~~Low~~ | ✅ **Resolved, Phase 15B / 15D (D-74, D-75)** — no hierarchy remains; owner routes are ownership-only. *Original finding:* **`SUPPORT` role outranks `BUSINESS_OWNER`** in the hierarchy (3 > 2), so any `@Roles(BUSINESS_OWNER)` route — e.g. `POST /events`, `POST /reviews/:id/reply` — is also open to `SUPPORT`. May be intended; it is not stated anywhere. **Phase 10 note:** catalog writes are still safe — `SUPPORT` clears the role floor but `ProductsService.assertCanManage` requires owner or ≥ `MODERATOR` (pinned by `catalog.authorization.spec.ts`). Hierarchy left unchanged (app-wide impact). | `role-hierarchy.ts`, `roles.guard.ts` |
 
 ### Stale comments that will actively mislead the next reader
 
@@ -162,24 +670,26 @@ These are documentation bugs, and they matter because the codebase's comments ar
 
 | Area | Debt |
 | --- | --- |
-| **Testing** | Total absence. 118 API routes and 132 components with no automated verification of any kind. This is the single largest risk to future change. |
+| **Testing** | ~~Total absence.~~ ✅ **Resolved** — see §4 and the current-state section. Remaining gap: no backend linter/static analysis in CI (SECURITY §16.3 R13). |
 | **Hardcoded credential** | ✅ **RESOLVED 2026-09-28.** `scripts/seed-role-accounts.js` now reads `process.env.SEED_ROLE_PASSWORD` with no default; the literal was purged from history before the first push; the production credential was rotated to a 192-bit random value and verified on all six accounts. |
-| **CORS wide open** | `app.enableCors()` with no origin allow-list. |
-| **No rate limiting** | Only OTP requests are throttled, and that is hand-rolled in the service. No `@nestjs/throttler`; login, register and password-reset are unthrottled. |
-| **Swagger public in production** | `/docs` returns 200 on the live API, publishing the full 118-route surface. |
+| **CORS wide open** | ✅ **Resolved, Phase 15B** — explicit origin allowlist (`src/common/cors.ts`). |
+| **No rate limiting** | ✅ **Partly resolved, Phase 15B** — every `/auth/*` credential and code route is throttled per address and per phone. Analytics, search, upload and `POST /businesses` remain unthrottled; storage is in-process (accepted residual risk, SECURITY §16.3 R1, R2). |
+| **Swagger public in production** | Still true (`/docs`, `/docs-json`). Accepted as low residual risk because both repositories are public (SECURITY §16.3 R8). |
 | **Mock data still shipped** | Three mock modules remain in the bundle: `src/lib/restaurantMock.ts` (deliberate — deterministic display data for fields the API lacks), `src/pages/admin/adminMockData.ts` (deleted Phase 6), `src/pages/dashboard/mockData.ts` (deleted Phase 10). Only `restaurantMock.ts` remains. |
 | **Deterministic fake display data** | `restaurantMock.ts` derives cuisine, price bucket, tags and delivery time from `Math.sin(id * k)`. It is stable and honest in intent, but restaurant cards in production show **invented** cuisine/price/delivery information. |
 | **Frontend/backend shape mismatch** | `Business`/`Branch` are not localized server-side but the frontend types assume they are, requiring a `normalizeBusiness`/`normalizeBranch` adapter layer. Sustainable, but it is a permanent tax. |
 | **Deprecated table** | `SearchQueryLog` superseded by `SearchAnalytics`; retained intentionally, not yet dropped. |
 | **`any` at the API boundary** | `normalizeBranch(raw: any)` / `normalizeBusiness(raw: any)` — deliberate, but untyped. |
 | **No error tracking** | No Sentry or equivalent in either repo. Frontend errors reach only the user's console. |
-| **No structured logging** | API uses Nest's default `Logger`; no request IDs, no log aggregation configured. |
+| **No structured logging** | API uses Nest's default `Logger` and no log aggregation is configured. *Update (15B):* every request has a server-generated id (`X-Request-Id`), recorded on audit rows and in security log lines. |
 | **Two repos, no monorepo tooling** | No shared type package; the API's DTOs and the frontend's `src/types/index.ts` are maintained by hand in parallel. |
-| **Single `master` branch, no CI** | Both repos: `master` only, no GitHub Actions, no PR flow. Commits are large and multi-concern (e.g. `1d53f7f` = "Restaurant search, premium monetization UI, and reliability fixes"). |
+| **Single `master` branch, no CI** | ✅ **Resolved** — both repos use `main` with GitHub Actions CI (`test-and-build`) and a "Protect main" ruleset (pull request + passing, up-to-date `test-and-build`; no force push, no deletion). *Original finding:* `master` only, no GitHub Actions, no PR flow. |
 
 ---
 
-## 7. Current development status
+## 7. Development status as of 2026-09-28 (historical)
+
+> Historical snapshot. For the current branches, commits and deployments see the current-state section at the top.
 
 | | Frontend | API |
 | --- | --- | --- |
@@ -192,7 +702,9 @@ These are documentation bugs, and they matter because the codebase's comments ar
 
 ---
 
-## 8. What was implemented most recently
+## 8. What was implemented most recently (as of 2026-09-28 — historical)
+
+> Since then: Phases 6–14, 15B, 15D, 15D.2, 15E.2–15E.4e.2 and the Phase 15 closeout (PR #13) — see `SESSION_CONTEXT.md` and SECURITY §16. The list below is the 2026-09-28 record.
 
 In order, newest first:
 
@@ -206,6 +718,8 @@ In order, newest first:
 ---
 
 ## 9. What should logically happen next
+
+> *(Superseded 2026-10-07 — current next action: top section. Phase 15 closed / PASS 2026-10-05.)* **Next steps as of 2026-10-04:** close Phase 15 — gates **A** (unique ADMIN / SUPER_ADMIN credentials), **B** (confirm ruleset bypass lists are empty) and **C** (final short closure audit) — then release Phase 16 in order: PR #10 + #6 (16C.1), then PR #11 + #7 (16E.1). The ordered list below is the 2026-09-28 plan; items 1, 4, 5, 6, 7 (CORS, throttling on `/auth/*`) and 9 are done, item 3 (Eskiz) is still open, `/docs` remains public by decision (SECURITY §16.3 R8), and items 2, 8 and 10 were not re-verified in this reconciliation.
 
 Ordered. Rationale given because the order is not arbitrary.
 

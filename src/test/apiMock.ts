@@ -1,7 +1,10 @@
 import { vi } from "vitest";
 import type {
   AdminBusiness,
+  AdminBusinessDetail,
+  BusinessEditDetail,
   AdminClaim,
+  AdminEvent,
   AdminReviewReport,
   AdminReview,
   Business,
@@ -10,6 +13,8 @@ import type {
   EventDetail,
   MenuItem,
   MyClaim,
+  MyStats,
+  OwnerAnalyticsOverview,
   PaginatedResponse,
   Region,
 } from "../types";
@@ -193,6 +198,30 @@ export const mockMyBusiness = {
 export const getBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinesses = vi.fn().mockResolvedValue([mockMyBusiness]);
+// GET /me/businesses/:id — the owner's own listing in any status, primary branch first.
+export const getMyBusinessById = vi.fn().mockResolvedValue({ ...mockMyBusiness, branches: [] });
+// The owner edit modal's prefill (built on GET /me/businesses/:id).
+export const getMyBusinessEditDetail = vi.fn().mockResolvedValue({ ...mockMyBusiness, branches: [] });
+export const updateMyBranch = vi.fn().mockResolvedValue({});
+
+export const mockMyStats: MyStats = {
+  businessCount: 1,
+  totalReviews: 4,
+  avgRating: 4.5,
+  upcomingEvents: 0,
+  pendingClaims: 0,
+  healthScore: { average: 72, businessesScored: 1, openRecommendations: 2 },
+};
+export const getMyStats = vi.fn().mockResolvedValue(mockMyStats);
+
+export const mockOwnerOverview: OwnerAnalyticsOverview = {
+  pageViews: { current: 128, previous: 100, change: "+28%" },
+  callClicks: { current: 6, previous: 10, change: "-40%" },
+  directionClicks: { current: 0, previous: 0, change: "0%" },
+  favorites: { current: 3, previous: 0, change: "+100%" },
+  avgRating: { current: 4.5, previous: 4.4, change: "+0.1" },
+};
+export const getMyAnalyticsOverview = vi.fn().mockResolvedValue(mockOwnerOverview);
 export const createMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
 export const updateMenuItem = vi.fn().mockResolvedValue(mockMenuItem);
 export const deleteMenuItem = vi.fn().mockResolvedValue(undefined);
@@ -236,6 +265,16 @@ export const getBusinessById = vi.fn().mockResolvedValue({
   branches: [],
 });
 export const updateBusinessHours = vi.fn().mockResolvedValue([]);
+// GET /admin/businesses/:id (Phase 16E.4) defaults to production's answer
+// until the API deploy that adds it: 404 (lazy — ApiError is declared below).
+export const getAdminBusinessById = vi.fn<(id: number) => Promise<AdminBusinessDetail>>((id) =>
+  Promise.reject(new ApiError(`Cannot GET /admin/businesses/${id}`, 404)),
+);
+// The admin edit prefill's real 404 fallback is the public loader (see
+// api.ts and its tests); the default here is exactly that fallback.
+export const getAdminBusinessEditDetail = vi.fn<(id: number) => Promise<BusinessEditDetail>>((id) =>
+  getBusinessById(id),
+);
 
 export const mockAdminReport: AdminReviewReport = {
   id: 3,
@@ -278,11 +317,25 @@ export const getMyClaims = vi
   .mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
 export const getAdminClaims = vi.fn().mockResolvedValue({ items: [mockAdminClaim], total: 1 });
 export const approveAdminClaim = vi.fn().mockResolvedValue({ ...mockAdminClaim, status: "APPROVED" });
+export const mockAdminEvent: AdminEvent = {
+  id: 3,
+  title: "Navro'z bayrami konserti",
+  status: "PENDING",
+  startAt: "2026-10-20T15:00:00.000Z",
+  venueName: "Bobur xiyoboni",
+  address: null,
+  rejectionReason: null,
+  business: { id: 1, slug: "soy-milliy-taomlar", name: "Soy milliy taomlar" },
+};
+export const getAdminEvents = vi.fn().mockResolvedValue({ items: [mockAdminEvent], total: 1 });
+export const approveAdminEvent = vi.fn().mockResolvedValue({ ...mockAdminEvent, status: "PUBLISHED" });
+export const rejectAdminEvent = vi.fn().mockResolvedValue({ ...mockAdminEvent, status: "REJECTED" });
 export const rejectAdminClaim = vi.fn().mockResolvedValue({ ...mockAdminClaim, status: "REJECTED" });
 export const recordBusinessView = vi.fn();
 export const recordBusinessClick = vi.fn();
 export const recordSearch = vi.fn();
 export const revokeSession = vi.fn().mockResolvedValue(undefined);
+export const notifyLogout = vi.fn();
 
 class ApiError extends Error {
   status: number;

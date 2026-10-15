@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ApiError, getMe, revokeSession, SESSION_EXPIRED_EVENT } from "../lib/api";
+import { ApiError, getMe, notifyLogout, revokeSession, SESSION_EXPIRED_EVENT } from "../lib/api";
 import type { AuthUser } from "../types";
 import { hasCapability, type Capability } from "../lib/capabilities";
 
@@ -157,8 +157,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    // Logout wins (Phase 15E.4a): a refresh still in flight — in this tab or
+    // another — discards its response instead of re-storing tokens.
+    notifyLogout();
     setToken(null);
     setUser(null);
+  }, []);
+
+  // Keep this tab's React state in step with sign-in / sign-out done in
+  // another tab (the `storage` event never fires in the tab that wrote).
+  // A token rotation (old and new both present) needs nothing here: requests
+  // always read the current token from localStorage.
+  useEffect(() => {
+    function onStorage(event: StorageEvent) {
+      if (event.storageArea !== null && event.storageArea !== localStorage) return;
+      if (event.key !== null && event.key !== TOKEN_KEY && event.key !== USER_KEY) return;
+      const storedToken = localStorage.getItem(TOKEN_KEY);
+      if (!storedToken) {
+        setToken(null);
+        setUser(null);
+        return;
+      }
+      if (event.key === TOKEN_KEY && !event.oldValue) {
+        setToken(storedToken);
+        setUser(readStoredUser());
+      } else if (event.key === USER_KEY) {
+        setUser(readStoredUser());
+      }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   // The API layer already cleared storage when any request came back 401 with

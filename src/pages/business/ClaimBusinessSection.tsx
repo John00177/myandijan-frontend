@@ -3,6 +3,7 @@ import { useState } from "react";
 import Button from "../../components/ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
 import { useLanguage } from "../../contexts/LanguageContext";
+import { useMyClaims } from "../../hooks/useMyClaims";
 import { ApiError, createClaim } from "../../lib/api";
 import type { Business } from "../../types";
 
@@ -25,8 +26,15 @@ export default function ClaimBusinessSection({ business }: ClaimBusinessSectionP
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Phase 16D: after a reload the claimant should see their pending claim, not
+  // the CTA again (a second claim would only answer 409). Fetched only for a
+  // signed-in viewer of an unowned listing; useMyClaims reads the newest 20
+  // claims, which covers any realistic claimant.
+  const { claims, loading: claimsLoading } = useMyClaims(business.ownerId == null ? token : null);
 
   if (business.ownerId != null) return null;
+
+  const hasPendingClaim = claims.some((c) => c.status === "PENDING" && c.business?.id === business.id);
 
   function handleStart() {
     if (!token) {
@@ -60,14 +68,21 @@ export default function ClaimBusinessSection({ business }: ClaimBusinessSectionP
     }
   }
 
-  if (submitted) {
+  if (submitted || hasPendingClaim) {
     return (
       <div className="mt-6 rounded-xl border border-success/30 bg-success/10 p-4">
-        <p className="text-sm font-medium text-success">{t("businessClaim.submittedTitle")}</p>
+        <p className="text-sm font-medium text-success">
+          {t(submitted ? "businessClaim.submittedTitle" : "businessClaim.pendingTitle")}
+        </p>
         <p className="text-sm text-ink-muted mt-1">{t("businessClaim.submittedBody")}</p>
       </div>
     );
   }
+
+  // Signed in and still loading the claims: render nothing rather than flash
+  // the CTA and then swap it out. If the request fails, the CTA comes back and
+  // the API's 409 still guards a duplicate.
+  if (token && claimsLoading) return null;
 
   return (
     <div className="mt-6 rounded-xl border border-white/[0.08] bg-white/[0.03] p-4">

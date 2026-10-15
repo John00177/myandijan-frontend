@@ -37,14 +37,21 @@ export default function MetaTags({ title, description, image, type = "website", 
       <html lang={lang} />
       <title>{title}</title>
       <meta name="description" content={description} />
-      <link rel="canonical" href={canonical} />
 
-      {noIndex ? <meta name="robots" content="noindex, nofollow" /> : null}
+      {/* A noindex page gets no canonical and no hreflang alternates (Phase
+          16F.1): canonical + noindex are contradictory signals, and the
+          alternates would advertise language versions of a private route or
+          of a URL that does not exist. */}
+      {noIndex ? <meta name="robots" content="noindex, nofollow" /> : <link rel="canonical" href={canonical} />}
 
-      {SUPPORTED_LANGS.map((alt) => (
-        <link key={alt} rel="alternate" hrefLang={alt} href={`${SITE_URL}${pathForLang(pathname, alt)}`} />
-      ))}
-      <link rel="alternate" hrefLang="x-default" href={`${SITE_URL}${pathForLang(pathname, "uz")}`} />
+      {noIndex
+        ? null
+        : SUPPORTED_LANGS.map((alt) => (
+            <link key={alt} rel="alternate" hrefLang={alt} href={`${SITE_URL}${pathForLang(pathname, alt)}`} />
+          ))}
+      {noIndex ? null : (
+        <link rel="alternate" hrefLang="x-default" href={`${SITE_URL}${pathForLang(pathname, "uz")}`} />
+      )}
 
       <meta property="og:site_name" content={SITE_NAME} />
       <meta property="og:title" content={title} />

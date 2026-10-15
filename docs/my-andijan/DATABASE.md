@@ -1,6 +1,6 @@
 # DATABASE — My Andijan
 
-> Source of truth: `my-andijan-api/prisma/schema.prisma` (1193 lines) and `prisma/migrations/` (11 migrations). Documented 2026-09-28. **31 models, 19 enums.**
+> Source of truth: `my-andijan-api/prisma/schema.prisma` (1193 lines) and `prisma/migrations/` (11 migrations). Documented 2026-09-28. **31 models, 19 enums.** *(Counts are 2026-09-28 values — there are now 16 migrations. §2.2 and §2.2a were updated 2026-10-04 for the Phase 15E.4 session schema; other models were not re-audited in that pass.)*
 
 ---
 
@@ -81,19 +81,37 @@
 **Indexes:** `role`, `status`, `deletedAt`, `districtId`.
 
 ### 2.2 `RefreshToken` → `refresh_tokens`
-**Purpose:** rotating refresh tokens with revocation and device attribution.
+**Purpose:** rotating refresh tokens with revocation, each belonging to one sign-in session (current schema, Phase 15E.4).
 
 | Field | Type | Req | Notes |
 | --- | --- | --- | --- |
 | `userId` | Int | ✔ | FK → `User`, **Cascade** |
-| `tokenHash` | String | ✔ | **@unique** — the token itself is never stored |
+| `tokenHash` | String | ✔ | **@unique** — SHA-256 of the token; the token itself is never stored |
 | `expiresAt` | DateTime | ✔ | |
 | `revokedAt` | DateTime | ✗ | enables explicit revocation |
-| `userAgent` | VarChar(500) | ✗ | |
-| `ipAddress` | VarChar(45) | ✗ | 45 chars = IPv6 |
+| `createdAt` | DateTime | ✔ | default `now()` |
+| `sessionId` | Int | ✔ | FK → `AuthSession`, **Cascade** — **NOT NULL since 15E.4e.1** |
+| `rotatedAt` | DateTime | ✗ | set (with `revokedAt`) by the one refresh that rotated this token |
+| `parentId` | Int | ✗ | **@unique**, FK → `RefreshToken` (the token this one replaced), **SetNull** — at most one successor per token |
 
-**Indexes:** `userId`, `expiresAt`.
-**Status note:** fully built and issued, but **the frontend never uses it** — see `CURRENT_STATE.md`.
+**Indexes:** `userId`, `expiresAt`, `sessionId`.
+**History:** until 15E.4e.2 (2026-10-04) the table also had `userAgent` VarChar(500) and `ipAddress` VarChar(45); they were never written and were dropped — device attribution lives on `AuthSession`. *(The 2026-09-28 status note "the frontend never uses it" is obsolete: the client refreshes since 15E.4a.)*
+
+### 2.2a `AuthSession` → `auth_sessions` (Phase 15E.4b)
+**Purpose:** one row per sign-in; the unit that refresh, logout, reuse detection and access-token `sid` binding act on.
+
+| Field | Type | Req | Notes |
+| --- | --- | --- | --- |
+| `userId` | Int | ✔ | FK → `User`, **Cascade** |
+| `createdAt` | DateTime | ✔ | default `now()` |
+| `absoluteExpiresAt` | DateTime | ✔ | `createdAt` + 90 days; refresh never extends it |
+| `revokedAt` | DateTime | ✗ | |
+| `revokedReason` | `SessionRevokedReason` | ✗ | `LOGOUT`, `PASSWORD_RESET`, `SUSPENDED`, `REUSE_DETECTED` (`LEGACY_MIGRATION` removed in 15E.4e.2) |
+| `lastUsedAt` | DateTime | ✔ | written by every successful refresh |
+| `userAgent` | VarChar(500) | ✗ | from the request context at sign-in |
+| `ipAddress` | VarChar(45) | ✗ | from the request context at sign-in |
+
+**Indexes:** `userId`, (`userId`, `revokedAt`).
 
 ### 2.3 `OtpCode` → `otp_codes`
 **Purpose:** one-time codes for phone verification, password reset and OTP login.
@@ -286,7 +304,7 @@ Indexes: `[branchId, sortOrder]`, `[branchId, isPrimary]`. Added in migration `2
 
 Indexes: `[businessId, status]`, `claimantId`, `[status, createdAt]`.
 
-> **⚠ Unenforced invariant, stated in the schema:** *"'only one PENDING claim per business' cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer."* **This is a database-level gap that depends on application discipline.** A partial unique index (`CREATE UNIQUE INDEX … WHERE status = 'PENDING'`) could be added via raw SQL in a migration.
+> **✅ Enforced since Phase 16H (API PR #24, merged 2026-10-07 as `7a3a7dd`; **not deployed** — its migration runs on the next API deploy): partial unique index `business_claims_one_pending_per_claimant` on `(business_id, claimant_id) WHERE status = 'PENDING'`.** Created by raw SQL in migration `20261007090000_phase16h_claim_pending_unique` (Prisma cannot model a partial index; its drift detection skips partial indexes, so `migrate dev` leaves it alone). Several `PENDING` claims from **different** claimants remain allowed — they compete, and approving one rejects the rest. The migration first closes any existing duplicate pairs (keeps the earliest, marks the rest `REJECTED` with a reason; deletes nothing). *Previously:* service-layer only.
 
 ---
 
@@ -443,7 +461,7 @@ Read via `GET /admin/audit`. **Deliberately distinct from `ActivityLog`** — th
 ### 14.1 `BusinessAnalytics` → `business_analytics`
 **Date-grain: one row per business per day.**
 
-`businessId` (FK → `Business`, **no onDelete specified** → Prisma default `Restrict`), `date @db.Date`, then counters: `pageViews`, `callClicks`, `directionClicks`, `favoriteClicks`, `shareClicks`, `websiteClicks` (all Int default 0), plus `searchQueries String[]` (top terms that led here) and `visitorCities Int[]` (anonymized city IDs).
+`businessId` (FK → `Business`, **no onDelete specified** → Prisma default `Restrict`), `date @db.Date`, then counters: `pageViews`, `callClicks`, `directionClicks`, `favoriteClicks`, `shareClicks`, `websiteClicks` (all Int default 0), plus `searchQueries String[]` (top terms that led here) and `visitorCities Int[]` (anonymized city IDs). Since Phase 16G.1 the two arrays are appended with plain SQL only while the day's row holds fewer than **200** / **1000** elements (`MAX_SEARCH_QUERIES_PER_DAY`, `MAX_VISITOR_CITIES_PER_DAY` in `analytics.service.ts`); the counters are not capped.
 
 **Constraint:** `@@unique([businessId, date])`. Indexes: `businessId`, `date`.
 
@@ -583,7 +601,7 @@ Demo/sample content. Not wired into the `prisma.seed` key — run manually.
 
 | # | Severity | Problem |
 | --- | --- | --- |
-| 1 | Medium | **`BusinessClaim` "one PENDING claim per business" is not enforced by the database.** Needs a partial unique index; currently service-layer only. |
+| 1 | ~~Medium~~ ✅ | ~~**`BusinessClaim` "one PENDING claim per business" is not enforced by the database.**~~ **Fixed — Phase 16H:** partial unique index per (business, claimant). |
 | 2 | Medium | **`Review.rating` has no range constraint.** Nothing at the DB level prevents `rating = 99`. |
 | 3 | Medium | **`Event` has no `endAt > startAt` check**, and no constraint linking `isFree` to `price`. |
 | 4 | Medium | **Three overlapping cover-image fields on `Business`**: `logoUrl`, `coverUrl`, `coverPhoto`. `coverUrl` and `coverPhoto` duplicate each other and the frontend has to fall back between them. |

@@ -204,6 +204,13 @@ export interface Business {
   reviews?: Review[];
   similar?: Business[];
   primaryBranch?: Branch | null;
+  /** Owner/staff SEO overrides; the public detail endpoint returns every column. */
+  metaTitleUz?: string | null;
+  metaTitleRu?: string | null;
+  metaTitleEn?: string | null;
+  metaDescriptionUz?: string | null;
+  metaDescriptionRu?: string | null;
+  metaDescriptionEn?: string | null;
 }
 
 // Matches EVENT_LIST_SELECT on the backend (GET /events) — Event.title is a
@@ -392,8 +399,17 @@ export interface AdminBusiness {
   hasDelivery?: boolean | null;
   deliveryFee?: number | null;
   deliveryTime?: string | null;
-  owner?: { id?: number; fullName?: string | null; phone?: string | null } | null;
+  coverUrl?: string | null;
+  website?: string | null;
+  email?: string | null;
+  telegram?: string | null;
+  instagram?: string | null;
+  /** Denormalized count across all branches; only the primary one is in `branches`. */
+  branchCount?: number | null;
+  /** phone/email are only returned to ADMIN+; a MODERATOR gets { id, fullName } (D-72). */
+  owner?: { id?: number; fullName?: string | null; phone?: string | null; email?: string | null } | null;
   ownerId?: number | null;
+  businessType?: { id?: number; nameUz?: string | null; slug?: string | null } | null;
   // Business-operation state (GET /admin/businesses returns every scalar).
   isVerified?: boolean | null;
   isPromoted?: boolean | null;
@@ -413,15 +429,63 @@ export interface AdminBusiness {
   branches?: { id: number; address?: string | null; phone?: string | null; district?: { id?: number; nameUz?: string | null } | null }[] | null;
 }
 
+/** A gallery photo in GET /admin/businesses/:id — never the uploader (Phase 16E.4). */
+export interface AdminBranchPhoto {
+  url: string;
+  thumbUrl?: string | null;
+  caption?: string | null;
+  isPrimary?: boolean;
+  sortOrder?: number;
+}
+
+export interface AdminBranchDetail {
+  id: number;
+  name?: string | null;
+  slug?: string | null;
+  address: string;
+  landmark?: string | null;
+  phone: string;
+  phoneAlt?: string | null;
+  /** Prisma Decimal — serialized as a string ("40.78250000"), or null when unset. */
+  lat?: string | number | null;
+  lng?: string | number | null;
+  isPrimary: boolean;
+  isActive?: boolean;
+  district?: { id: number; slug?: string | null; nameUz?: string | null } | null;
+  city?: { id: number; slug?: string | null; nameUz?: string | null } | null;
+  hours: MyBranchHour[];
+  photos: AdminBranchPhoto[];
+}
+
+/**
+ * GET /admin/businesses/:id (Phase 16E.4, `business.review`): one listing in
+ * full, ANY status except soft-deleted. Every non-deleted branch, primary
+ * first, with hours, photos and coordinates. Owner phone/email only for ADMIN+.
+ */
+export interface AdminBusinessDetail extends Omit<AdminBusiness, "branches"> {
+  branches: AdminBranchDetail[];
+}
+
+/**
+ * Matches GET /admin/events (AdminService.findEvents: Event row + business + district).
+ * The real columns are `title`, `startAt`, `venueName`/`address` and
+ * `rejectionReason`; the older guessed names (`nameUz`…, `startsAt`,
+ * `location`) are kept optional only so nothing that still reads them breaks.
+ */
 export interface AdminEvent {
   id: number;
+  title?: string | null;
   nameUz?: string | null;
   nameRu?: string | null;
   nameEn?: string | null;
-  title?: string | null;
   status?: string | null;
+  startAt?: string | null;
   startsAt?: string | null;
+  venueName?: string | null;
+  address?: string | null;
   location?: string | null;
+  rejectionReason?: string | null;
+  business?: { id: number; slug: string; name: string } | null;
 }
 
 /** Matches GET /admin/reviews (see AdminService.findReviews). */
@@ -454,8 +518,20 @@ export interface AdminClaim {
   rejectionReason: string | null;
   createdAt: string;
   reviewedAt: string | null;
-  business: { id: number; slug: string; name: string; ownerId: number | null } | null;
-  claimant: { id: number; fullName: string; phone: string; email: string | null; role: string } | null;
+  // status / deletedAt / _count and claimant.status are the Phase 16E.1 review
+  // context. Optional: an API without that change omits them, and the view
+  // then simply shows no context rather than a false warning.
+  business: {
+    id: number;
+    slug: string;
+    name: string;
+    ownerId: number | null;
+    status?: string;
+    deletedAt?: string | null;
+    /** The business's PENDING claims, this one included. */
+    _count?: { claims: number };
+  } | null;
+  claimant: { id: number; fullName: string; phone: string; email: string | null; role: string; status?: string } | null;
   reviewedBy: { id: number; fullName: string } | null;
 }
 
@@ -511,7 +587,10 @@ export interface AdminCategoryPayload {
  * `text` on replies, etc. Confirmed against the real API responses
  * (2026-08-14/15), not guessed.
  */
-export type BusinessStatusValue = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED";
+// HIDDEN is a real BusinessStatus (admin hide, Phase 14) and GET /me/businesses
+// returns hidden listings to their owner — leaving it out made the owner's
+// status badge render empty (Phase 16D).
+export type BusinessStatusValue = "DRAFT" | "PENDING" | "APPROVED" | "REJECTED" | "SUSPENDED" | "HIDDEN";
 export type ReviewStatusValue = "PENDING" | "PUBLISHED" | "REJECTED" | "HIDDEN";
 export type EventStatusValue = "DRAFT" | "PENDING" | "PUBLISHED" | "REJECTED" | "CANCELLED" | "COMPLETED";
 
@@ -548,6 +627,9 @@ export interface MyBusiness {
   slug: string;
   name: string;
   status: BusinessStatusValue;
+  // Set by an admin reject or suspend (the API reuses the column for both),
+  // cleared on approve / unsuspend. Phase 16D shows it to the owner.
+  rejectionReason?: string | null;
   coverPhoto?: string | null;
   hasDelivery?: boolean | null;
   deliveryFee?: number | null;
@@ -569,6 +651,12 @@ export interface MyBusiness {
 /** GET /me/businesses/:id — same as MyBusiness plus the fields the list endpoint omits. */
 export interface MyBusinessDetail extends MyBusiness {
   description?: string | null;
+  // Real Business columns, returned because OwnerService.findMyBusinessById
+  // uses Prisma `include` (every scalar comes back). Read by the owner edit
+  // modal's prefill (getMyBusinessEditDetail).
+  instagram?: string | null;
+  telegram?: string | null;
+  website?: string | null;
 }
 
 /**
@@ -616,6 +704,27 @@ export interface MyStats {
     businessesScored: number;
     openRecommendations: number;
   };
+}
+
+/** One metric of GET /me/analytics/overview: the last 7 days vs the 7 before. */
+export interface OverviewMetric {
+  current: number;
+  previous: number;
+  /** Server-formatted: "+12%", "0%", "-30%" (counts) or "+0.3" (rating). */
+  change: string;
+}
+
+/**
+ * GET /me/analytics/overview — AnalyticsService.getOverview on the backend.
+ * Summed over every business the caller owns. Counts are what the anonymous
+ * collectors recorded (de-duplicated per visitor since API Phase 16G.1).
+ */
+export interface OwnerAnalyticsOverview {
+  pageViews: OverviewMetric;
+  callClicks: OverviewMetric;
+  directionClicks: OverviewMetric;
+  favorites: OverviewMetric;
+  avgRating: OverviewMetric;
 }
 
 export interface MyReview {

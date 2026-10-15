@@ -1,6 +1,8 @@
 # HANDOFF_INDEX — My Andijan
 
-**Entry point for the next engineer or AI architect.** Read this document first, end to end. It is short by design; everything else is reference.
+> **Role changed 2026-10-07 (D-78).** The recovery entry point is now [`CURRENT_STATE.md`](CURRENT_STATE.md) (top section). The memory map is [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md), and agents start at [`intelligence/AGENT_GUIDE.md`](intelligence/AGENT_GUIDE.md). This document is the **historical 2026-09-28 handoff and audit**, plus the document directory in §7. Its status, blockers, priorities, counts and repository paths (`C:\Users\JKT443\Desktop\…`; now `D:\My-Andijan-Work\…`) are as of 2026-09-28 unless marked otherwise. Do not read it end to end for orientation.
+
+*Original preamble:* **Entry point for the next engineer or AI architect.** Read this document first, end to end. It is short by design; everything else is reference.
 
 Compiled 2026-09-28 from the two live repositories, their git history, a recovered Claude Code transcript (2026-08-24 → 2026-09-27), and read-only probes of the live API and site.
 
@@ -157,6 +159,8 @@ The shortest path to a launchable product. Details in [`ROADMAP.md`](ROADMAP.md)
 | [`TODO.md`](TODO.md) | You want a task. Grouped and marked `[ ] [~] [x] [?]` |
 | [`SESSION_CONTEXT.md`](SESSION_CONTEXT.md) | You want the development history and the non-obvious bugs already solved |
 | [`CHATGPT_CONTEXT.md`](CHATGPT_CONTEXT.md) | **You are ChatGPT acting as architect/reviewer** — what you can rely on, what to ask for, and where this project will mislead a reviewer who cannot execute code |
+| [`ENGINEERING_RULES.md`](ENGINEERING_RULES.md) | *(added 2026-10-07)* Do-not-break rules, conventions and commands for both repos (moved out of the former `CLAUDE.md` files) |
+| [`intelligence/`](intelligence/PROJECT_MEMORY.md) | *(added 2026-10-07)* Memory control: map, contract and update protocol, agent guide, architecture, knowledge model, planned AI Brain |
 | [`../SSG.md`](../SSG.md) | You are considering SSR/prerendering (pre-existing doc, still valid) |
 | [`../../CLAUDE.md`](../../CLAUDE.md) | You are an AI agent — the working contract |
 | [`../../README.md`](../../README.md) | Setup, commands, deployment |
@@ -166,6 +170,8 @@ Plus [`my-andijan-api/CLAUDE.md`](../../../my-andijan-api/CLAUDE.md) in the API 
 ---
 
 ## 8. How another AI should start
+
+> *Superseded 2026-10-07 by [`intelligence/AGENT_GUIDE.md`](intelligence/AGENT_GUIDE.md). Kept as the 2026-09-28 guidance.*
 
 1. **Read this document, then [`CURRENT_STATE.md`](CURRENT_STATE.md), then [`DECISIONS.md`](DECISIONS.md).** That is ~30 minutes and covers 80% of what you need.
 2. **Read `prisma/schema.prisma` in full.** It is the densest source of intent in the project.
@@ -184,13 +190,13 @@ Plus [`my-andijan-api/CLAUDE.md`](../../../my-andijan-api/CLAUDE.md) in the API 
 
 | Don't assume | Reality |
 | --- | --- |
-| ~~The live site reflects the code~~ | **It does, as of 2026-09-28.** Both platforms run current `main`. But neither auto-deploys from GitHub, so re-verify after any new commit. |
+| ~~The live site reflects the code~~ | **It does.** *Update:* both platforms now deploy automatically from `main` after CI passes (Railway waits for CI; Vercel waits for the `test-and-build` status). Current: backend `2ea83b6` on Railway `6b5f057b-ea08-4252-b5fa-79910859f8d8`. |
 | **A 200 means a page or asset exists** | `vercel.json` rewrites `/(.*)` → `/index.html`, so **every** URL on the domain returns 200 with HTML. **Check `content-type` and bundle contents.** |
 | **Comments in `src/lib/api.ts` are current** | Several assert endpoints 404 that now exist. Same for `AuthContext` ("no profile-update endpoint or age/gender columns") and `docs/SSG.md` ("the API returns zero businesses"). |
-| **The backend is the bottleneck** | ~80 of 118 routes have no frontend caller. |
-| **`GET /search` powers the search page** | It does not. The frontend uses `GET /businesses?search=`. The sophisticated FTS endpoint is unused. |
-| **Analytics dashboards show real data** | The frontend never calls `POST /analytics/*`, so the source tables are empty. |
-| **OTP works** | The endpoint returns success and sends nothing. |
+| **The backend is the bottleneck** | ~80 of 118 routes had no frontend caller *(2026-09-28 count; not re-measured — the API now has 127 routes)*. |
+| **`GET /search` powers the search page** | *(2026-09-28; since Phase 8 the frontend calls `GET /search` for text queries — category/district browsing still uses `GET /businesses`.)* |
+| **Analytics dashboards show real data** | *(2026-09-28; since fixed — the frontend now calls `POST /analytics/*`.)* Data volume is still small, and the endpoints are public and unthrottled (SECURITY §16.3 R1). |
+| **OTP works** | It does not deliver: `ESKIZ_*` is unset, so since 15E.2 the endpoint answers **503** (it used to return success and send nothing). |
 | **Restaurant cuisine/price/delivery are real** | Derived from `Math.sin(id * k)` in `restaurantMock.ts`. Deterministic and invented. |
 | **Settings forms save** | `AdminSettingsView` and dashboard `SettingsView` both discard input. |
 | **`dayOfWeek` is `Date.getDay()`** | It is **0 = Monday**. |
@@ -202,7 +208,7 @@ Plus [`my-andijan-api/CLAUDE.md`](../../../my-andijan-api/CLAUDE.md) in the API 
 | **There is 3D / immersive content** | None. A genuine blank. |
 | **The 15-minute session timeout should be fixed by raising the TTL** | Implement client-side refresh instead — the server side already works. |
 | **Soft deletes are enforced by the database** | They are application-level only. A query that forgets `deletedAt: null` returns deleted rows. |
-| **"One pending claim per business" is enforced** | The schema says it needs a partial index and is service-layer only. |
+| **"One pending claim per business" is enforced** | Since Phase 16H it is one pending claim per **(business, claimant)**, enforced by a partial unique index; several people can still have competing pending claims on one listing. |
 | **A product spec exists** | No PRD, business plan, pricing rationale, launch plan, or design file exists in either repo. |
 
 ---
@@ -325,5 +331,19 @@ Ten decisions were **never actually made** and are listed at the end of [`DECISI
 - **15B** (D-74): owner-only business content, explicit suspension target table, session revocation on reset/suspension, `/auth/*` rate limits, CORS allowlist, audit request context.
 - **15D** (D-75): **capability authorization, deny by default.** Global `AuthzGuard`; every route declares `@Public` / `@Authenticated` / `@RequireCapability`; 20 capabilities in one explicit role table (`src/authz/capabilities.ts`, no inheritance); ownership + conflict-of-interest policies; rank model (`ROLE_HIERARCHY`, `RolesGuard`, `@Roles`) deleted; route-inventory test + committed snapshot fail CI on any undeclared or changed rule; frontend renders from server-issued `capabilities`.
 - **15D.2** (D-75 point 7): **platform staff hold no business-owner capability.** ADMIN/SUPER_ADMIN lost `business.claim` / `business.create` / `business.manage_own` (BUSINESS_OWNER = ownership authority; staff = platform capability authority via `/admin`, e.g. `business.edit_any`); pre-checked 0 ADMIN/SUPER_ADMIN-owned businesses in production. Business Staff (membership) and PLATFORM_OWNER governance remain future work.
-- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone); the Security Hardening backlog (reset code logged to stdout + `Math.random`, Vercel CI gate, distributed rate limiting, refresh-token reuse detection, remaining rate-limit coverage).
+- **Not implemented (deferred, separate phases):** PLATFORM_OWNER governance (no role, no table, no endpoints, no UI — `@RequireGovernance` refuses everyone). *Of the Security Hardening backlog listed here on 2026-10-02, the reset-code logging + `Math.random` (15E.2), the Vercel CI gate (15E.3 / 15E.7.1) and refresh-token reuse detection (15E.4c) are done; distributed rate limiting and the remaining rate-limit coverage are accepted residual risk (SECURITY §16.3 R1, R2) — see the next section.*
 - **Where to look:** `ARCHITECTURE.md` §31–§32, `DECISIONS.md` D-74/D-75, `SECURITY.md` §3.
+
+## Phase 15 — security hardening and closeout (2026-10-02 → 10-04)
+
+> *Historical — superseded 2026-10-07. **Phase 15 was CLOSED / PASS on 2026-10-05** (gates A, B, C); the open-gate and "frozen" lines below are historical. Current state, including Phase 16 and the Railway release blocker: [`CURRENT_STATE.md`](CURRENT_STATE.md) top section.*
+
+**State as of 2026-10-04 (then authoritative):** backend `main` `2ea83b620c715cf1b5ab719ca5762c2c18fd1d13` (PR #13 merge) on Railway deployment `6b5f057b-ea08-4252-b5fa-79910859f8d8` (SUCCESS, 1/1, CI-gated, pre-deploy `prisma migrate deploy`, 16 migrations); frontend `main` `f80ee8d` (PR #9 merge, head `a534f41155f6dde42e9ce348533d95c74a83a8cb`). Commit and deployment ids in earlier sections are historical.
+
+- **15E.2** (D-76): authentication codes never logged/returned, `crypto.randomInt`, one live code per phone + purpose, per-phone wrong-guess budget, atomic single use, no OTP sign-in for staff, fail-closed SMS (503 while `ESKIZ_*` is unset — still the case).
+- **15E.3 / 15E.7.1** (D-77): CI hardened in both repositories; Railway waits for CI; Vercel production waits for the `test-and-build` status; "Protect main" rulesets.
+- **15E.4** refresh-token hardening — **CLOSED / PASS**: 4a client refresh + cross-tab coordination; 4b one `auth_sessions` row per sign-in, race-safe rotation; 4c reuse detection (10 s grace); 4d `sid`-bound access tokens (mandatory); 4e.0 migrations moved to Railway pre-deploy; 4e.1 `refresh_tokens.session_id` NOT NULL; **4e.2** legacy `user_agent` / `ip_address` columns and `LEGACY_MIGRATION` removed — production verification PASS (E5–E14 = 0, 0 sessionless tokens).
+- **Final security audit (2026-10-04):** two HIGH findings **remediated in production** via PR #13 — SMS password reset refused for SUPPORT / MODERATOR / ADMIN / SUPER_ADMIN (staff recovery is owner-controlled, out of band) and `multer` 2.4.0. Residual risks R1–R14 accepted and assigned (SECURITY §16.3).
+- **Phase 15 is NOT yet officially closed.** Open gates: **A** unique ADMIN / SUPER_ADMIN credentials · **B** confirm the `main` ruleset bypass lists are empty · **C** final short closure audit.
+- **Phase 16:** 16E.2 (frontend) is already on `main`; PR #10 + #6 (16C.1) then PR #11 + #7 (16E.1) stay **frozen** until Phase 15 closes.
+- **Where to look:** `CURRENT_STATE.md` (current-state section), `SECURITY.md` §15–§16, `PHASE_15E4_REFRESH_TOKEN_ARCHITECTURE.md`, `PHASE_15E4D_ACCESS_TOKEN_SESSION_BINDING_ARCHITECTURE.md`.

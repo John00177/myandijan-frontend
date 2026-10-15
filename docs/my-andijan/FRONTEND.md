@@ -96,7 +96,7 @@ export default function SearchPage() {
 - `pages/signup/`: `PhoneScreen`, `OtpScreen`, `ProfileScreen`
 - `pages/claim/`: `StepShell` + 8 steps
 - `pages/dashboard/`: `DashboardLayout`, `Sidebar`, `TopBar`, `MobileDrawer`, `KpiCard`, `ProductModal`, `ProductRow`, `addBusiness/` (`Step1BasicInfo`, `Step2Location`, `Step3Hours`, `StepIndicator`, `FormField`)
-- `pages/admin/`: `AdminLayout`, `AdminSidebar`, `AdminTopBar`, `AdminMobileDrawer`, `DataTable`, `CategoryModal`, `AdminFetchState`, `statusLabels`, `auditFormat`, `charts/ChartCard`
+- `pages/admin/`: `AdminLayout`, `AdminSidebar`, `AdminTopBar`, `AdminMobileDrawer`, `DataTable`, `CategoryModal`, `BusinessReviewDrawer`, `AdminFetchState`, `statusLabels`, `auditFormat`, `charts/ChartCard`
 
 ---
 
@@ -133,7 +133,7 @@ No form library. Every form is `useState` + hand-rolled validation.
 | Signup (3 steps) | `pages/signup/*` via `useSignup` | steps `phone \| otp \| profile \| success`; `OTP_LENGTH = 6`, `RESEND_COOLDOWN_SECONDS = 45`; **account is created at the OTP step**, so step 3 is genuinely skippable |
 | Claim (8 steps) | `pages/claim/steps/*` via `useClaimFlow` | one field per screen, **no progress bar**, Skip on optional steps, live preview |
 | Add business (3 steps) | `pages/dashboard/addBusiness/*` | `StepIndicator` **is** shown here — unlike signup/claim |
-| Edit business | `EditBusinessModal` | details + 7-day hours grid; saves via `PATCH /businesses/:id` and `PUT /businesses/:id/hours` |
+| Edit business | `EditBusinessModal` | details + 7-day hours grid; saves via `PATCH /businesses/:id`, and `PUT /businesses/:id/hours` **only when hours were loaded and edited** (owner: prefill `getMyBusinessEditDetail` → `GET /me/businesses/:id`, `preserveUnchangedHours`, `adminHoursPayload` — PR #32, merged `dd1e84b`, 2026-10-14) |
 | Review | `ReviewForm` | rating + title + comment + photos |
 | Menu item | `ProductModal` | name, price, description, photo |
 | Category | `CategoryModal` (admin) | localized name triples, icon, colour |
@@ -237,7 +237,7 @@ All traffic goes through **`src/lib/api.ts`** — see `ARCHITECTURE.md` §7 for 
 | View | Data source |
 | --- | --- |
 | `AdminHomeView` | real — `getAdminStats`, `getAdminAuditLogs` |
-| `AdminBusinessesView` | real — list / approve / reject / edit / edit-branch |
+| `AdminBusinessesView` | real — list / approve / reject / edit / edit-branch; PENDING listings open `BusinessReviewDrawer` (submitted details from the list row + a validated rejection-reason form, replacing `window.prompt`) — Phase 16E. Since 16E.5 the drawer also fetches `GET /admin/businesses/:id` for every branch's hours, photos and coordinates, and the admin edit modal prefills from it (`getAdminBusinessEditDetail`, any status; falls back to `GET /businesses/:id` only on a 404 — the route not deployed yet) |
 | `AdminCategoriesView` | real — list / create / update (+`CategoryModal`) |
 | `AdminUsersView` | real — `getAdminUsers` |
 | `AdminEventsView` | real — `getAdminEvents` |

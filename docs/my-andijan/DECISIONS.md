@@ -54,7 +54,7 @@
 
 ### D-08 · Extract `BusinessClaim`; remove `claimedAt`/`claimedById` 🔒 LOCKED
 **Rationale (schema).** *"A business may be claimed, rejected, and re-claimed — that history is an entity, not two columns."* And: *"claim history now lives in business_claims. Ownership is expressed solely by ownerId, which is set when a claim is approved."*
-**Known gap, documented at the time.** *"'only one PENDING claim per business' cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer."* Still unenforced at the database level.
+**Known gap, documented at the time.** *"'only one PENDING claim per business' cannot be expressed as a Prisma unique constraint (needs a partial index) — enforce in the service layer."* **Closed in Phase 16H** with a raw-SQL partial unique index on `(business_id, claimant_id) WHERE status = 'PENDING'` — scoped per claimant, not per business, because competing claims are a supported flow (D-60: approving one rejects the rest).
 
 ### D-09 · Defer advertising to Phase 2, but keep the table 🔒 LOCKED
 **Rationale (schema).** *"DEFERRED TO PHASE 2 (ships with Click payments). Table retained so the module attaches without a core migration. MVP promotion is handled by Business.isPromoted / isFeatured."*
@@ -501,16 +501,45 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 **Not decided here:** staff password reset by SMS code is still allowed (needed for self-recovery; revisit with 2FA); a second factor for staff; refresh-token reuse detection (15E.4).
 
 
-### D-77 · Production deploys only commits whose `test-and-build` check passed 🔒 LOCKED (frontend gate pending owner action)
+### D-77 · Production deploys only commits whose `test-and-build` check passed 🔒 LOCKED
 **Decision (Phase 15E.3, 2026-10-02).**
-1. **One required check per repository: `test-and-build`** (workflow `CI`). It is the production gate: Railway's "Wait for CI" (`checkSuites: true`) for the backend, Vercel Deployment Checks for the frontend, and the `main` ruleset for merges. Renaming the job breaks the gates.
+1. **One required check per repository: `test-and-build`** (workflow `CI`). It is the production gate: Railway's "Wait for CI" (`checkSuites: true`) for the backend, the Vercel Production Deployment Check `Vercel - myandijan-frontend: test-and-build` (a commit status the CI job reports) for the frontend, and the `main` ruleset for merges. Renaming the job breaks the gates.
 2. **CI is read-only and immutable:** `permissions: contents: read`, actions pinned to full commit SHAs (updated through Dependabot pull requests), `persist-credentials: false`. No workflow deploys; the platforms deploy on the check result.
 3. **Normal releases never bypass the gate.** Manual platform deploys/promotions and ruleset bypass are owner-only emergency tools; prefer rolling back to a previously gated deployment.
-4. **`main` ruleset:** no deletion, no force push, pull request + `test-and-build` (up to date) for everyone except the repository admin (single-maintainer workflow).
-**Status (verified).** Backend gate active. **Frontend gate and both rulesets require the owner** (platform/admin settings; see SECURITY §15 "Owner actions") — until then the frontend is NOT gated.
+4. **`main` ruleset "Protect main" (both repos):** no deletion, no force push, pull request + `test-and-build` (up to date). Changes reach `main` only through a pull request.
+**Status (2026-10-02).** Backend gate active and verified. Rulesets active (verified via the public API; the bypass list is not readable without admin access). Frontend Production Deployment Check configured by the owner; **production proof pending** the first deployment after configuration (the 15E.7.1 documentation PR merge).
 
 ---
 
+## Project memory (2026-10-07)
+
+### D-78 · One canonical project memory in `myandijan-frontend/docs/my-andijan/`; explicit source-of-truth hierarchy 🔓 REVISITABLE
+**Decision (2026-10-07, pending the owner's review of the PR that adds it).**
+1. **Hierarchy:** GitHub code/history > canonical project memory (`docs/my-andijan/`) > `AGENTS.md` / `CLAUDE.md` > Notion > SAFE (`D:\My-Andijan-SAFE`) > conversational/vendor AI memory. Vendor AI memory is convenience only and never authoritative.
+2. **One home:** canonical memory for both repositories stays in `myandijan-frontend/docs/my-andijan/`. Each repository keeps its own root `AGENTS.md` (identical in both) and `CLAUDE.md` (repo-specific, short). Backend work records its memory update through a `docs/` PR in the frontend repository.
+3. **Recovery entry point:** `CURRENT_STATE.md` top section. Domain documents are read on demand. History is append-only and marked, never deleted.
+4. **Memory-update protocol** after every major implementation session: `intelligence/MEMORY_CONTRACT.md` §4.
+5. **No vector database / RAG corpus / cloud memory service.** The planned AI Brain (`intelligence/BRAIN_ARCHITECTURE.md`) is not implemented and needs its own decision.
+**Alternatives rejected:** moving memory to the API repo; mirroring it in both repos (drift); a third repository (needs the owner's approval; not justified yet); a Git submodule (tooling friction). Reasoning: `intelligence/MEMORY_ARCHITECTURE.md` §3.
+**Revisit when:** a third codebase appears, or the frontend-repo coupling becomes a real cost.
+
+---
+
+### D-79 · Creating a listing stays BUSINESS_OWNER-only; 16D is re-scoped around it 🔒 LOCKED
+**Decision (owner, 2026-10-08).** D-75 is kept: `business.create` remains a BUSINESS_OWNER capability; a CUSTOMER cannot create a listing. A customer reaches ownership by **claiming** an existing listing (an approved claim promotes the claimant to BUSINESS_OWNER), or registers as a business owner (`RegisterDto` allows CUSTOMER or BUSINESS_OWNER).
+**Consequence for Phase 16D.** The planned "CUSTOMER `business.create`" item is dropped. 16D keeps the UX that does not depend on it — claim and listing status shown to claimants and owners, 403 copy that points to the claim path (frontend branch `feat/16d-claim-status-ux`, 2026-10-08) — and two items that need API work, not authorization: an owner path to resubmit a REJECTED listing, and one create route instead of `POST /businesses` + `POST /me/businesses`.
+**Reason:** the owner kept D-75's capability model as decided; no further reason recorded.
+**Alternative rejected:** granting CUSTOMER `business.create` (would reverse D-75).
+**Revisit when:** the owner reopens self-service listing creation.
+
+---
+
+### D-80 · Memory-impact check after every material change; no automatic GitHub → memory sync 🔓 REVISITABLE
+**Decision (owner, 2026-10-15, chat; pending the owner's review of the PR that adds it).** Refines D-78 item 4. The trigger for updating canonical memory is any **material** change — implementation, architecture, security, database, API, product, phase or deployment state, a decision, a new blocker — instead of "a major session". Before declaring work complete the agent runs a memory-impact check, reconciles only the affected documents with PR/SHA/CI/deployment evidence, and ends its final report with `memory impact: updated` (files) or `memory impact: none` (why). Nothing synchronizes GitHub into memory automatically. Roles are unchanged: GitHub = technical truth; `docs/my-andijan/` = curated durable memory; Notion = human decisions/history; Todoist = execution queue; SAFE = recovery; conversation and auto-memory = working memory only. Full rule: `intelligence/MEMORY_CONTRACT.md` §4.1.
+**Alternatives not chosen:** an automatic GitHub → memory synchronization (none exists, and it would duplicate GitHub history); updating memory on every change (contradicts the selective-memory rule).
+**Revisit when:** memory updates are routinely missed, or become noise.
+
+---
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

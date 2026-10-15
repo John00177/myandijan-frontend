@@ -1,6 +1,7 @@
 import type {
   AdminAuditLog,
   AdminBusiness,
+  AdminBusinessDetail,
   AdminCategoryPayload,
   AdminClaim,
   AdminEvent,
@@ -32,6 +33,7 @@ import type {
   MyEvent,
   MyReview,
   MyStats,
+  OwnerAnalyticsOverview,
   PaginatedResponse,
   Region,
   Review,
@@ -41,6 +43,13 @@ import type {
   DashboardAnalytics,
   UserAnalytics,
 } from "../types";
+import {
+  AUTH_CHANNEL_NAME,
+  createRefreshCoordinator,
+  type ChannelLike,
+  type RefreshAttempt,
+  type RefreshCoordinator,
+} from "./auth/refreshCoordinator";
 
 const BASE = import.meta.env.VITE_API_URL || "https://myandijan-api-production.up.railway.app";
 const TIMEOUT_MS = 10_000;
@@ -82,42 +91,86 @@ function handleUnauthorized(hadToken: boolean, status: number): void {
 }
 
 /**
- * Single-flight silent refresh. On a 401 from an authenticated request, each
- * of the request helpers below calls this once before giving up — it trades
- * the opaque refresh token (POST /auth/refresh) for a new access+refresh
- * pair and persists both, so a session survives past the 15-minute access
- * token instead of forcing a re-login. Concurrent 401s share one in-flight
- * call rather than each racing to redeem the same rotating refresh token.
- * Returns null (never throws) on any failure — callers then fall through to
- * the existing handleUnauthorized/logout path unchanged.
+ * One POST /auth/refresh, classified. 4xx (other than 408/429) means the
+ * server refused the refresh token; network errors, timeouts, 408/429 and
+ * 5xx are transient and must not end a session that may still be valid.
  */
-let refreshInFlight: Promise<string | null> | null = null;
-
-async function refreshAccessToken(): Promise<string | null> {
-  const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-  if (!storedRefreshToken) return null;
-
-  if (!refreshInFlight) {
-    refreshInFlight = (async () => {
-      try {
-        const res = await fetch(new URL("/auth/refresh", BASE).toString(), {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ refreshToken: storedRefreshToken }),
-        });
-        if (!res.ok) return null;
-        const data = (await res.json()) as { accessToken: string; refreshToken: string };
-        localStorage.setItem(TOKEN_KEY, data.accessToken);
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-        return data.accessToken;
-      } catch {
-        return null;
-      } finally {
-        refreshInFlight = null;
-      }
-    })();
+async function postRefresh(refreshToken: string, signal: AbortSignal): Promise<RefreshAttempt> {
+  let res: Response;
+  try {
+    res = await fetch(new URL("/auth/refresh", BASE).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ refreshToken }),
+      signal,
+    });
+  } catch {
+    return { kind: "transient" };
   }
-  return refreshInFlight;
+  if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) return { kind: "rejected" };
+  if (!res.ok) return { kind: "transient" };
+  try {
+    const data = (await res.json()) as { accessToken?: unknown; refreshToken?: unknown };
+    if (typeof data.accessToken === "string" && typeof data.refreshToken === "string") {
+      return { kind: "success", accessToken: data.accessToken, refreshToken: data.refreshToken };
+    }
+  } catch {
+    // fall through
+  }
+  return { kind: "transient" };
+}
+
+/**
+ * Silent refresh, coordinated across tabs (Phase 15E.4a — see
+ * lib/auth/refreshCoordinator.ts). One coordinator per tab, created on first
+ * use: one BroadcastChannel where the browser has it, plus the `storage`
+ * event as the fallback channel.
+ */
+let coordinator: RefreshCoordinator | null = null;
+
+function getRefreshCoordinator(): RefreshCoordinator {
+  coordinator ??= createRefreshCoordinator({
+    storage: localStorage,
+    tokenKey: TOKEN_KEY,
+    refreshTokenKey: REFRESH_TOKEN_KEY,
+    performRefresh: postRefresh,
+    requestTimeoutMs: TIMEOUT_MS,
+    createChannel: () => {
+      if (typeof BroadcastChannel !== "function") return null;
+      const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+      // Node (tests) keeps a process alive while a channel is open; browsers have no unref.
+      (channel as unknown as { unref?: () => void }).unref?.();
+      return channel as unknown as ChannelLike;
+    },
+    subscribeStorage: (listener) => {
+      const onStorage = (event: StorageEvent) => {
+        if (event.storageArea === null || event.storageArea === localStorage) listener(event.key);
+      };
+      window.addEventListener("storage", onStorage);
+      return () => window.removeEventListener("storage", onStorage);
+    },
+  });
+  return coordinator;
+}
+
+/**
+ * On a 401 from an authenticated request, each request helper below calls
+ * this ONCE with the access token that was rejected, then retries ONCE.
+ * Returns the access token to retry with (freshly refreshed here, or already
+ * refreshed by another tab), or null when the session is genuinely over (the
+ * caller then runs handleUnauthorized). A transient refresh failure throws
+ * ApiError 503 instead, so a flaky network never logs the user out.
+ */
+async function refreshAccessToken(failedAccessToken: string): Promise<string | null> {
+  const result = await getRefreshCoordinator().refresh(failedAccessToken);
+  if (result.status === "refreshed") return result.accessToken;
+  if (result.status === "unauthenticated") return null;
+  throw new ApiError("Could not refresh the session — please try again", 503);
+}
+
+/** Called by AuthContext.logout: logout wins over any refresh in flight, in every tab. */
+export function notifyLogout(): void {
+  getRefreshCoordinator().notifyLogout();
 }
 
 async function request<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
@@ -142,7 +195,7 @@ async function request<T>(path: string, params?: Record<string, string | number 
   try {
     let res = await fetch(url.toString(), { headers, signal: controller.signal });
     if (res.status === 401 && token) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         headers.Authorization = `Bearer ${newToken}`;
         res = await fetch(url.toString(), { headers, signal: controller.signal });
@@ -413,7 +466,7 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
       signal: controller.signal,
     });
     if (res.status === 401 && token) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         headers.Authorization = `Bearer ${newToken}`;
         res = await fetch(new URL("/upload/image", BASE).toString(), {
@@ -604,7 +657,7 @@ async function authedDelete(path: string): Promise<void> {
       signal: controller.signal,
     });
     if (res.status === 401 && token) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         headers.Authorization = `Bearer ${newToken}`;
         res = await fetch(new URL(path, BASE).toString(), {
@@ -648,7 +701,7 @@ async function authedJson<T>(method: "POST" | "PATCH" | "PUT", path: string, bod
       signal: controller.signal,
     });
     if (res.status === 401 && token) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         headers.Authorization = `Bearer ${newToken}`;
         res = await fetch(new URL(path, BASE).toString(), {
@@ -692,7 +745,7 @@ async function authedFormData<T>(method: "POST" | "PUT" | "PATCH", path: string,
       signal: controller.signal,
     });
     if (res.status === 401 && token) {
-      const newToken = await refreshAccessToken();
+      const newToken = await refreshAccessToken(token);
       if (newToken) {
         headers.Authorization = `Bearer ${newToken}`;
         res = await fetch(new URL(path, BASE).toString(), {
@@ -777,8 +830,11 @@ export async function getAdminClaims(params?: {
   return normalizeAdminList<AdminClaim>(raw);
 }
 
-export function approveAdminClaim(id: number): Promise<AdminClaim> {
-  return authedPostJson<AdminClaim>(`/admin/claims/${id}/approve`, {});
+// Phase 16C.1: approval requires a verification note — how the claimant was
+// verified — which the API records on the approval's audit row
+// (ApproveClaimDto: non-empty, at most 1000 characters).
+export function approveAdminClaim(id: number, verificationNote: string): Promise<AdminClaim> {
+  return authedPostJson<AdminClaim>(`/admin/claims/${id}/approve`, { verificationNote });
 }
 
 export function rejectAdminClaim(id: number, reason: string): Promise<AdminClaim> {
@@ -848,6 +904,63 @@ export async function getAdminBusinesses(params?: {
 }): Promise<AdminListResult<AdminBusiness>> {
   const raw = await request<unknown>("/admin/businesses", params);
   return normalizeAdminList<AdminBusiness>(raw);
+}
+
+// GET /admin/businesses/:id (Phase 16E.4) — `business.review`. One listing in
+// full, ANY status except soft-deleted: every branch with hours, photos and
+// coordinates. Until the API deploy that adds it, production answers 404, so
+// callers must treat a 404 as "not available yet", never as fatal.
+export function getAdminBusinessById(id: number): Promise<AdminBusinessDetail> {
+  return request<AdminBusinessDetail>(`/admin/businesses/${id}`);
+}
+
+/**
+ * The admin edit modal's prefill (Phase 16E.5). The admin detail serves
+ * DRAFT/PENDING/REJECTED/SUSPENDED/HIDDEN listings too, so their real hours
+ * load and the hours editor unlocks (EditBusinessModal `preserveUnchangedHours`).
+ * Falls back to the public GET /businesses/:id ONLY on a 404 — the route not
+ * deployed yet — which is exactly the pre-16E.5 behaviour (APPROVED listings
+ * prefill, others keep their hours locked). Any other failure propagates, so
+ * the modal keeps the hours locked rather than guessing.
+ */
+export async function getAdminBusinessEditDetail(id: number): Promise<BusinessEditDetail> {
+  let detail: AdminBusinessDetail;
+  try {
+    detail = await getAdminBusinessById(id);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return getBusinessById(id);
+    throw err;
+  }
+  return {
+    id: detail.id,
+    slug: detail.slug ?? "",
+    name: detail.name ?? detail.nameUz ?? "",
+    description: detail.description ?? null,
+    status: detail.status ?? null,
+    coverPhoto: detail.coverPhoto ?? null,
+    hasDelivery: detail.hasDelivery ?? null,
+    deliveryFee: detail.deliveryFee ?? null,
+    deliveryTime: detail.deliveryTime ?? null,
+    instagram: detail.instagram ?? null,
+    telegram: detail.telegram ?? null,
+    website: detail.website ?? null,
+    category:
+      detail.category?.id != null
+        ? { id: detail.category.id, slug: detail.category.slug ?? "", nameUz: detail.category.nameUz ?? "" }
+        : null,
+    // Order preserved: branches[0] is the primary branch — the one
+    // PUT /admin/businesses/:id/hours replaces — and hours keep is24Hours.
+    branches: detail.branches.map((branch) => ({
+      id: branch.id,
+      address: branch.address,
+      phone: branch.phone,
+      isPrimary: branch.isPrimary,
+      district: branch.district
+        ? { id: branch.district.id, slug: branch.district.slug ?? "", nameUz: branch.district.nameUz ?? "" }
+        : null,
+      hours: branch.hours,
+    })),
+  };
 }
 
 export function approveAdminBusiness(id: number): Promise<AdminBusiness> {
@@ -948,9 +1061,24 @@ export async function getAdminUsers(params?: { page?: number; limit?: number }):
   return normalizeAdminList<AdminUser>(raw);
 }
 
-export async function getAdminEvents(): Promise<AdminListResult<AdminEvent>> {
-  const raw = await request<unknown>("/admin/events");
+export async function getAdminEvents(params?: {
+  status?: string;
+  page?: number;
+  limit?: number;
+}): Promise<AdminListResult<AdminEvent>> {
+  const raw = await request<unknown>("/admin/events", params);
   return normalizeAdminList<AdminEvent>(raw);
+}
+
+// `event.review` (ADMIN, SUPER_ADMIN). Both only act on a PENDING event (409
+// otherwise) and refuse an event of a business the reviewer owns (403) —
+// AdminService.getPendingEvent. Approve takes no body.
+export function approveAdminEvent(id: number): Promise<AdminEvent> {
+  return authedPostJson<AdminEvent>(`/admin/events/${id}/approve`, {});
+}
+
+export function rejectAdminEvent(id: number, reason: string): Promise<AdminEvent> {
+  return authedPostJson<AdminEvent>(`/admin/events/${id}/reject`, { reason });
 }
 
 export async function getAdminReviews(params?: {
@@ -1020,6 +1148,11 @@ export function getMyStats(): Promise<MyStats> {
   return request<MyStats>("/me/stats");
 }
 
+/** Last 7 days vs the previous 7, across the caller's businesses (Phase 16G.2). */
+export function getMyAnalyticsOverview(): Promise<OwnerAnalyticsOverview> {
+  return request<OwnerAnalyticsOverview>("/me/analytics/overview");
+}
+
 export function getMyBusinesses(): Promise<MyBusiness[]> {
   return request<MyBusiness[]>("/me/businesses");
 }
@@ -1029,6 +1162,48 @@ export function getMyBusinesses(): Promise<MyBusiness[]> {
 // the edit modal opening with real data instead of a partially-blank form.
 export function getMyBusinessById(id: number): Promise<MyBusinessDetail> {
   return request<MyBusinessDetail>(`/me/businesses/${id}`);
+}
+
+/**
+ * The owner edit modal's prefill. GET /me/businesses/:id is owner-scoped and
+ * serves every status (the public GET /businesses/:id 404s for anything not
+ * APPROVED), so a DRAFT/PENDING/REJECTED listing's real hours load too.
+ * Branches come primary-first — the branch PUT /businesses/:id/hours
+ * replaces — and hours keep is24Hours.
+ *
+ * Fails (and so keeps the modal's hours locked) when the primary branch
+ * arrives without an hours list: treating that as "no hours" would let an
+ * edit of one day delete every other stored day.
+ */
+export async function getMyBusinessEditDetail(id: number): Promise<BusinessEditDetail> {
+  const detail = await getMyBusinessById(id);
+  const branches = detail.branches ?? [];
+  if (branches[0] && !Array.isArray(branches[0].hours)) {
+    throw new Error(`GET /me/businesses/${id}: primary branch has no hours list`);
+  }
+  return {
+    id: detail.id,
+    slug: detail.slug,
+    name: detail.name,
+    description: detail.description ?? null,
+    status: detail.status,
+    coverPhoto: detail.coverPhoto ?? null,
+    hasDelivery: detail.hasDelivery ?? null,
+    deliveryFee: detail.deliveryFee ?? null,
+    deliveryTime: detail.deliveryTime ?? null,
+    instagram: detail.instagram ?? null,
+    telegram: detail.telegram ?? null,
+    website: detail.website ?? null,
+    category: detail.category ?? null,
+    branches: branches.map((branch) => ({
+      id: branch.id,
+      address: branch.address,
+      phone: branch.phone,
+      isPrimary: branch.isPrimary,
+      district: branch.district ?? null,
+      hours: branch.hours,
+    })),
+  };
 }
 
 export function updateMyBusiness(

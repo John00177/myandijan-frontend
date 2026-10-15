@@ -118,7 +118,7 @@ The frontend fetches the whole list and filters client-side, so the purpose-buil
 | PUT | `/businesses/:id/hours` | 🔒 **owner only** (Phase 15B) | Replace the **primary branch's** 7-day hours wholesale. Staff use `PUT /admin/businesses/:id/hours` | ✅ |
 | GET | `/businesses/featured` | — | `isFeatured` businesses | ✅ |
 | GET | `/businesses/promoted` | — | `isPromoted` businesses | **⭕** |
-| GET | `/businesses` | — | **List + filter + paginate** (name `contains`, no ranking) — used for category/district-only browsing | ✅ |
+| GET | `/businesses` | — | **List + filter + paginate** (name `contains`, no ranking) — used for category/district-only browsing. Each item carries `updatedAt` since Phase 16F.6 (also on `/featured` and `/promoted`, which share the projection): the last real edit of the listing — views and favourites no longer move it — for the sitemap's `lastmod` | ✅ |
 | GET | `/businesses/:id` | — | Detail by **id or slug**; only `APPROVED` | ✅ |
 | GET | `/businesses/:id/reviews` | — | Reviews for a business | ✅ |
 | POST | `/businesses/:id/reviews` | 🔒 `CUSTOMER` | Create a review; resolves to the primary branch server-side | ✅ |
@@ -220,7 +220,7 @@ Not editable through this API (no columns or deliberately server-owned): SKU, st
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| GET | `/events` | — | Paginated list | ✅ |
+| GET | `/events` | — | Paginated list. Each item carries `updatedAt` since Phase 16F.6: the last real edit of the event — RSVPs no longer move it — for the sitemap's `lastmod` | ✅ |
 | POST | `/events` | 🔒 **owner of `businessId`** (Phase 15B; no role floor) | Create an event | **⭕** |
 | GET | `/events/:slug` | — | Detail by slug | **⭕** |
 | POST | `/events/:slug/attend` | 🔒 | RSVP (`EventAttendee`) | **⭕** |
@@ -268,7 +268,7 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 > `GET /me/businesses` returns a lean shape without description or branch phone/address/district — which is why `GET /me/businesses/:id` exists and why the edit modal opens with real data rather than a partially blank form.
 
-**`POST /me/claims` (`CreateClaimDto`) — added Phase 9.** Any authenticated user (class-level `JwtAuthGuard`; no role floor — a claim is how an unverified representative first establishes a relationship to a listing). Body: `businessId` (int, required), `evidence?` (≤2000), `contactPhone?` (≤20), `contactNote?` (≤1000). Response: the new `BusinessClaim` (`status: "PENDING"`) with `business: {id, slug, name}`.
+**`POST /me/claims` (`CreateClaimDto`) — added Phase 9.** Any authenticated user (class-level `JwtAuthGuard`; no role floor — a claim is how an unverified representative first establishes a relationship to a listing). Body: `businessId` (int, required), `evidence?` (≤2000), `contactPhone?` (≤20), `contactNote?` (≤1000). Response: the new `BusinessClaim` (`status: "PENDING"`) with `business: {id, slug, name}`. **Phase 16H:** a second pending claim by the same user for the same listing is `409` *"You already have a pending claim for this business"* even when both requests race (database partial unique index); a claim that loses a race with an approval of another claim is `409` *"This business is already claimed or no longer open to claims"* (or, if it committed first, is auto-rejected by that approval).
 
 | Status | When |
 | --- | --- |
@@ -291,9 +291,9 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 | Method | Path | Auth | Purpose | FE |
 | --- | --- | --- | --- | --- |
-| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`) | **⭕** |
-| POST | `/analytics/click` | — | Record a click (`RecordClickDto`) | **⭕** |
-| POST | `/analytics/search` | — | Record a search (`RecordSearchDto`) | **⭕** |
+| POST | `/analytics/view` | — | Record a business view (`RecordViewDto`). Since Phase 16F.6 the `viewCount` increment is a plain SQL update that does **not** move the business's `updatedAt` (same for favourite ±1 and RSVP `attendeeCount` +1 — `src/common/counters.ts`). Since Phase 16G.1 one view per client (address + user-agent) per business per 30 min is recorded; repeats answer the same `{ success: true }` and write nothing (`AnalyticsGate`, which also caps each address at 300 events / 10 min across all three collectors) | **⭕** |
+| POST | `/analytics/click` | — | Record a click (`RecordClickDto`). Phase 16G.1: the same click again within 10 s is not recorded | **⭕** |
+| POST | `/analytics/search` | — | Record a search (`RecordSearchDto`). Phase 16G.1: the same query + filters (case/space-insensitive) within a minute is not recorded | **⭕** |
 
 > **⚠ The single most consequential gap in the API surface.** These three are the only writers for `BusinessAnalytics`, `SearchAnalytics` and `ActivityLog`, and **the frontend calls none of them.** Every owner and admin analytics screen therefore reads from tables nothing populates. Wiring these is a small change with large downstream effect.
 > They are also **unauthenticated and unthrottled** — see `SECURITY.md`.
@@ -302,7 +302,7 @@ Class-level 🔒 `JwtAuthGuard`. `OwnerService` scopes everything by `ownerId`.
 
 | Method | Path | Purpose | FE |
 | --- | --- | --- | --- |
-| GET | `/me/analytics/overview` | Summary | **⭕** |
+| GET | `/me/analytics/overview` | Summary: the last 7 days vs the previous 7, over all the caller's businesses | ✅ **(Phase 16G.2)** — owner dashboard home panel |
 | GET | `/me/analytics/traffic` | Time series (`TrafficQueryDto`) | **⭕** |
 | GET | `/me/analytics/demographics` | Visitor cities | **⭕** |
 | GET | `/me/analytics/search-terms` | Terms that led to the business | **⭕** |
@@ -355,17 +355,17 @@ Class-level 🔒 `JwtAuthGuard, RolesGuard` + `@Roles(ADMIN)`, with per-route ov
 | POST | `/admin/businesses/:id/unsuspend` | `ADMIN` | **New Phase 11.** `SUSPENDED` → `APPROVED`, clears `rejectionReason`. `409` unless currently `SUSPENDED`; compare-and-set. Cannot approve a PENDING or restore a HIDDEN listing | ✅ **(Phase 11)** |
 | POST | `/admin/businesses/:id/promote` | `ADMIN` | `isPromoted = true`, `promotedUntil = until` (body `{ until }` ISO date, must be future → else `400`). Sets **promotion only** — `isFeatured` has no admin endpoint | ✅ **(Phase 11)** |
 | POST | `/admin/businesses/:id/unpromote` | `ADMIN` | **New Phase 11.** End a promotion early: `isPromoted = false`, `promotedUntil = null`. Allowed for an already-expired promotion. `409` if not promoted | ✅ **(Phase 11)** |
-| GET | `/admin/claims` | `ADMIN` | List claims (paginated, `?status=PENDING\|APPROVED\|REJECTED`); each row includes evidence, contact, claimant and business — there is no separate detail endpoint | ✅ **(Phase 9)** |
-| POST | `/admin/claims/:id/approve` | `ADMIN` | Approve → atomically sets `Business.ownerId` (only if still null), promotes a `CUSTOMER` claimant to `BUSINESS_OWNER`, auto-rejects other pending claims on that business. `404` unknown claim, `409` already reviewed / business already owned / lost a concurrent race | ✅ **(Phase 9)** |
+| GET | `/admin/claims` | `ADMIN` | List claims (paginated, `?status=PENDING\|APPROVED\|REJECTED`); each row includes evidence, contact, claimant and business — there is no separate detail endpoint. Since Phase 16E.1 each row also carries review context: `business.status`, `business.deletedAt`, `business._count.claims` (that business's `PENDING` claims, this one included) and `claimant.status`; the admin queue warns on and disables approval of claims whose business or claimant would fail the approval checks, and flags competing claims | ✅ **(Phase 9, 16E.1)** |
+| POST | `/admin/claims/:id/approve` | `ADMIN` | Body `{ verificationNote }` — **required** since Phase 16C.1 (non-empty, ≤1000 chars; how the claimant was verified, stored on the approval's audit row; any other body property → `400`). Re-checks that the business is still `APPROVED` and not deleted and the claimant still `ACTIVE` and not deleted (`409` otherwise). Approve → atomically sets `Business.ownerId` (only if still null), promotes a `CUSTOMER` claimant to `BUSINESS_OWNER`, auto-rejects other pending claims on that business. `404` unknown claim, `409` already reviewed / business already owned / lost a concurrent race | ✅ **(Phase 9)** |
 | POST | `/admin/claims/:id/reject` | `ADMIN` | Reject with required `reason`; never touches ownership or roles. `409` if already reviewed | ✅ **(Phase 9)** |
 | GET | `/admin/reports` | **`MODERATOR`** ↓ (Phase 14; reporter name ADMIN+ only) | List **review** reports (`ReviewReport`; no business-report model exists), paginated, `?status=PENDING\|RESOLVED\|DISMISSED`. Fed by `POST /reviews/:id/report` since Phase 12 | ✅ **(Phase 12)** `AdminReportsView` |
 | POST | `/admin/reports/:id/resolve` | **`MODERATOR`** ↓ (Phase 14) | Body `{ action: HIDE_REVIEW \| DISMISS, note? }`. `HIDE_REVIEW` → report `RESOLVED` + review hidden + aggregates recalculated; `DISMISS` → report **`DISMISSED`** (Phase 11 fix — was stored as `RESOLVED`). `409` if already handled | ✅ **(Phase 12)** |
 | GET | `/admin/reviews` | **`MODERATOR`** ↓ (Phase 14) | List reviews, paginated, optional `?status=` filter — **added Phase 6 (2026-09-29)** | ✅ |
 | POST | `/admin/reviews/:id/hide` | **`MODERATOR`** ↓ (Phase 14) | Hide a review | ✅ |
 | POST | `/admin/reviews/:id/restore` | **`MODERATOR`** ↓ (Phase 14) | Restore a review | ✅ |
-| GET | `/admin/events` | `ADMIN` | List events | ✅ |
-| POST | `/admin/events/:id/approve` | `ADMIN` | Approve | **⭕** |
-| POST | `/admin/events/:id/reject` | `ADMIN` | Reject | **⭕** |
+| GET | `/admin/events` | `ADMIN` | List events (`?status=`; the admin queue opens on `PENDING`). Rows are the `Event` columns (`title`, `startAt`, `venueName`, `address`, `rejectionReason`, …) plus `business` and `district` | ✅ |
+| POST | `/admin/events/:id/approve` | `ADMIN` | Approve → `PUBLISHED` (no body). `409` unless `PENDING`, `403` on your own business's event | ✅ **(Phase 16E.2)** |
+| POST | `/admin/events/:id/reject` | `ADMIN` | Reject → `REJECTED`, body `{ reason }` (non-empty, ≤1000 chars). Same `409`/`403` | ✅ **(Phase 16E.2)** |
 | GET | `/admin/categories` | `ADMIN` | List | ✅ |
 | POST | `/admin/categories` | `ADMIN` | Create | ✅ |
 | PATCH | `/admin/categories/reorder` | `ADMIN` | Bulk `sortOrder` | **⭕** |
