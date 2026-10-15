@@ -431,3 +431,15 @@ SIG Gate 2 only, separate from Phase 16. Operator John; every step separately ow
   - Two rollback deployments appeared (`61082d56…` superseded by `2e7eb32a…`); cause unconfirmed.
 - **Artifacts:** dump kept on the encrypted `R:` volume until Gate 2 closes; `remote-dump.sh`, `*.framed`, `prod.raw` moved to the `R:` Recycle Bin, then purged and verified 2026-10-09 (owner deletion; disk blocks not overwritten).
 - **Not done:** Phase A (not started), runbook change, any deployment of `main`.
+
+## 2026-10-11 — Owner edit modal hours-overwrite fix: frontend PR #32 (open, not merged)
+
+Frontend only. No production access, no deployment, no Railway/Vercel change; SIG/security work not touched (deferred by the owner until public release). State in `CURRENT_STATE.md`.
+
+- **Bug (found while building the Settings-page hours form, roadmap item 11):** the owner "My businesses" edit modal called `PUT /businesses/:id/hours` on every save with all 7 grid days and no `is24Hours`, prefilled from the APPROVED-only public `GET /businesses/:id`. A name-only edit therefore rewrote the hours: 24-hour days became 09:00–18:00, empty days got placeholder rows, DRAFT/PENDING/REJECTED listings lost every real day.
+- **Non-obvious:**
+  - The owner `PATCH /businesses/:id` DTO has no hours fields (verified in the API source), so the safe fix is to *not send hours* unless edited — not to resend all stored hours.
+  - A second, hidden path: `openEditModal` fetched the detail again and replaced the modal's `initial`; the modal's reset effect depends on `initial`, so a response arriving after the modal's own load wiped the loaded grid back to the placeholder. Found because two of the new regression tests failed on exactly that ordering.
+  - The fix reuses the Phase 16E admin rule (`preserveUnchangedHours` + `adminHoursPayload`); the shared modal change (blank unknown times, complete-range validation) also applies to the admin edit.
+- **PR #32** head `f7776e3`; checks `test-and-build` + Vercel Preview Comments success; Vercel deployment is a preview only. Local: focused 14/14 (9 fail on the old code), related suites 169/169, build and lint pass, full suite 337/338 (known `App.routing` timing flake; 338/338 on an earlier run of the same tree).
+- **Not done:** merge or deploy (owner hold); the Settings-page hours branch `feat/16-settings-hours` is still local and uncommitted.

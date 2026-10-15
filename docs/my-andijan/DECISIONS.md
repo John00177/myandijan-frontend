@@ -533,6 +533,13 @@ Phase 15A audited the role model; Phase 15C designed and the owner approved the 
 **Revisit when:** the owner reopens self-service listing creation.
 
 ---
+
+### D-80 · Memory-impact check after every material change; no automatic GitHub → memory sync 🔓 REVISITABLE
+**Decision (owner, 2026-10-15, chat; pending the owner's review of the PR that adds it).** Refines D-78 item 4. The trigger for updating canonical memory is any **material** change — implementation, architecture, security, database, API, product, phase or deployment state, a decision, a new blocker — instead of "a major session". Before declaring work complete the agent runs a memory-impact check, reconciles only the affected documents with PR/SHA/CI/deployment evidence, and ends its final report with `memory impact: updated` (files) or `memory impact: none` (why). Nothing synchronizes GitHub into memory automatically. Roles are unchanged: GitHub = technical truth; `docs/my-andijan/` = curated durable memory; Notion = human decisions/history; Todoist = execution queue; SAFE = recovery; conversation and auto-memory = working memory only. Full rule: `intelligence/MEMORY_CONTRACT.md` §4.1.
+**Alternatives not chosen:** an automatic GitHub → memory synchronization (none exists, and it would duplicate GitHub history); updating memory on every change (contradicts the selective-memory rule).
+**Revisit when:** memory updates are routinely missed, or become noise.
+
+---
 ## Decisions that were never actually made
 
 Listed because their absence is itself the finding, and because each will otherwise be silently decided by whoever touches that area next.

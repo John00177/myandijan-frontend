@@ -1164,6 +1164,48 @@ export function getMyBusinessById(id: number): Promise<MyBusinessDetail> {
   return request<MyBusinessDetail>(`/me/businesses/${id}`);
 }
 
+/**
+ * The owner edit modal's prefill. GET /me/businesses/:id is owner-scoped and
+ * serves every status (the public GET /businesses/:id 404s for anything not
+ * APPROVED), so a DRAFT/PENDING/REJECTED listing's real hours load too.
+ * Branches come primary-first — the branch PUT /businesses/:id/hours
+ * replaces — and hours keep is24Hours.
+ *
+ * Fails (and so keeps the modal's hours locked) when the primary branch
+ * arrives without an hours list: treating that as "no hours" would let an
+ * edit of one day delete every other stored day.
+ */
+export async function getMyBusinessEditDetail(id: number): Promise<BusinessEditDetail> {
+  const detail = await getMyBusinessById(id);
+  const branches = detail.branches ?? [];
+  if (branches[0] && !Array.isArray(branches[0].hours)) {
+    throw new Error(`GET /me/businesses/${id}: primary branch has no hours list`);
+  }
+  return {
+    id: detail.id,
+    slug: detail.slug,
+    name: detail.name,
+    description: detail.description ?? null,
+    status: detail.status,
+    coverPhoto: detail.coverPhoto ?? null,
+    hasDelivery: detail.hasDelivery ?? null,
+    deliveryFee: detail.deliveryFee ?? null,
+    deliveryTime: detail.deliveryTime ?? null,
+    instagram: detail.instagram ?? null,
+    telegram: detail.telegram ?? null,
+    website: detail.website ?? null,
+    category: detail.category ?? null,
+    branches: branches.map((branch) => ({
+      id: branch.id,
+      address: branch.address,
+      phone: branch.phone,
+      isPrimary: branch.isPrimary,
+      district: branch.district ?? null,
+      hours: branch.hours,
+    })),
+  };
+}
+
 export function updateMyBusiness(
   id: number,
   payload: { name?: string; description?: string; categoryId?: number },
