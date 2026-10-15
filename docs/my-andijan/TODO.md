@@ -90,7 +90,7 @@
 - [x] **`InventoryView`** — **done, Phase 10.** Real product/service catalog (create/edit/publish-hide/delete) on `GET /me/businesses/:id/menu` + `POST/PATCH/DELETE`; `mockData.ts` deleted; SKU/quantity dropped (D-61) **[REVIEW]**
 - [x] **`AdminReviewsView`** — **done, Phase 6.** Real list + hide/restore, mock data (`adminMockData.ts`) deleted **[REVIEW]**
 - [ ] **`restaurantMock.ts`** — production restaurant cards show cuisine, price bucket, tags and delivery time derived from `Math.sin(id * k)`. Deterministic, honestly labelled in code, **invented** **[REVIEW]**
-- [ ] **Home hero weather is a placeholder** — `src/pages/home/HeroSection.tsx:30` `// TODO: Replace with real weather API` **[CODE]**
+- [x] ~~**Home hero weather is a placeholder**~~ — the four invented cards (fixed temperatures, conditions, "tomorrow" forecasts) and the `hero.weather.*` strings, **and the "Weather" tile in Useful services** (a title and "weather forecast" over a link to generic search, no data behind it), were removed on branch `fix/phase0-remove-invented-weather` (2026-10-15; committed on that branch, not merged or deployed). Guarded by `src/pages/__tests__/HeroSection.test.tsx` and `UsefulServices.test.tsx` (uz/ru/en). Seven tiles remain. Weather returns only with a verified provider (owner decision) **[CODE]**
 - [ ] **Telegram + Google login buttons do nothing** — and sit *above* the phone field, so they are the first thing a new user sees **[REVIEW]**
 - [ ] **`AdsView`** — honest "coming soon" empty state (acceptable as-is) **[REVIEW]**
 

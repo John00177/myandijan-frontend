@@ -194,7 +194,7 @@ Buttons are rendered in `PhoneScreen` **above** the phone field with a "yoki" di
 
 ### 4.4 Weather ⚪
 
-`src/pages/home/HeroSection.tsx:30` — `// TODO: Replace with real weather API`. The home hero shows hardcoded placeholder weather. No provider chosen.
+No provider chosen. The hero's hard-coded placeholder weather was removed on branch `fix/phase0-remove-invented-weather` (2026-10-15; committed on that branch, not merged or deployed); nothing weather-like renders until a verified provider is approved.
 
 ---
 

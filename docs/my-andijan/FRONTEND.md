@@ -310,7 +310,7 @@ Ordered by user impact.
 6. **Restaurant cards show invented cuisine, price and delivery data.** Deterministic and stable, but not true.
 7. **Inventory shows "Demo" mock rows** while a working menu API exists.
 8. **`AddBusinessPage` shows a step indicator; signup and claim deliberately do not.** Inconsistent, and the inconsistency is undocumented in the UI.
-9. **Home hero shows placeholder weather** (`HeroSection.tsx:30`).
+9. ~~**Home hero shows placeholder weather**~~ — removed on branch `fix/phase0-remove-invented-weather` (2026-10-15; committed on that branch, not merged or deployed).
 10. **Claim flow cannot show claim status** — `GET /me/claims` exists but nothing calls it, so after submitting there is no way to see what happened.
 11. **Social login buttons are prominent and non-functional** — they sit *above* the phone field, so they are the first thing a user sees.
 12. **No events detail page and no RSVP UI**, though both endpoints exist.
