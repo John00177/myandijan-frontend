@@ -454,3 +454,13 @@ Read-only verification plus a docs-only update. No application-code change, no p
   - GitHub's unauthenticated API rate-limited mid-review and the Vercel tools returned 403, so deployment state came from GitHub's deployment records plus the live site itself: HTTP 200, post-merge `Last-Modified`, and fix-specific strings found in the served chunks (the modal and `adminHoursPayload` share one chunk, which `OwnerDashboard` imports).
   - A GitHub `success` status or a matching bundle is deployment evidence, not workflow evidence.
 - **Not done:** live test of the owner edit flow; Vercel logs; re-check of the API repo and other open PRs. The 2026-10-11 owner instruction was not to merge or deploy; the merge happened afterwards and the SIG Gate 2 / public-release policy conflict is still unresolved.
+
+## 2026-10-15 — D-80 merged in both repos; API `main` deployed to Railway with migration 16H (log-confirmed; DB unverified)
+
+Read-only verification plus docs. No application code, database connection, migration, rollback or configuration change by the agent; SIG/security work not touched (hold unresolved). State in `CURRENT_STATE.md`.
+
+- **Merged:** frontend #34 (`372a3e5`) and API #29 (`1b8a0e1`) — D-80, the memory-impact rule (`AGENTS.md` identical in both). Both `test-and-build` green; frontend Production record `7084301893` success.
+- **Non-obvious:** the docs-only API merge **deployed all of API `main`** (Railway deployment `5dce7cfe-d5aa-4a9d-8f4d-5bd240bad2b4`, SUCCESS). `railway.json` runs `npx prisma migrate deploy` as pre-deploy, so migration `20261007090000_phase16h_claim_pending_unique` was applied to production (log lines: "Applying migration…", "All migrations have been successfully applied"; 17 found, only it applied) along with 58 files of backend changes since `2ea83b6`. Earlier notes saying production runs `2ea83b6` and that merged API work is not live are stale (`2ea83b6` is REMOVED in Railway).
+- **Probes (read-only):** `/categories` and `/businesses?limit=2` 200; unauthenticated claim routes 401. These do not show the claim flow is correct.
+- **Pending, not verified:** `_prisma_migrations` row, the live partial unique index, the number of duplicate claims auto-rejected, claim filing/approval end to end, the owner-hours save and its 24-hour/closed/timed cases. No agent database access exists; the route is the Gate 2 runbook read-only SQL, owner-authorized.
+- **Not recorded:** who authorized the deployment. The 2026-10-11 hold (SIG Gate 2 / public-release policy conflict unresolved; no release authorized) is unchanged.

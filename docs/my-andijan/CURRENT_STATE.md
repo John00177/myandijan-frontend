@@ -2,7 +2,49 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-14, frontend PR #32 merged and deployed (authoritative)
+## Current state — 2026-10-15, frontend #32/#34 and API #29 merged; API deployed with migration 16H (authoritative)
+
+**Repositories**
+
+| | `main` | Since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`1b8a0e13da83d2cf372f27a8fd81f88a3dc8546a`** | 2026-10-15 — PR #29 (D-80 agent rules; docs only). Previous `ae43648` |
+| Frontend `myandijan-frontend` | **`372a3e50f7dd9c63a0e13a44b02c4b76034a9d5b`** | 2026-10-15 — PR #34 (D-80 memory rule; docs only). Before it: `dd1e84b` = PR #32 (owner hours-overwrite fix, 2026-10-14) |
+
+**CI and deployment evidence (records only, read 2026-10-15)**
+- **Frontend `372a3e5`:** `test-and-build` success; GitHub Production deployment `7084301893`, success (2026-10-15T05:01Z). PR #32's `dd1e84b` has Production record `7068012896`, success (2026-10-14).
+- **API `1b8a0e1`:** `test-and-build` success; Railway production deployment **`5dce7cfe-d5aa-4a9d-8f4d-5bd240bad2b4`** (reason `deploy`, branch `main`) **SUCCESS**, 2026-10-15 05:00–05:04 UTC; GitHub record `7084289611`. The previous production commit **`2ea83b6` is stale** — its Railway deployment `2e7eb32a-…` is now REMOVED. Who authorized this deployment is **not recorded here**.
+- **A docs-only merge deployed all of API `main`.** Railway auto-deploys `main` and runs `npx prisma migrate deploy` as the pre-deploy command (`railway.json`). So production now runs everything in `main` since `2ea83b6` (58 files: the Phase 16C.1–16H backend changes, the authz route snapshot, and one migration), not just the docs.
+- **Migration (log-confirmed):** Railway's pre-deploy log reports "Applying migration `20261007090000_phase16h_claim_pending_unique`" and "All migrations have been successfully applied" (17 migrations found; this was the only one applied); Nest then started successfully. The migration (1) locks `business_claims`, (2) rejects duplicate PENDING claims for the same business and claimant (keeping the earliest; reason "Duplicate of an earlier pending claim by the same user (closed automatically)"), (3) creates the partial unique index `business_claims_one_pending_per_claimant`. A rollback would not undo it or its data change.
+
+**Read-only probes that passed (2026-10-15):** `GET /categories` 200, valid JSON; `GET /businesses?limit=2` 200; unauthenticated `GET /me/claims` and `GET /admin/claims` 401 (not 5xx). The signed-in owner dashboard rendered live data. Read-only check of the owner edit modal (2026-10-14) on a PENDING listing with no stored hours: `GET /me/businesses/<id>` 200, blank hours grid (no placeholder times), no `/hours` request on open.
+
+**STILL UNVERIFIED — pending (do not treat as done):**
+- The `_prisma_migrations` row and its `finished_at` / `rolled_back_at` (log lines only so far).
+- That the partial unique index exists live, and its definition.
+- How many claims the cleanup rejected (needs the database).
+- End-to-end claim filing and approval behaviour.
+- The owner edit flow with a stored 24-hour day, a closed day and a timed day, and any save (a save is a production write and needs the owner's explicit authorization).
+- Vercel and Railway runtime logs beyond the deployment's own.
+- No production database access exists for the agent; the documented read-only route is the Gate 2 runbook (`db/privileges/20_verify_readonly.sql`), owner-authorized per step.
+
+**Release restrictions — NOT cleared.** Owner, 2026-10-11 (chat): do not merge or deploy; the **SIG Gate 2 / public-release policy conflict remains unresolved**; security work remains deferred until public release. Frontend #32, #34 and API #29 were merged afterwards and Vercel/Railway deployed them (every `main` merge does) — recorded here as fact only. **No release authorization is recorded, and the hold is not cleared:** Gate 2 is still OPEN (R-E4 MET 2026-10-09, Phase A NOT STARTED).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · **API `main` including the 16C.1–16H backend changes is deployed per Railway; live behaviour of those flows unverified** · frontend 16E–16H changes still in the state recorded below · owner hours-overwrite fix MERGED (#32) and deployed per the record, live flow partly checked (above) · 16I in review: API #27, frontend #29, #30 · `feat/16-settings-hours` still local. The runbook's order (API deploy, then frontend #6) is now at the point where #6 would follow: **owner decision**, not inferred here. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Open PRs** (last checked 2026-10-11 except where noted; **not re-checked 2026-10-15**): frontend #33 (this record, docs only); frontend #6 **held**; frontend #28, #29, #30; API #27 (merging deploys API `main`), API #28 (security, deferred); Dependabot #1, #2 in both repos. Open frontend branches may now conflict with `main` on `docs/my-andijan/`, `AGENTS.md` and `CLAUDE.md`; check before merging.
+
+**Rules now in force:** D-80 — a memory-impact check after every material change, and `memory impact: updated|none` in every final report (`intelligence/MEMORY_CONTRACT.md` §4.1; `AGENTS.md` identical in both repos).
+
+**Next action**
+1. **Owner:** authorize, or run, the read-only database verification (migration row, index definition, cleanup count) and record the result here.
+2. **Owner:** decide whether to test claim filing/approval and the owner-hours save on a throwaway business (writes data; explicit authorization per action).
+3. **Owner:** decide the frontend #6 / runbook order, and resolve the SIG Gate 2 / public-release policy conflict.
+4. Settings-page hours (`feat/16-settings-hours`): rebase onto `main`; PR when asked.
+
+---
+
+## Current state — 2026-10-14, frontend PR #32 merged and deployed (historical — superseded 2026-10-15)
 
 **Repositories**
 
