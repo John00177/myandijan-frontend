@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Branch } from "../../types";
-import { branchDirectionsUrl, hasCoordinates } from "../maps";
+import { branchDirectionsUrl, computeMapView, hasCoordinates, mapViewKey } from "../maps";
 
 function branch(overrides: Partial<Branch> = {}): Branch {
   return { id: 1, nameUz: "Asosiy", nameRu: "Основной", nameEn: "Main", address: null, phone: null, ...overrides };
@@ -47,5 +47,44 @@ describe("branchDirectionsUrl", () => {
   it("returns null with neither coordinates nor a usable address", () => {
     expect(branchDirectionsUrl(branch())).toBeNull();
     expect(branchDirectionsUrl(branch({ address: "   " }))).toBeNull();
+  });
+});
+
+describe("computeMapView", () => {
+  it("has no view without points", () => {
+    expect(computeMapView([])).toBeNull();
+  });
+
+  it("looks at a single branch at street level", () => {
+    expect(computeMapView([[40.7823, 72.3442]])).toEqual({ kind: "point", center: [40.7823, 72.3442], zoom: 16 });
+  });
+
+  it("treats branches at the same coordinates as one place, not a zero-size box to fit", () => {
+    expect(computeMapView([[40.78, 72.34], [40.78, 72.34]])).toEqual({ kind: "point", center: [40.78, 72.34], zoom: 16 });
+  });
+
+  it("treats branches a few metres apart as one place", () => {
+    const view = computeMapView([[40.78, 72.34], [40.7801, 72.3401]]);
+    expect(view?.kind).toBe("point");
+  });
+
+  it("fits branches that are really apart, never closer than street level", () => {
+    expect(computeMapView([[40.8, 72.4], [40.7, 72.3], [40.75, 72.5]])).toEqual({
+      kind: "bounds",
+      bounds: [[40.7, 72.3], [40.8, 72.5]],
+      maxZoom: 16,
+    });
+  });
+
+  it("still fits branches on one latitude line", () => {
+    expect(computeMapView([[40.78, 72.2], [40.78, 72.5]])?.kind).toBe("bounds");
+  });
+});
+
+describe("mapViewKey", () => {
+  it("is stable for the same points and changes with the business", () => {
+    expect(mapViewKey([[40.78, 72.34]])).toBe(mapViewKey([[40.78, 72.34]]));
+    expect(mapViewKey([[40.78, 72.34]])).not.toBe(mapViewKey([[40.9, 72.5]]));
+    expect(mapViewKey([[40.78, 72.34]])).not.toBe(mapViewKey([[40.78, 72.34], [40.9, 72.5]]));
   });
 });

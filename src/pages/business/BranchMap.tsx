@@ -5,13 +5,12 @@ import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { Navigation } from "lucide-react";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { localizedName } from "../../lib/localize";
-import { branchDirectionsUrl } from "../../lib/maps";
+import { branchDirectionsUrl, computeMapView, mapViewKey } from "../../lib/maps";
 import type { Branch } from "../../types";
 
 const TILE_URL = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
-const SINGLE_BRANCH_ZOOM = 16;
 
 // Static markup only — no user text reaches this HTML (Leaflet injects divIcon
 // HTML raw, so the branch name stays in the React-rendered popup instead).
@@ -32,28 +31,40 @@ interface BranchMapProps {
 export default function BranchMap({ branches }: BranchMapProps) {
   const { lang, t } = useLanguage();
   const points = useMemo(() => branches.map((b) => [b.lat, b.lng] as [number, number]), [branches]);
+  const view = useMemo(() => computeMapView(points), [points]);
+  if (!view) return null;
 
-  // One branch: centre on it, close in. Several: fit them all in view.
-  const view =
-    points.length === 1
-      ? { center: points[0], zoom: SINGLE_BRANCH_ZOOM }
-      : { bounds: L.latLngBounds(points), boundsOptions: { padding: [32, 32] as [number, number] } };
+  // One place: centre on it. Several: fit them all, never closer than street level.
+  const viewProps =
+    view.kind === "point"
+      ? { center: view.center, zoom: view.zoom }
+      : {
+          bounds: L.latLngBounds(view.bounds),
+          boundsOptions: { padding: [32, 32] as [number, number], maxZoom: view.maxZoom },
+        };
 
   return (
     <MapContainer
-      {...view}
-      // The page scrolls; a map that captures the wheel traps visitors in it.
+      // The view props are read once at mount; a different business needs a new map.
+      key={mapViewKey(points)}
+      {...viewProps}
+      // The page scrolls: a map that captures the wheel, or a one-finger swipe
+      // on a phone, traps visitors in it. Touch devices keep pinch-zoom and
+      // the zoom buttons, but a swipe over the map scrolls the page.
       scrollWheelZoom={false}
+      dragging={!L.Browser.mobile}
       style={{ height: "100%", width: "100%", filter: "brightness(0.8) contrast(1.1)" }}
     >
       <TileLayer url={TILE_URL} attribution={TILE_ATTRIBUTION} />
       {branches.map((branch) => {
+        const name = localizedName(branch, lang);
         const directions = branchDirectionsUrl(branch);
         return (
-          <Marker key={branch.id} position={[branch.lat, branch.lng]} icon={PIN_ICON}>
+          // `title` names the pin for assistive technology and on hover.
+          <Marker key={branch.id} position={[branch.lat, branch.lng]} icon={PIN_ICON} title={name} alt={name}>
             <Popup>
               <div className="min-w-[160px]">
-                <div className="font-semibold text-ink text-sm">{localizedName(branch, lang)}</div>
+                <div className="font-semibold text-ink text-sm">{name}</div>
                 {branch.address && <div className="text-xs text-ink-muted mt-1">{branch.address}</div>}
                 {directions && (
                   <a
