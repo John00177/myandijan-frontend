@@ -830,8 +830,11 @@ export async function getAdminClaims(params?: {
   return normalizeAdminList<AdminClaim>(raw);
 }
 
-export function approveAdminClaim(id: number): Promise<AdminClaim> {
-  return authedPostJson<AdminClaim>(`/admin/claims/${id}/approve`, {});
+// Phase 16C.1: approval requires a verification note — how the claimant was
+// verified — which the API records on the approval's audit row
+// (ApproveClaimDto: non-empty, at most 1000 characters).
+export function approveAdminClaim(id: number, verificationNote: string): Promise<AdminClaim> {
+  return authedPostJson<AdminClaim>(`/admin/claims/${id}/approve`, { verificationNote });
 }
 
 export function rejectAdminClaim(id: number, reason: string): Promise<AdminClaim> {

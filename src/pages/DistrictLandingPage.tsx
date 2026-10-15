@@ -1,6 +1,6 @@
 import { SearchX } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import JsonLd from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
 import NotFoundState from "../components/seo/NotFoundState";
@@ -8,10 +8,12 @@ import StaggerContainer, { StaggerItem } from "../components/StaggerContainer";
 import EmptyState from "../components/ui/EmptyState";
 import Skeleton from "../components/ui/Skeleton";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useCategories } from "../hooks/useCategories";
 import { useRegions } from "../hooks/useRegions";
 import { useSearchBusinesses } from "../hooks/useSearchBusinesses";
 import { localizedName } from "../lib/localize";
 import BusinessListCard from "./search/BusinessListCard";
+import LandingFilterChips from "./landing/LandingFilterChips";
 import Pagination from "./search/Pagination";
 
 const PAGE_SIZE = 20;
@@ -20,6 +22,12 @@ export default function DistrictLandingPage() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, t } = useLanguage();
   const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { categories } = useCategories(lang);
+  const topCategories = categories.filter((c) => c.parentId == null && c.isActive !== false);
+  // Read straight from the URL (no wait for the category list, so one fetch).
+  const rawCategory = searchParams.get("category") ?? "";
+  const categoryFilter = /^[a-z0-9-]+$/.test(rawCategory) ? rawCategory : "";
 
   // Only ~14 districts exist total, all already fetched (nested under regions)
   // for the search filters and DistrictsSection — no dedicated
@@ -33,7 +41,18 @@ export default function DistrictLandingPage() {
     meta,
     loading: businessesLoading,
     error: businessesError,
-  } = useSearchBusinesses({ district: district?.id, page, limit: PAGE_SIZE, lang });
+  } = useSearchBusinesses({
+    district: district?.id,
+    category: categoryFilter || undefined,
+    page,
+    limit: PAGE_SIZE,
+    lang,
+  });
+
+  const setCategoryFilter = (value: string) => {
+    setPage(1);
+    setSearchParams(value ? { category: value } : {}, { replace: true });
+  };
 
   if (regionsLoading) {
     return (
@@ -56,8 +75,9 @@ export default function DistrictLandingPage() {
 
   const name = localizedName(district, lang);
   const title = t("district.metaTitle").replace("{name}", name);
+  // See CategoryLandingPage: no filtered count in the intro or meta description.
   const description =
-    meta && meta.total > 0
+    !categoryFilter && meta && meta.total > 0
       ? t("district.introWithCount").replace("{name}", name).replace("{count}", String(meta.total))
       : t("district.introEmpty").replace("{name}", name);
 
@@ -90,6 +110,14 @@ export default function DistrictLandingPage() {
 
         <h1 className="text-2xl font-bold text-ink">{name}</h1>
         <p className="text-sm text-ink-muted mt-2 max-w-2xl">{description}</p>
+
+        <LandingFilterChips
+          label={t("landing.filterByCategory")}
+          allLabel={t("landing.filterAll")}
+          options={topCategories.map((c) => ({ value: c.slug, label: localizedName(c, lang) }))}
+          value={categoryFilter}
+          onChange={setCategoryFilter}
+        />
 
         <div className="mt-8">
           {businessesLoading ? (
