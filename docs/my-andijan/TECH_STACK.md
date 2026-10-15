@@ -199,7 +199,7 @@ No `@nestjs/config` (env read straight from `process.env`). No `@nestjs/throttle
 | Supabase Storage REST | API `UploadService` | Working |
 | Eskiz `POST /auth/login`, `POST /message/sms/send` | API `SmsService` | Implemented, unconfigured |
 | OpenStreetMap-style tiles | Frontend Leaflet | Working (exact provider **UNKNOWN**) |
-| Weather | — | **Placeholder.** `src/pages/home/HeroSection.tsx:30` — `// TODO: Replace with real weather API` |
+| Weather | — | **None.** The hard-coded hero placeholder was removed on branch `fix/phase0-remove-invented-weather` (2026-10-15; committed on that branch, not merged or deployed). |
 
 ---
 
