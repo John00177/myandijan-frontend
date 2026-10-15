@@ -203,6 +203,7 @@ export const getMyBusinessById = vi.fn().mockResolvedValue({ ...mockMyBusiness, 
 // The owner edit modal's prefill (built on GET /me/businesses/:id).
 export const getMyBusinessEditDetail = vi.fn().mockResolvedValue({ ...mockMyBusiness, branches: [] });
 export const updateMyBranch = vi.fn().mockResolvedValue({});
+export const resubmitMyBusiness = vi.fn().mockResolvedValue({ id: 1, status: "PENDING" });
 
 export const mockMyStats: MyStats = {
   businessCount: 1,

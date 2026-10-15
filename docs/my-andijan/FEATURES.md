@@ -85,7 +85,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Marker clustering | **PLANNED** | — |
 | Distance sorting / radius | **PLANNED** | Needs PostGIS or manual haversine |
 | User geolocation | **PLANNED** | No `navigator.geolocation` use found |
-| Map on the detail page | **UNKNOWN** | Not verified in this pass |
+| Map on the detail page | **IMPLEMENTED (branch `feat/business-location-map`, 2026-10-15 — in review, not merged or deployed)** | "Joylashuv" section on the About tab: a lazy-loaded Leaflet map of every branch that has valid coordinates (`hasCoordinates`; none = no section), popups with name, address and a directions link; each branch in the list also gets its own "Yo'nalish" link (coordinates, else address). Frontend only; no API change. Not verified live. **Dormant on current data (checked 2026-10-15): all 4 APPROVED production businesses have a branch with `lat`/`lng` null, and no path writes coordinates — `POST /businesses` accepts `mapUrl` but does not persist it, no owner or admin UI sets them — so the map appears only once coordinates exist (a capture feature is needed, see `TODO.md`)** |
 
 ## 4. Reviews & ratings
 
@@ -155,7 +155,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Owner dashboard shell | **IMPLEMENTED** | 8 views |
-| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch. **Phase 16D:** every status labelled (HIDDEN no longer renders an empty badge, here and on the dashboard home); a REJECTED or SUSPENDED listing shows the admin's reason (`rejectionReason`). No owner resubmit yet — the API has no owner path from REJECTED back to PENDING |
+| My businesses | **IMPLEMENTED** | Lean list + full-detail fetch. **Phase 16D:** every status labelled (HIDDEN no longer renders an empty badge, here and on the dashboard home); a REJECTED or SUSPENDED listing shows the admin's reason (`rejectionReason`). **Phase 16I (PARTIALLY IMPLEMENTED — frontend PR #29, in review, not merged/deployed):** a REJECTED listing offers "Qayta ko'rib chiqishga yuborish" (uz/ru/en), calling `POST /me/businesses/:id/resubmit` (REJECTED → PENDING); a 409 refreshes the list. The API route is merged (API PR #27, `bc5dc38`; GitHub deployment record success, 2026-10-15) — not yet exercised from this UI |
 | Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours. **Hours-overwrite fix merged (PR #32, `dd1e84b`, 2026-10-14; Production deployment record success, live owner flow not yet tested):** the owner modal now loads real hours for every status via `GET /me/businesses/:id` and sends `PUT /businesses/:id/hours` only for an intentional hours edit (stored days verbatim, `is24Hours` kept, no placeholder days); a details-only save sends no hours. Verified by tests and a deployment record only; no live test of the owner flow yet |
 | Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
 | Reviews + reply | **IMPLEMENTED** | |

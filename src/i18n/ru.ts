@@ -236,6 +236,8 @@ const ru: Record<keyof typeof uz, string> = {
   "branches": "Филиалы",
   "noBranches": "Филиалов нет",
   "noBranchesBody": "Для этого бизнеса не указаны дополнительные филиалы.",
+  "location": "Расположение",
+  "locationMapLabel": "Карта расположения бизнеса",
   "noMenuYet": "Меню пока нет",
   "noMenuDescription": "Список блюд для этого бизнеса не добавлен.",
   "itemName": "Название",
@@ -428,6 +430,13 @@ const ru: Record<keyof typeof uz, string> = {
   "businessClaim.errorConflict": "Этот бизнес уже закреплён за владельцем, или у вас уже есть заявка на рассмотрении.",
   "businessClaim.rejectionReasonLabel": "Причина",
   "businessClaim.pendingTitle": "Ваша заявка на рассмотрении",
+
+  // Phase 16I — owner resubmits a rejected listing for review
+  "myBusinesses.resubmit": "Отправить на повторную проверку",
+  "myBusinesses.resubmitHint": "Исправьте замечания, затем отправьте бизнес на повторную проверку.",
+  "myBusinesses.resubmitSuccess": "Бизнес отправлен на повторную проверку",
+  "myBusinesses.resubmitError": "Не удалось отправить бизнес. Попробуйте ещё раз.",
+  "myBusinesses.resubmitConflict": "Этот бизнес больше не отклонён. Список обновлён.",
 
   "common.retry": "Повторить",
   "menuLoadFailed": "Не удалось загрузить меню",

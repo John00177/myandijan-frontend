@@ -236,6 +236,8 @@ const en: Record<keyof typeof uz, string> = {
   "branches": "Branches",
   "noBranches": "No branches",
   "noBranchesBody": "No additional branches listed for this business.",
+  "location": "Location",
+  "locationMapLabel": "Map of the business location",
   "noMenuYet": "No menu yet",
   "noMenuDescription": "No menu items have been added for this business.",
   "itemName": "Name",
@@ -428,6 +430,13 @@ const en: Record<keyof typeof uz, string> = {
   "businessClaim.errorConflict": "This business is already claimed, or you already have a pending claim for it.",
   "businessClaim.rejectionReasonLabel": "Reason",
   "businessClaim.pendingTitle": "Your claim is under review",
+
+  // Phase 16I — owner resubmits a rejected listing for review
+  "myBusinesses.resubmit": "Resubmit for review",
+  "myBusinesses.resubmitHint": "Fix the issues, then send the listing back for review.",
+  "myBusinesses.resubmitSuccess": "Listing sent back for review",
+  "myBusinesses.resubmitError": "Couldn't resubmit the listing. Please try again.",
+  "myBusinesses.resubmitConflict": "This listing is no longer rejected. The list has been refreshed.",
 
   "common.retry": "Try again",
   "menuLoadFailed": "Could not load the menu",

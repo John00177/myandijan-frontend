@@ -234,6 +234,8 @@ const uz = {
   "branches": "Filiallar",
   "noBranches": "Filiallar yo'q",
   "noBranchesBody": "Bu biznes uchun qo'shimcha filiallar ko'rsatilmagan.",
+  "location": "Joylashuv",
+  "locationMapLabel": "Biznes joylashuvi xaritasi",
   "noMenuYet": "Menyu hali yo'q",
   "noMenuDescription": "Bu biznes uchun taomlar ro'yxati kiritilmagan.",
   "itemName": "Nomi",
@@ -426,6 +428,13 @@ const uz = {
   "businessClaim.errorConflict": "Bu biznes allaqachon egalik qilingan yoki sizda u uchun ko'rib chiqilayotgan da'vo bor.",
   "businessClaim.rejectionReasonLabel": "Sabab",
   "businessClaim.pendingTitle": "Da'vongiz ko'rib chiqilmoqda",
+
+  // Phase 16I — owner resubmits a rejected listing for review
+  "myBusinesses.resubmit": "Qayta ko'rib chiqishga yuborish",
+  "myBusinesses.resubmitHint": "Kamchiliklarni tuzating, so'ng biznesni qayta ko'rib chiqishga yuboring.",
+  "myBusinesses.resubmitSuccess": "Biznes qayta ko'rib chiqishga yuborildi",
+  "myBusinesses.resubmitError": "Biznesni qayta yuborib bo'lmadi. Qayta urinib ko'ring.",
+  "myBusinesses.resubmitConflict": "Bu biznes endi rad etilgan holatda emas. Ro'yxat yangilandi.",
 
   "common.retry": "Qayta urinish",
   "menuLoadFailed": "Menyuni yuklab bo'lmadi",
