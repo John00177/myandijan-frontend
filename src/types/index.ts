@@ -204,6 +204,13 @@ export interface Business {
   reviews?: Review[];
   similar?: Business[];
   primaryBranch?: Branch | null;
+  /** Owner/staff SEO overrides; the public detail endpoint returns every column. */
+  metaTitleUz?: string | null;
+  metaTitleRu?: string | null;
+  metaTitleEn?: string | null;
+  metaDescriptionUz?: string | null;
+  metaDescriptionRu?: string | null;
+  metaDescriptionEn?: string | null;
 }
 
 // Matches EVENT_LIST_SELECT on the backend (GET /events) — Event.title is a
@@ -644,6 +651,12 @@ export interface MyBusiness {
 /** GET /me/businesses/:id — same as MyBusiness plus the fields the list endpoint omits. */
 export interface MyBusinessDetail extends MyBusiness {
   description?: string | null;
+  // Real Business columns, returned because OwnerService.findMyBusinessById
+  // uses Prisma `include` (every scalar comes back). Read by the owner edit
+  // modal's prefill (getMyBusinessEditDetail).
+  instagram?: string | null;
+  telegram?: string | null;
+  website?: string | null;
 }
 
 /**

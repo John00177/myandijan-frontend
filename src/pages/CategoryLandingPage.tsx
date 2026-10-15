@@ -1,6 +1,6 @@
 import { SearchX } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import JsonLd from "../components/seo/JsonLd";
 import MetaTags from "../components/seo/MetaTags";
 import NotFoundState from "../components/seo/NotFoundState";
@@ -9,9 +9,11 @@ import EmptyState from "../components/ui/EmptyState";
 import Skeleton from "../components/ui/Skeleton";
 import { useLanguage } from "../contexts/LanguageContext";
 import { useCategoryDetail } from "../hooks/useCategoryDetail";
+import { useRegions } from "../hooks/useRegions";
 import { useSearchBusinesses } from "../hooks/useSearchBusinesses";
 import { localizedName } from "../lib/localize";
 import BusinessListCard from "./search/BusinessListCard";
+import LandingFilterChips from "./landing/LandingFilterChips";
 import Pagination from "./search/Pagination";
 
 const PAGE_SIZE = 20;
@@ -20,6 +22,13 @@ export default function CategoryLandingPage() {
   const { slug } = useParams<{ slug: string }>();
   const { lang, t } = useLanguage();
   const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Read straight from the URL (no wait for the district list, so one fetch).
+  const rawDistrict = searchParams.get("district") ?? "";
+  const districtId = /^\d+$/.test(rawDistrict) ? Number(rawDistrict) : undefined;
+
+  const { regions } = useRegions(lang);
+  const districts = regions.flatMap((r) => r.districts);
 
   const { category, loading: categoryLoading, notFound, error: categoryError } = useCategoryDetail(slug ?? "");
   const {
@@ -27,7 +36,12 @@ export default function CategoryLandingPage() {
     meta,
     loading: businessesLoading,
     error: businessesError,
-  } = useSearchBusinesses({ category: slug, page, limit: PAGE_SIZE, lang });
+  } = useSearchBusinesses({ category: slug, district: districtId, page, limit: PAGE_SIZE, lang });
+
+  const setDistrictFilter = (value: string) => {
+    setPage(1);
+    setSearchParams(value ? { district: value } : {}, { replace: true });
+  };
 
   if (categoryLoading) {
     return (
@@ -48,8 +62,11 @@ export default function CategoryLandingPage() {
 
   const name = localizedName(category, lang);
   const title = t("category.metaTitle").replace("{name}", name);
+  // A filtered count is not the category's total, so the intro (and the meta
+  // description, which canonicalizes to the unfiltered page) falls back to
+  // the count-free wording while a district is selected.
   const description =
-    meta && meta.total > 0
+    !districtId && meta && meta.total > 0
       ? t("category.introWithCount").replace("{name}", name).replace("{count}", String(meta.total))
       : t("category.introEmpty").replace("{name}", name);
 
@@ -82,6 +99,14 @@ export default function CategoryLandingPage() {
 
         <h1 className="text-2xl font-bold text-ink">{name}</h1>
         <p className="text-sm text-ink-muted mt-2 max-w-2xl">{description}</p>
+
+        <LandingFilterChips
+          label={t("landing.filterByDistrict")}
+          allLabel={t("landing.filterAll")}
+          options={districts.map((d) => ({ value: String(d.id), label: localizedName(d, lang) }))}
+          value={districtId ? String(districtId) : ""}
+          onChange={setDistrictFilter}
+        />
 
         <div className="mt-8">
           {businessesLoading ? (

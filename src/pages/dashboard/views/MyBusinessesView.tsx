@@ -13,7 +13,7 @@ import { useLanguage } from "../../../contexts/LanguageContext";
 import { useAdminResource } from "../../../hooks/useAdminResource";
 import {
   ApiError,
-  getMyBusinessById,
+  getMyBusinessEditDetail,
   getMyBusinesses,
   resubmitMyBusiness,
   updateBusiness,
@@ -21,6 +21,7 @@ import {
   updateMyBranch,
 } from "../../../lib/api";
 import type { BusinessStatusValue, MyBusiness } from "../../../types";
+import { adminHoursPayload } from "../../admin/adminHoursPayload";
 
 const STATUS_LABEL: Record<BusinessStatusValue, string> = {
   DRAFT: "Qoralama",
@@ -81,7 +82,6 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
   const [toast, setToast] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [editingBusiness, setEditingBusiness] = useState<EditableBusiness | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editLoading, setEditLoading] = useState(false);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [autoOpenedId, setAutoOpenedId] = useState<number | null>(null);
@@ -97,30 +97,23 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
     const match = businesses.find((b) => b.id === autoOpenBusinessId);
     if (match) {
       setAutoOpenedId(autoOpenBusinessId);
-      void openEditModal(match);
+      openEditModal(match);
     }
   }, [autoOpenBusinessId, businesses, autoOpenedId]);
 
-  async function openEditModal(business: MyBusiness) {
-    // The list response is a lean summary (no description, no branch
-    // phone/address/district) — fetch the full detail so the form doesn't
-    // open silently missing fields the business actually has.
+  function openEditModal(business: MyBusiness) {
+    // The list response is a lean summary; the modal itself loads the full
+    // listing (getMyBusinessEditDetail — description, branch, real hours, any
+    // status). There is deliberately no second detail fetch here: replacing
+    // `editingBusiness` after the modal has loaded re-runs the modal's reset
+    // (it depends on `initial`), which discarded the loaded hours — before
+    // this fix the placeholder grid then overwrote the real hours on save.
     setEditingBusiness(toEditableBusiness(business));
     setEditError(null);
     setEditModalOpen(true);
-    setEditLoading(true);
-    try {
-      const full = await getMyBusinessById(business.id);
-      setEditingBusiness({ ...toEditableBusiness(full), description: full.description ?? null });
-    } catch {
-      // Keep the summary-derived data already shown rather than blocking
-      // the form on a failed detail fetch.
-    } finally {
-      setEditLoading(false);
-    }
   }
 
-  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null }) {
+  async function handleSaveEdit(form: EditBusinessFormState, meta: { branchId: number | null; hoursLoaded: boolean }) {
     if (!editingBusiness) return;
     setEditSaving(true);
     setEditError(null);
@@ -139,15 +132,14 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
         website: form.website.trim() || undefined,
       });
 
-      await updateBusinessHours(
-        editingBusiness.id,
-        form.hours.map((row) => ({
-          dayOfWeek: row.dayOfWeek,
-          openTime: row.isClosed ? undefined : row.openTime,
-          closeTime: row.isClosed ? undefined : row.closeTime,
-          isClosed: row.isClosed,
-        })),
-      );
+      // PUT /businesses/:id/hours deletes every hour row on the primary branch
+      // and inserts exactly what it receives, and PATCH /businesses/:id never
+      // touches hours. So hours are sent only when they were loaded AND the
+      // owner edited a day — then every stored day verbatim (is24Hours kept)
+      // plus the edited days, never a placeholder day (Phase 16E rule, owner
+      // side). A details-only save leaves the stored hours exactly as they are.
+      const hours = adminHoursPayload(form.hours, meta.hoursLoaded);
+      if (hours) await updateBusinessHours(editingBusiness.id, hours);
 
       const branchId = meta.branchId ?? editingBusiness.branchId;
       if (branchId && (form.phone.trim() || form.address.trim() || form.districtId)) {
@@ -289,8 +281,10 @@ export default function MyBusinessesView({ autoOpenBusinessId }: MyBusinessesVie
         initial={editingBusiness}
         onClose={() => setEditModalOpen(false)}
         onSave={handleSaveEdit}
-        submitting={editSaving || editLoading}
+        submitting={editSaving}
         error={editError}
+        preserveUnchangedHours
+        loadDetail={getMyBusinessEditDetail}
       />
     </div>
   );

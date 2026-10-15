@@ -431,3 +431,36 @@ SIG Gate 2 only, separate from Phase 16. Operator John; every step separately ow
   - Two rollback deployments appeared (`61082d56…` superseded by `2e7eb32a…`); cause unconfirmed.
 - **Artifacts:** dump kept on the encrypted `R:` volume until Gate 2 closes; `remote-dump.sh`, `*.framed`, `prod.raw` moved to the `R:` Recycle Bin, then purged and verified 2026-10-09 (owner deletion; disk blocks not overwritten).
 - **Not done:** Phase A (not started), runbook change, any deployment of `main`.
+
+## 2026-10-11 — Owner edit modal hours-overwrite fix: frontend PR #32 (open, not merged)
+
+Frontend only. No production access, no deployment, no Railway/Vercel change; SIG/security work not touched (deferred by the owner until public release). State in `CURRENT_STATE.md`.
+
+- **Bug (found while building the Settings-page hours form, roadmap item 11):** the owner "My businesses" edit modal called `PUT /businesses/:id/hours` on every save with all 7 grid days and no `is24Hours`, prefilled from the APPROVED-only public `GET /businesses/:id`. A name-only edit therefore rewrote the hours: 24-hour days became 09:00–18:00, empty days got placeholder rows, DRAFT/PENDING/REJECTED listings lost every real day.
+- **Non-obvious:**
+  - The owner `PATCH /businesses/:id` DTO has no hours fields (verified in the API source), so the safe fix is to *not send hours* unless edited — not to resend all stored hours.
+  - A second, hidden path: `openEditModal` fetched the detail again and replaced the modal's `initial`; the modal's reset effect depends on `initial`, so a response arriving after the modal's own load wiped the loaded grid back to the placeholder. Found because two of the new regression tests failed on exactly that ordering.
+  - The fix reuses the Phase 16E admin rule (`preserveUnchangedHours` + `adminHoursPayload`); the shared modal change (blank unknown times, complete-range validation) also applies to the admin edit.
+- **PR #32** head `f7776e3`; checks `test-and-build` + Vercel Preview Comments success; Vercel deployment is a preview only. Local: focused 14/14 (9 fail on the old code), related suites 169/169, build and lint pass, full suite 337/338 (known `App.routing` timing flake; 338/338 on an earlier run of the same tree).
+- **Not done:** merge or deploy (owner hold); the Settings-page hours branch `feat/16-settings-hours` is still local and uncommitted.
+
+## 2026-10-14 — Frontend PR #32 merged and deployed to Production (record); live workflow untested
+
+Read-only verification plus a docs-only update. No application-code change, no production write, no Railway/Vercel change; SIG/security work not touched (hold unresolved). State in `CURRENT_STATE.md`.
+
+- **Merged:** PR #32 into frontend `main` as `dd1e84b` (2026-10-14 19:21 +05). `8a7b072` (docs) corrected the stale "444bd12 deployment UNKNOWN" claim: GitHub's records show a successful Production deployment of `444bd12` (2026-10-09).
+- **Deployed (record):** GitHub deployment `7068012896`, environment Production, sha `dd1e84b`, status success (2026-10-14T14:22Z). Earlier `8a7b072` etc. were Preview.
+- **Non-obvious:**
+  - GitHub's unauthenticated API rate-limited mid-review and the Vercel tools returned 403, so deployment state came from GitHub's deployment records plus the live site itself: HTTP 200, post-merge `Last-Modified`, and fix-specific strings found in the served chunks (the modal and `adminHoursPayload` share one chunk, which `OwnerDashboard` imports).
+  - A GitHub `success` status or a matching bundle is deployment evidence, not workflow evidence.
+- **Not done:** live test of the owner edit flow; Vercel logs; re-check of the API repo and other open PRs. The 2026-10-11 owner instruction was not to merge or deploy; the merge happened afterwards and the SIG Gate 2 / public-release policy conflict is still unresolved.
+
+## 2026-10-15 — D-80 merged in both repos; API `main` deployed to Railway with migration 16H (log-confirmed; DB unverified)
+
+Read-only verification plus docs. No application code, database connection, migration, rollback or configuration change by the agent; SIG/security work not touched (hold unresolved). State in `CURRENT_STATE.md`.
+
+- **Merged:** frontend #34 (`372a3e5`) and API #29 (`1b8a0e1`) — D-80, the memory-impact rule (`AGENTS.md` identical in both). Both `test-and-build` green; frontend Production record `7084301893` success.
+- **Non-obvious:** the docs-only API merge **deployed all of API `main`** (Railway deployment `5dce7cfe-d5aa-4a9d-8f4d-5bd240bad2b4`, SUCCESS). `railway.json` runs `npx prisma migrate deploy` as pre-deploy, so migration `20261007090000_phase16h_claim_pending_unique` was applied to production (log lines: "Applying migration…", "All migrations have been successfully applied"; 17 found, only it applied) along with 58 files of backend changes since `2ea83b6`. Earlier notes saying production runs `2ea83b6` and that merged API work is not live are stale (`2ea83b6` is REMOVED in Railway).
+- **Probes (read-only):** `/categories` and `/businesses?limit=2` 200; unauthenticated claim routes 401. These do not show the claim flow is correct.
+- **Pending, not verified:** `_prisma_migrations` row, the live partial unique index, the number of duplicate claims auto-rejected, claim filing/approval end to end, the owner-hours save and its 24-hour/closed/timed cases. No agent database access exists; the route is the Gate 2 runbook read-only SQL, owner-authorized.
+- **Not recorded:** who authorized the deployment. The 2026-10-11 hold (SIG Gate 2 / public-release policy conflict unresolved; no release authorized) is unchanged.

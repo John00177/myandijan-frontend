@@ -133,7 +133,7 @@ No form library. Every form is `useState` + hand-rolled validation.
 | Signup (3 steps) | `pages/signup/*` via `useSignup` | steps `phone \| otp \| profile \| success`; `OTP_LENGTH = 6`, `RESEND_COOLDOWN_SECONDS = 45`; **account is created at the OTP step**, so step 3 is genuinely skippable |
 | Claim (8 steps) | `pages/claim/steps/*` via `useClaimFlow` | one field per screen, **no progress bar**, Skip on optional steps, live preview |
 | Add business (3 steps) | `pages/dashboard/addBusiness/*` | `StepIndicator` **is** shown here — unlike signup/claim |
-| Edit business | `EditBusinessModal` | details + 7-day hours grid; saves via `PATCH /businesses/:id` and `PUT /businesses/:id/hours` |
+| Edit business | `EditBusinessModal` | details + 7-day hours grid; saves via `PATCH /businesses/:id`, and `PUT /businesses/:id/hours` **only when hours were loaded and edited** (owner: prefill `getMyBusinessEditDetail` → `GET /me/businesses/:id`, `preserveUnchangedHours`, `adminHoursPayload` — PR #32, merged `dd1e84b`, 2026-10-14) |
 | Review | `ReviewForm` | rating + title + comment + photos |
 | Menu item | `ProductModal` | name, price, description, photo |
 | Category | `CategoryModal` (admin) | localized name triples, icon, colour |
