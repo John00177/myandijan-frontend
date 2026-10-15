@@ -234,6 +234,8 @@ const uz = {
   "branches": "Filiallar",
   "noBranches": "Filiallar yo'q",
   "noBranchesBody": "Bu biznes uchun qo'shimcha filiallar ko'rsatilmagan.",
+  "location": "Joylashuv",
+  "locationMapLabel": "Biznes joylashuvi xaritasi",
   "noMenuYet": "Menyu hali yo'q",
   "noMenuDescription": "Bu biznes uchun taomlar ro'yxati kiritilmagan.",
   "itemName": "Nomi",
