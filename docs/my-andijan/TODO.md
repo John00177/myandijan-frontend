@@ -58,7 +58,7 @@
 - [x] **MODERATOR admin access** — **done, Phase 14**: least-privilege moderation surface with owner/reporter PII redacted (D-72) **[REVIEW]**
 - [x] `GET /me/claims` — **done, Phase 9**: claim status on `ProfilePage`; `POST /me/claims` added so claims can actually be created **[REVIEW]**
 - [ ] **Claims follow-ups (non-blocking, Phase 9):** ~~show the rejection reason to the claimant on `ProfilePage`~~ and ~~show "pending" on `BusinessDetailPage` after reload instead of the CTA~~ — **done, Phase 16D**; still open: audit-log claim creation if policy changes; optional `GET /admin/claims/:id` **[REVIEW]**
-- [ ] **16D remainder (needs API work, not authorization):** an owner path to resubmit a REJECTED listing for review; a single create route instead of `POST /businesses` + `POST /me/businesses`. CUSTOMER `business.create` stays closed — D-75 kept (owner decision, 2026-10-08) **[REVIEW]**
+- [ ] **16D remainder (needs API work, not authorization):** ~~an owner path to resubmit a REJECTED listing for review~~ — **code complete 2026-10-08 on branches `feat/16i-owner-resubmit` (API + frontend), not merged; the API half must not merge to API `main` while Gate 2 is open (Railway auto-deploys `main`)**; a single create route instead of `POST /businesses` + `POST /me/businesses`. CUSTOMER `business.create` stays closed — D-75 kept (owner decision, 2026-10-08) **[REVIEW]**
 - [ ] `POST /me/businesses`, `POST /me/businesses/:id/branches`, `POST|PATCH|DELETE /me/events` — no UI **[REVIEW]**
 - [ ] `GET /events/:slug`, `POST /events/:slug/attend` — no detail page, no RSVP **[REVIEW]**
 - [ ] `GET /businesses/promoted`, `GET /categories/homepage`, `GET /categories/:slug`, 4 `/geography/*` routes — unused **[REVIEW]**
