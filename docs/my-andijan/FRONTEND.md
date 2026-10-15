@@ -91,7 +91,7 @@ export default function SearchPage() {
 
 ### 2.9 Page-local components
 - `pages/home/`: `HeroSection`, `CategoriesSection`, `DistrictsSection`, `FeaturedBusinesses`, `StatsStrip`, `UsefulServices`, `CtaBanner`
-- `pages/business/`: `HeroImage`, `BusinessInfoHeader`, `DescriptionSection`, `MenuSection`, `ReviewsSection`, `BranchesSection`, `SimilarBusinesses`, `ActionButtons`, `ContactCTA`
+- `pages/business/`: `HeroImage`, `BusinessInfoHeader`, `DescriptionSection`, `MenuSection`, `ReviewsSection`, `LocationSection` + `BranchMap` (lazy Leaflet; branch `feat/business-location-map`, in review), `BranchesSection`, `SimilarBusinesses`, `ActionButtons`, `ContactCTA`
 - `pages/search/`: `SearchHeader`, `SearchMap`, `BusinessListCard`, `FilterSelect`, `Pagination`, `CategorySearchPage`
 - `pages/signup/`: `PhoneScreen`, `OtpScreen`, `ProfileScreen`
 - `pages/claim/`: `StepShell` + 8 steps

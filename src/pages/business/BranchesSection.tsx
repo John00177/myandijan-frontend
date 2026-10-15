@@ -1,9 +1,28 @@
-import { MapPin, Phone } from "lucide-react";
+import { MapPin, Navigation, Phone } from "lucide-react";
 import Card from "../../components/ui/Card";
 import EmptyState from "../../components/ui/EmptyState";
 import { useLanguage } from "../../contexts/LanguageContext";
 import { localizedName } from "../../lib/localize";
+import { branchDirectionsUrl } from "../../lib/maps";
 import type { Branch } from "../../types";
+
+/** One link per branch — ActionButtons only ever covers the primary branch. */
+function DirectionsLink({ branch }: { branch: Branch }) {
+  const { t } = useLanguage();
+  const url = branchDirectionsUrl(branch);
+  if (!url) return null;
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-blue-300 mt-2"
+    >
+      <Navigation size={14} />
+      {t("directions")}
+    </a>
+  );
+}
 
 interface BranchesSectionProps {
   branches: Branch[] | undefined;
@@ -35,6 +54,7 @@ export default function BranchesSection({ branches }: BranchesSectionProps) {
                   {branch.phone}
                 </div>
               )}
+              <DirectionsLink branch={branch} />
             </Card>
           ))}
         </div>
