@@ -2,7 +2,94 @@
 
 > **Recovery entry point.** Read the top section only; it is the current state. Everything below it is historical and is kept for context. How memory works: [`intelligence/PROJECT_MEMORY.md`](intelligence/PROJECT_MEMORY.md). Update rules: [`intelligence/MEMORY_CONTRACT.md`](intelligence/MEMORY_CONTRACT.md) §4.
 
-## Current state — 2026-10-11, owner hours-overwrite fix in review as frontend PR #32 (authoritative)
+## Current state — 2026-10-15, frontend #32/#34 and API #29 merged; API deployed with migration 16H (authoritative)
+
+**Repositories**
+
+| | `main` | Since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`1b8a0e13da83d2cf372f27a8fd81f88a3dc8546a`** | 2026-10-15 — PR #29 (D-80 agent rules; docs only). Previous `ae43648` |
+| Frontend `myandijan-frontend` | **`372a3e50f7dd9c63a0e13a44b02c4b76034a9d5b`** | 2026-10-15 — PR #34 (D-80 memory rule; docs only). Before it: `dd1e84b` = PR #32 (owner hours-overwrite fix, 2026-10-14) |
+
+**CI and deployment evidence (records only, read 2026-10-15)**
+- **Frontend `372a3e5`:** `test-and-build` success; GitHub Production deployment `7084301893`, success (2026-10-15T05:01Z). PR #32's `dd1e84b` has Production record `7068012896`, success (2026-10-14).
+- **API `1b8a0e1`:** `test-and-build` success; Railway production deployment **`5dce7cfe-d5aa-4a9d-8f4d-5bd240bad2b4`** (reason `deploy`, branch `main`) **SUCCESS**, 2026-10-15 05:00–05:04 UTC; GitHub record `7084289611`. The previous production commit **`2ea83b6` is stale** — its Railway deployment `2e7eb32a-…` is now REMOVED. Who authorized this deployment is **not recorded here**.
+- **A docs-only merge deployed all of API `main`.** Railway auto-deploys `main` and runs `npx prisma migrate deploy` as the pre-deploy command (`railway.json`). So production now runs everything in `main` since `2ea83b6` (58 files: the Phase 16C.1–16H backend changes, the authz route snapshot, and one migration), not just the docs.
+- **Migration (log-confirmed):** Railway's pre-deploy log reports "Applying migration `20261007090000_phase16h_claim_pending_unique`" and "All migrations have been successfully applied" (17 migrations found; this was the only one applied); Nest then started successfully. The migration (1) locks `business_claims`, (2) rejects duplicate PENDING claims for the same business and claimant (keeping the earliest; reason "Duplicate of an earlier pending claim by the same user (closed automatically)"), (3) creates the partial unique index `business_claims_one_pending_per_claimant`. A rollback would not undo it or its data change.
+
+**Read-only probes that passed (2026-10-15):** `GET /categories` 200, valid JSON; `GET /businesses?limit=2` 200; unauthenticated `GET /me/claims` and `GET /admin/claims` 401 (not 5xx). The signed-in owner dashboard rendered live data. Read-only check of the owner edit modal (2026-10-14) on a PENDING listing with no stored hours: `GET /me/businesses/<id>` 200, blank hours grid (no placeholder times), no `/hours` request on open.
+
+**STILL UNVERIFIED — pending (do not treat as done):**
+- The `_prisma_migrations` row and its `finished_at` / `rolled_back_at` (log lines only so far).
+- That the partial unique index exists live, and its definition.
+- How many claims the cleanup rejected (needs the database).
+- End-to-end claim filing and approval behaviour.
+- The owner edit flow with a stored 24-hour day, a closed day and a timed day, and any save (a save is a production write and needs the owner's explicit authorization).
+- Vercel and Railway runtime logs beyond the deployment's own.
+- No production database access exists for the agent; the documented read-only route is the Gate 2 runbook (`db/privileges/20_verify_readonly.sql`), owner-authorized per step.
+
+**Release restrictions — NOT cleared.** Owner, 2026-10-11 (chat): do not merge or deploy; the **SIG Gate 2 / public-release policy conflict remains unresolved**; security work remains deferred until public release. Frontend #32, #34 and API #29 were merged afterwards and Vercel/Railway deployed them (every `main` merge does) — recorded here as fact only. **No release authorization is recorded, and the hold is not cleared:** Gate 2 is still OPEN (R-E4 MET 2026-10-09, Phase A NOT STARTED).
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · **API `main` including the 16C.1–16H backend changes is deployed per Railway; live behaviour of those flows unverified** · frontend 16E–16H changes still in the state recorded below · owner hours-overwrite fix MERGED (#32) and deployed per the record, live flow partly checked (above) · 16I in review: API #27, frontend #29, #30 · `feat/16-settings-hours` still local. The runbook's order (API deploy, then frontend #6) is now at the point where #6 would follow: **owner decision**, not inferred here. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Open PRs** (last checked 2026-10-11 except where noted; **not re-checked 2026-10-15**): frontend #33 (this record, docs only); frontend #6 **held**; frontend #28, #29, #30; API #27 (merging deploys API `main`), API #28 (security, deferred); Dependabot #1, #2 in both repos. Open frontend branches may now conflict with `main` on `docs/my-andijan/`, `AGENTS.md` and `CLAUDE.md`; check before merging.
+
+**Rules now in force:** D-80 — a memory-impact check after every material change, and `memory impact: updated|none` in every final report (`intelligence/MEMORY_CONTRACT.md` §4.1; `AGENTS.md` identical in both repos).
+
+**Next action**
+1. **Owner:** authorize, or run, the read-only database verification (migration row, index definition, cleanup count) and record the result here.
+2. **Owner:** decide whether to test claim filing/approval and the owner-hours save on a throwaway business (writes data; explicit authorization per action).
+3. **Owner:** decide the frontend #6 / runbook order, and resolve the SIG Gate 2 / public-release policy conflict.
+4. Settings-page hours (`feat/16-settings-hours`): rebase onto `main`; PR when asked.
+
+---
+
+## Current state — 2026-10-14, frontend PR #32 merged and deployed (historical — superseded 2026-10-15)
+
+**Repositories**
+
+| | `main` | Since |
+| --- | --- | --- |
+| Backend `my-andijan-api` | **`ae43648`** | 2026-10-08 (backend PR #26) — last verified 2026-10-11, **not re-checked 2026-10-14** |
+| Frontend `myandijan-frontend` | **`dd1e84bae34feb0e0c65c9928dc2bdf5f10061ed`** | 2026-10-14 19:21 +05 — merge of frontend PR #32 (previous `444bd12`) |
+
+**Merge (fact).** PR #32 `fix(dashboard): never overwrite stored hours from the owner edit modal` is **merged** into frontend `main` as `dd1e84b`. Its content is the 12 files reviewed pre-merge, ending at head `8a7b072`; `8a7b072` is an ancestor of `main`. `8a7b072` (docs only) corrected the earlier "444bd12 deployment UNKNOWN" wording.
+
+**Production — deployment evidence only (read-only, 2026-10-14):**
+- **Production** deployment record (GitHub deployments API): id `7068012896`, environment `Production`, sha **`dd1e84b`**, created 2026-10-14T14:22:10Z, latest status **success**. The previous Production record was `444bd12` (2026-10-09). The `8a7b072` and earlier records are **Preview** deployments, not Production.
+- `https://myandijan.uz/uz` returned HTTP 200 (HTML, served by Vercel, `Last-Modified` 2026-10-14 14:25:27 GMT, i.e. after the merge). The served bundles contain strings added by PR #32 (the edited-day validation message in the shared modal chunk; the loader's fail-closed error in the main bundle). That shows the new code is being served.
+- **Not done / not available:** the owner-edit hours workflow has **NOT been live-tested** (no owner account, no test business, no write to production). Vercel dashboard, build logs and runtime logs were **not accessible** (the Vercel API returned 403 to the tools available), so no deployment error log was read. A successful deployment record plus matching bundle strings is **not** proof that the workflow works live.
+- API on Railway: unchanged on record (`2ea83b6`, deployment `2e7eb32a-be06-4021-8c2e-e2abdff2ec2e`), **not re-verified**. No API, auth or migration change in PR #32.
+
+**Release restrictions — NOT cleared.**
+- Owner, 2026-10-11 (chat): do not merge or deploy (#32 included); the **SIG Gate 2 / public-release policy conflict remains unresolved**, and **security work remains deferred until public release**.
+- PR #32 was then merged on 2026-10-14 and Vercel deployed it to Production (every frontend `main` merge does). This record states that as fact. It does **not** clear the hold: Gate 2 is still **OPEN** (R-E4 MET 2026-10-09, Phase A NOT STARTED), and the policy conflict is unresolved. Any release authorization for the merge is not recorded here. Nothing else is authorized to merge or deploy because of it.
+
+**Phase 16 status:** 16A, 16B CLOSED · 16C backend merged, frontend #6 **held** (runbook §4) · 16D PARTIAL · 16E–16H CODE COMPLETE · **owner hours-overwrite fix: MERGED (#32) and deployed per the Production record; live workflow untested** · 16I in review: API #27, frontend #29, #30 · roadmap item 11 (Settings-page hours, `SettingsView`): local uncommitted branch `feat/16-settings-hours`, not on GitHub. Deploy-day runbook: [`PHASE_16_DEPLOY_RUNBOOK.md`](PHASE_16_DEPLOY_RUNBOOK.md).
+
+**Open PRs** (last checked 2026-10-11, **not re-checked 2026-10-14**; #32 removed because merged)
+
+| PR | Head | State |
+| --- | --- | --- |
+| frontend #6 — 16C.1 verification note | `5832f10` | **Hold** until runbook §4 |
+| API #27 — 16I owner resubmit | `558641e` | Open. Merging deploys API `main` (`checkSuites=false`) |
+| frontend #29 — 16I resubmit UI | `149641b` | Open; pairs with API #27 |
+| frontend #30 — 16I.1 admin re-review context | `5c6d876` | Open |
+| frontend #28 — business discovery + SEO business pages | `8b3afe8` | Open; merging deploys to Vercel production |
+| API #28 — SIG Gate 2 Phase C (`directUrl`) | `e37e4d8` | Open; security work deferred |
+| API #1, #2 · frontend #1, #2 | — | Dependabot, not reviewed |
+
+Open frontend branches that touched `docs/my-andijan/` or `src/test/apiMock.ts` may now conflict with `main` (#29, #30, `feat/16-settings-hours`); check before merging.
+
+**Next action**
+
+1. **Owner:** decide whether to run a live check of the owner hours flow on a test business (details-only save must leave stored hours, including a 24-hour day, unchanged), and record the result here.
+2. **Owner:** resolve the SIG Gate 2 / public-release policy conflict; release order then per the runbook.
+3. Settings-page hours (`feat/16-settings-hours`): rebase onto `main` and commit/open a PR when asked. The expected conflicts with #32 (`TODO.md` Bugs entry; `src/test/apiMock.ts`) now resolve in favour of what is on `main`.
+
+---
+
+## Current state — 2026-10-11, owner hours-overwrite fix in review as frontend PR #32 (historical — superseded 2026-10-14)
 
 **Repositories** (verified 2026-10-11 from Git and GitHub's API, read-only)
 
