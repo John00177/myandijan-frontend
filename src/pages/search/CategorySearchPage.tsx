@@ -91,10 +91,8 @@ export default function CategorySearchPage() {
 
   return (
     <>
-      <MetaTags
-        title="Restoranlar — My Andijan"
-        description="Andijon viloyatidagi restoran, kafe va oshxonalarni turkum, narx va reyting bo'yicha qidiring."
-      />
+      {/* Was hard-coded Uzbek for every language, like the generic search page. */}
+      <MetaTags title={t("restaurants.metaTitle")} description={t("restaurants.metaDescription")} />
 
       {/* top matches the fixed header height per breakpoint: MobileHeader is
           h-14, the desktop Header h-16. */}
@@ -131,6 +129,7 @@ export default function CategorySearchPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        <h1 className="text-2xl font-bold text-ink mb-1">{t("restaurants.h1")}</h1>
         <p className="text-sm text-ink-muted mb-4">
           {loading ? t("common.loading") : t("restaurantsFound").replace("{count}", String(sorted.length))}
         </p>

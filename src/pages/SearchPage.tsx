@@ -51,7 +51,7 @@ export default function SearchPage() {
 }
 
 function GenericSearchPage() {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -125,12 +125,14 @@ function GenericSearchPage() {
 
   return (
     <>
+      {/* Title and description were hard-coded Uzbek, so /ru and /en search
+          pages advertised an Uzbek title to browsers and search engines. */}
       <MetaTags
-        title={query ? `${query} — Qidiruv natijalari — My Andijan` : "Qidiruv natijalari — My Andijan"}
+        // A replacer function, not the string: replace() would read `$&`, `$1`
+        // and `` $` `` inside what the user typed as substitution patterns.
+        title={query ? t("search.metaTitleQuery").replace("{query}", () => query) : t("search.metaTitle")}
         description={
-          query
-            ? `"${query}" bo'yicha Andijon viloyatidagi qidiruv natijalari.`
-            : "Andijon viloyatidagi bizneslarni turkum, tuman va shahar bo'yicha qidiring."
+          query ? t("search.metaDescriptionQuery").replace("{query}", () => query) : t("search.metaDescription")
         }
       />
 
@@ -156,6 +158,9 @@ function GenericSearchPage() {
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* The page's only h1. It names the page's purpose rather than echoing
+            the query, so it stays stable while the user types. */}
+        <h1 className="text-2xl font-bold text-ink mb-1">{t("search.h1")}</h1>
         <p className="text-sm text-ink-muted mb-4">
           {loading ? "Qidirilmoqda..." : `${meta?.total ?? 0} ta natija topildi`}
         </p>

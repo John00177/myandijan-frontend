@@ -83,6 +83,14 @@ Emitted tags:
 
 **Coverage:** `HomePage`, `SearchPage`, `CategorySearchPage`, `BusinessDetailPage`, `EventsPage`, `PricingPage`, `SignupPage`, `ClaimPage`, `FavoritesPage`, `ProfilePage`, `OwnerDashboard`, `AdminDashboard`, `AddBusinessPage` — i.e. **all public pages plus the private ones (which pass `noIndex`)**.
 
+**Search page title and `h1` (Phase 0, 2026-10-15 — on branch `fix/phase0-search-title-h1`, committed there; not merged or deployed).**
+- **Before:** `SearchPage` and `CategorySearchPage` passed hard-coded Uzbek titles and descriptions, so `/ru/search` and `/en/search` advertised Uzbek titles. Neither rendered an `h1`.
+- **On the branch:**
+  - both read `search.*` / `restaurants.*` keys;
+  - a title with `?q=` is `search.metaTitleQuery`;
+  - each branch renders exactly one localized `h1` (`search.h1`, `restaurants.h1`) that names the page's purpose and does not echo the query.
+- **Tests:** `src/pages/__tests__/SearchPage.seo.test.tsx`.
+
 **Not-found states (Phase 16F.1).** Because the SPA answers `200` for every URL, a missing page is kept out of the index with `noindex`, not a status code. `NotFoundState` renders the empty state plus `MetaTags noIndex` (title `"<not found> — My Andijan"`) when the absence is **confirmed** — business/category/event `404`, or a district slug matching nothing in the loaded list. A transient failure (network/5xx) emits no head tags, so a crawler that hits a blip is not told to drop a real page. Unknown paths under `/:lang` reach the `*` route (`NotFoundPage`, always noindex), and a first segment that is not `uz`/`ru`/`en` is redirected under `/uz` (`LangShell`) instead of rendering the homepage.
 
 **Supporting module `src/lib/seo.ts`:**
