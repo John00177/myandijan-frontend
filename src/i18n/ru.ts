@@ -232,6 +232,8 @@ const ru: Record<keyof typeof uz, string> = {
   "branches": "Филиалы",
   "noBranches": "Филиалов нет",
   "noBranchesBody": "Для этого бизнеса не указаны дополнительные филиалы.",
+  "location": "Расположение",
+  "locationMapLabel": "Карта расположения бизнеса",
   "noMenuYet": "Меню пока нет",
   "noMenuDescription": "Список блюд для этого бизнеса не добавлен.",
   "itemName": "Название",

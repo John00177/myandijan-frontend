@@ -85,7 +85,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | Marker clustering | **PLANNED** | — |
 | Distance sorting / radius | **PLANNED** | Needs PostGIS or manual haversine |
 | User geolocation | **PLANNED** | No `navigator.geolocation` use found |
-| Map on the detail page | **UNKNOWN** | Not verified in this pass |
+| Map on the detail page | **IMPLEMENTED (branch `feat/business-location-map`, 2026-10-15 — in review, not merged or deployed)** | "Joylashuv" section on the About tab: a lazy-loaded Leaflet map of every branch that has valid coordinates (`hasCoordinates`; none = no section), popups with name, address and a directions link; each branch in the list also gets its own "Yo'nalish" link (coordinates, else address). Frontend only; no API change. Not verified live |
 
 ## 4. Reviews & ratings
 

@@ -11,6 +11,7 @@ import { localizedDescription, localizedName } from "../lib/localize";
 import { ownsBusiness } from "../lib/ownership";
 import ActionButtons from "./business/ActionButtons";
 import BranchesSection from "./business/BranchesSection";
+import LocationSection from "./business/LocationSection";
 import BusinessInfoHeader from "./business/BusinessInfoHeader";
 import ClaimBusinessSection from "./business/ClaimBusinessSection";
 import ContactCTA from "./business/ContactCTA";
@@ -128,6 +129,7 @@ export default function BusinessDetailPage() {
             {activeTab === "about" && (
               <>
                 <DescriptionSection business={business} />
+                <LocationSection branches={business.branches} />
                 <BranchesSection branches={business.branches} />
               </>
             )}

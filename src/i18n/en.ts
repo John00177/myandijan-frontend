@@ -232,6 +232,8 @@ const en: Record<keyof typeof uz, string> = {
   "branches": "Branches",
   "noBranches": "No branches",
   "noBranchesBody": "No additional branches listed for this business.",
+  "location": "Location",
+  "locationMapLabel": "Map of the business location",
   "noMenuYet": "No menu yet",
   "noMenuDescription": "No menu items have been added for this business.",
   "itemName": "Name",
