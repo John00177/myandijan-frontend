@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,17 @@ import CategoryLandingPage from "../CategoryLandingPage";
 
 vi.mock("../../lib/api", () => import("../../test/apiMock"));
 
-import { ApiError, emptyPage, getCategoryBySlug, mockBusiness, mockCategories, searchBusinesses } from "../../test/apiMock";
+import {
+  ApiError,
+  emptyPage,
+  getCategoryBySlug,
+  getRegions,
+  mockBusiness,
+  mockCategories,
+  mockDistrict,
+  mockRegions,
+  searchBusinesses,
+} from "../../test/apiMock";
 
 function renderCategoryPage(slug = mockCategories[0].slug) {
   return render(
@@ -101,5 +111,30 @@ describe("CategoryLandingPage", () => {
     await screen.findByRole("heading", { name: "Ovqatlanish" });
     expect(document.title).toBe("Ovqatlanish — Andijon viloyati | My Andijan");
     expect(document.querySelector('meta[name="description"]')?.getAttribute("content")).toContain("Ovqatlanish");
+  });
+});
+
+describe("CategoryLandingPage — district filter", () => {
+  beforeEach(() => {
+    getCategoryBySlug.mockResolvedValue(mockCategories[0]);
+    searchBusinesses.mockReset();
+    searchBusinesses.mockResolvedValue(emptyPage);
+    getRegions.mockResolvedValue([{ ...mockRegions[0], districts: [mockDistrict] }]);
+  });
+
+  it("filters the category by a district chip and keeps the unfiltered canonical", async () => {
+    renderCategoryPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: mockDistrict.nameUz }));
+
+    await waitFor(() =>
+      expect(searchBusinesses).toHaveBeenLastCalledWith(
+        expect.objectContaining({ category: mockCategories[0].slug, district: mockDistrict.id, page: 1 }),
+      ),
+    );
+    expect(screen.getByRole("button", { name: mockDistrict.nameUz })).toHaveAttribute("aria-pressed", "true");
+    expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute("href")).toMatch(
+      new RegExp(`/uz/category/${mockCategories[0].slug}$`),
+    );
   });
 });

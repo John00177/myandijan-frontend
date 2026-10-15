@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, getAdminBusinessById, getAdminBusinessEditDetail, getRegions, notifyLogout } from "../api";
+import {
+  ApiError,
+  approveAdminClaim,
+  getAdminBusinessById,
+  getAdminBusinessEditDetail,
+  getRegions,
+  notifyLogout,
+} from "../api";
 
 const TOKEN_KEY = "myandijan_token";
 const REFRESH_TOKEN_KEY = "myandijan_refresh_token";
@@ -270,5 +277,32 @@ describe("admin business detail", () => {
 
     await expect(getAdminBusinessEditDetail(5)).rejects.toBeInstanceOf(ApiError);
     expect(fetchMock.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(["/admin/businesses/5"]);
+  });
+});
+
+// Phase 16C.1 contract: the API's ApproveClaimDto requires `verificationNote`
+// and its global ValidationPipe rejects any other property (forbidNonWhitelisted),
+// so the body must be exactly this one field.
+describe("approveAdminClaim()", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    localStorage.setItem(TOKEN_KEY, "access-token");
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("POSTs exactly { verificationNote } to /admin/claims/:id/approve", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ id: 3, status: "APPROVED" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await approveAdminClaim(3, "Called the phone on the listing");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toMatch(/\/admin\/claims\/3\/approve$/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body)).toEqual({ verificationNote: "Called the phone on the listing" });
   });
 });

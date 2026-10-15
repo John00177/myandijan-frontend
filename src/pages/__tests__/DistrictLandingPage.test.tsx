@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HelmetProvider } from "react-helmet-async";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +8,15 @@ import DistrictLandingPage from "../DistrictLandingPage";
 
 vi.mock("../../lib/api", () => import("../../test/apiMock"));
 
-import { emptyPage, getRegions, mockBusiness, mockDistrict, mockRegions, searchBusinesses } from "../../test/apiMock";
+import {
+  emptyPage,
+  getRegions,
+  mockBusiness,
+  mockCategories,
+  mockDistrict,
+  mockRegions,
+  searchBusinesses,
+} from "../../test/apiMock";
 
 function renderDistrictPage(slug = mockDistrict.slug) {
   return render(
@@ -99,5 +107,25 @@ describe("DistrictLandingPage", () => {
 
     await screen.findByRole("heading", { name: mockDistrict.nameUz });
     expect(document.title).toBe(`${mockDistrict.nameUz} tumanidagi bizneslar | My Andijan`);
+  });
+});
+
+describe("DistrictLandingPage — category filter", () => {
+  beforeEach(() => {
+    getRegions.mockResolvedValue([{ ...mockRegions[0], districts: [mockDistrict] }]);
+    searchBusinesses.mockReset();
+    searchBusinesses.mockResolvedValue(emptyPage);
+  });
+
+  it("narrows the district to a category chip", async () => {
+    renderDistrictPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: mockCategories[0].nameUz }));
+
+    await waitFor(() =>
+      expect(searchBusinesses).toHaveBeenLastCalledWith(
+        expect.objectContaining({ district: mockDistrict.id, category: mockCategories[0].slug, page: 1 }),
+      ),
+    );
   });
 });
