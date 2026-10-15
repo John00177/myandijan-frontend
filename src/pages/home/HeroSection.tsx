@@ -1,5 +1,5 @@
 import { motion, type Transition } from "framer-motion";
-import { Cloud, CloudRain, Search, Sun, type LucideIcon } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "../../contexts/LanguageContext";
@@ -15,25 +15,15 @@ const CHIPS: { labelKey: TranslationKey; slug: string }[] = [
   { labelKey: "hero.chip.education", slug: "talim" },
 ];
 
-interface WeatherCard {
-  location: string;
-  temp: number;
-  conditionKey: TranslationKey;
-  tomorrow: number;
-  icon: LucideIcon;
-}
-
-/**
- * Location names are proper nouns and stay as-is across languages; only the
- * condition label is translated.
+/*
+ * No weather here. The hero used to show four hard-coded cards (fixed
+ * temperatures, conditions and "tomorrow" forecasts for Andijon, Asaka,
+ * Shahrixon, Baliqchi) that no source backed — presenting them as current
+ * weather was misleading. They were removed in Phase 0 rather than replaced
+ * with other guessed values. Bring weather back only with a verified provider
+ * (an owner decision: provider, terms, credentials), and keep
+ * `src/pages/__tests__/HeroSection.test.tsx` honest when you do.
  */
-// TODO: Replace with real weather API
-const WEATHER: WeatherCard[] = [
-  { location: "Andijon", temp: 32, conditionKey: "hero.weather.sunny", tomorrow: 33, icon: Sun },
-  { location: "Asaka", temp: 31, conditionKey: "hero.weather.cloudy", tomorrow: 30, icon: Cloud },
-  { location: "Shahrixon", temp: 30, conditionKey: "hero.weather.rainy", tomorrow: 29, icon: CloudRain },
-  { location: "Baliqchi", temp: 33, conditionKey: "hero.weather.sunny", tomorrow: 34, icon: Sun },
-];
 
 export default function HeroSection() {
   const { lang, t } = useLanguage();
@@ -138,35 +128,6 @@ export default function HeroSection() {
             >
               {t(chip.labelKey)}
             </motion.button>
-          ))}
-        </motion.div>
-
-        {/*
-          Already inside the section's max-w-7xl px-6 wrapper, so this only adds
-          the vertical gap and horizontal scroll — repeating max-w-7xl mx-auto px-6
-          here would double up the side padding.
-        */}
-        <motion.div
-          className="flex gap-4 overflow-x-auto mt-8 pb-1"
-          initial={fadeUp}
-          animate={{ opacity: 1, y: 0 }}
-          transition={enter(0.35)}
-        >
-          {WEATHER.map((w) => (
-            <div
-              key={w.location}
-              className="bg-white/[0.05] backdrop-blur border border-white/[0.10] rounded-xl px-4 py-3 flex items-center gap-3 min-w-[140px] shrink-0"
-            >
-              <w.icon size={20} className="text-amber-400 shrink-0" />
-              <div>
-                <div className="text-xs text-ink-muted">{w.location}</div>
-                <div className="text-lg font-bold text-ink">{w.temp}°</div>
-                <div className="text-xs text-ink-body">{t(w.conditionKey)}</div>
-                <div className="text-[10px] text-ink-muted">
-                  {t("hero.weather.tomorrow")}: {w.tomorrow}°
-                </div>
-              </div>
-            </div>
           ))}
         </motion.div>
       </div>
