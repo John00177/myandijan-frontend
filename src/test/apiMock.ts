@@ -198,6 +198,11 @@ export const mockMyBusiness = {
 export const getBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinessMenu = vi.fn().mockResolvedValue([]);
 export const getMyBusinesses = vi.fn().mockResolvedValue([mockMyBusiness]);
+// GET /me/businesses/:id — the owner's own listing in any status, primary branch first.
+export const getMyBusinessById = vi.fn().mockResolvedValue({ ...mockMyBusiness, branches: [] });
+// The owner edit modal's prefill (built on GET /me/businesses/:id).
+export const getMyBusinessEditDetail = vi.fn().mockResolvedValue({ ...mockMyBusiness, branches: [] });
+export const updateMyBranch = vi.fn().mockResolvedValue({});
 
 export const mockMyStats: MyStats = {
   businessCount: 1,
