@@ -443,3 +443,14 @@ Frontend only. No production access, no deployment, no Railway/Vercel change; SI
   - The fix reuses the Phase 16E admin rule (`preserveUnchangedHours` + `adminHoursPayload`); the shared modal change (blank unknown times, complete-range validation) also applies to the admin edit.
 - **PR #32** head `f7776e3`; checks `test-and-build` + Vercel Preview Comments success; Vercel deployment is a preview only. Local: focused 14/14 (9 fail on the old code), related suites 169/169, build and lint pass, full suite 337/338 (known `App.routing` timing flake; 338/338 on an earlier run of the same tree).
 - **Not done:** merge or deploy (owner hold); the Settings-page hours branch `feat/16-settings-hours` is still local and uncommitted.
+
+## 2026-10-14 — Frontend PR #32 merged and deployed to Production (record); live workflow untested
+
+Read-only verification plus a docs-only update. No application-code change, no production write, no Railway/Vercel change; SIG/security work not touched (hold unresolved). State in `CURRENT_STATE.md`.
+
+- **Merged:** PR #32 into frontend `main` as `dd1e84b` (2026-10-14 19:21 +05). `8a7b072` (docs) corrected the stale "444bd12 deployment UNKNOWN" claim: GitHub's records show a successful Production deployment of `444bd12` (2026-10-09).
+- **Deployed (record):** GitHub deployment `7068012896`, environment Production, sha `dd1e84b`, status success (2026-10-14T14:22Z). Earlier `8a7b072` etc. were Preview.
+- **Non-obvious:**
+  - GitHub's unauthenticated API rate-limited mid-review and the Vercel tools returned 403, so deployment state came from GitHub's deployment records plus the live site itself: HTTP 200, post-merge `Last-Modified`, and fix-specific strings found in the served chunks (the modal and `adminHoursPayload` share one chunk, which `OwnerDashboard` imports).
+  - A GitHub `success` status or a matching bundle is deployment evidence, not workflow evidence.
+- **Not done:** live test of the owner edit flow; Vercel logs; re-check of the API repo and other open PRs. The 2026-10-11 owner instruction was not to merge or deploy; the merge happened afterwards and the SIG Gate 2 / public-release policy conflict is still unresolved.
