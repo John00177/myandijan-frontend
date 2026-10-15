@@ -49,6 +49,7 @@ import { adminHoursPayload } from "../adminHoursPayload";
 import { renderAdminState } from "../AdminFetchState";
 import BusinessReviewDrawer, { type BusinessReviewMode } from "../BusinessReviewDrawer";
 import DataTable, { type Column } from "../DataTable";
+import { reReviewReason } from "../reReview";
 import { BusinessStatusBadge, formatDate } from "../statusLabels";
 
 function toEditableBusiness(b: AdminBusiness): EditableBusiness {
@@ -369,6 +370,14 @@ export default function AdminBusinessesView() {
           )}
           {statusOf(b) === "SUSPENDED" && b.rejectionReason && (
             <span className="text-xs text-ink-muted">Sabab: {b.rejectionReason}</span>
+          )}
+          {reReviewReason(b) && (
+            <>
+              <div className="flex flex-wrap gap-1">
+                <Badge tone="amber">Qayta ko'rib chiqish</Badge>
+              </div>
+              <span className="text-xs text-ink-muted">Oldingi sabab: {reReviewReason(b)}</span>
+            </>
           )}
           {statusOf(b) === "HIDDEN" && (
             <span className="text-xs text-ink-muted">Tiklanganda: {restoreTargetLabel(b)}</span>

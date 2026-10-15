@@ -578,6 +578,51 @@ describe("AdminBusinessesView — review drawer", () => {
     expect(window.prompt).not.toHaveBeenCalled();
     expect(rejectAdminBusiness).not.toHaveBeenCalled();
   });
+
+  // Phase 16I.1: a PENDING listing that still carries a reason is back after
+  // an earlier decision (owner resubmit, or the unhide fallback).
+  it("marks a listing back for re-review in the queue, with the earlier reason", async () => {
+    listOf({ ...submitted, rejectionReason: "  Telefon raqami noto'g'ri  " });
+    renderView();
+    await waitForRow();
+
+    expect(screen.getAllByText("Qayta ko'rib chiqish").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Oldingi sabab: Telefon raqami noto'g'ri").length).toBeGreaterThan(0);
+  });
+
+  it("shows the earlier reason inside the review drawer, above the decision", async () => {
+    listOf({ ...submitted, rejectionReason: "Telefon raqami noto'g'ri" });
+    const drawer = await openDrawer();
+
+    expect(within(drawer).getByText("Qayta ko'rib chiqish")).toBeInTheDocument();
+    expect(within(drawer).getByText("Oldingi sabab: Telefon raqami noto'g'ri")).toBeInTheDocument();
+    expect(within(drawer).getByRole("button", { name: /Tasdiqlash/ })).toBeInTheDocument();
+  });
+
+  it("does not mark a first-time PENDING submission, or a blank leftover reason", async () => {
+    listOf(submitted, { ...submitted, id: 99, name: "Ikkinchi biznes", nameUz: "Ikkinchi biznes", rejectionReason: "   " });
+    renderView();
+    await waitForRow();
+    await waitForRow("Ikkinchi biznes");
+
+    expect(screen.queryByText("Qayta ko'rib chiqish")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Oldingi sabab/)).not.toBeInTheDocument();
+
+    const drawer = await (async () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "Ko'rib chiqish" })[0]);
+      return screen.findByRole("dialog", { name: `Ko'rib chiqish: ${submitted.name}` });
+    })();
+    expect(within(drawer).queryByText(/Oldingi sabab/)).not.toBeInTheDocument();
+  });
+
+  it("keeps a REJECTED listing's reason out of the re-review marker", async () => {
+    listOf({ ...submitted, status: "REJECTED", rejectionReason: "Hujjat yetarli emas" });
+    renderView();
+    await waitForRow();
+
+    expect(screen.queryByText("Qayta ko'rib chiqish")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Oldingi sabab/)).not.toBeInTheDocument();
+  });
 });
 
 // Phase 16E data-integrity fix: PUT /admin/businesses/:id/hours replaces
