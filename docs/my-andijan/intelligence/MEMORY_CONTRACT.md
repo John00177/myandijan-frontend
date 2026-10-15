@@ -1,6 +1,6 @@
 # MEMORY_CONTRACT — rules for My Andijan's project memory
 
-> Binding for every human and AI agent that reads or writes project memory. Created 2026-10-07 (decision **D-78**). The short operational version is in each repository's root `AGENTS.md`; this is the full contract.
+> Binding for every human and AI agent that reads or writes project memory. Created 2026-10-07 (decision **D-78**); update trigger refined 2026-10-15 (**D-80**). The short operational version is in each repository's root `AGENTS.md`; this is the full contract.
 
 ---
 
@@ -16,6 +16,8 @@ When two sources disagree, the higher one wins. Fix the lower one; never "averag
 | **4** | **Notion** — the owner's human decision and history records | Owner intent and decisions not yet recorded in rank 2 | Technical state. A Notion decision becomes binding for agents once recorded in `DECISIONS.md` |
 | **5** | **SAFE recovery layer** — `D:\My-Andijan-SAFE` | Restoring lost repositories, clones or documents (bundles, checksums, snapshots) | Current state. SAFE is a dated snapshot (2026-10-05); it ages the moment it is written |
 | **6** | **Conversational / vendor AI memory** — Claude sessions and auto-memory, ChatGPT memory and chats | Nothing. Convenience only | Everything. Never cite it as evidence; re-verify against ranks 1–2 |
+
+**Todoist** is the owner's execution queue (what to do next), not a source of project state; it sits outside this hierarchy.
 
 **Vendor AI memory must never become the authoritative project state.** If an agent "remembers" something that ranks 1–2 do not record, it is either unrecorded (record it, with evidence) or wrong.
 
@@ -47,11 +49,22 @@ A fact in working memory is not known to the project until it is committed to ca
 
 ## 4. Memory-update protocol
 
-### 4.1 When to update
+### 4.1 When to update — the memory-impact check
 
-**Update canonical memory after every major implementation session** — a session that merged or opened a PR, changed phase status, made a decision, changed or verified production, or discovered a blocker or a material bug.
+Nothing synchronizes GitHub (or Notion, or Todoist) into canonical memory automatically: a merge, deployment or decision is unknown to the project until an agent records it. So **after every material change, run a memory-impact check before declaring the work complete.**
 
-**Do not update** for trivial commands, read-only questions, failed experiments that changed nothing, or individual conversation messages.
+**Material — update canonical memory:** a change to implementation, architecture, security, the database or schema, an API contract, product behaviour or scope, phase status, or deployment/production state (including newly verified production evidence); a decision; a newly found blocker or material bug. Opening or merging a PR that carries such a change is material.
+
+**Not material — do not update:** trivial refactors, typo fixes, read-only questions and reviews, failed experiments that left no durable change, individual conversation messages.
+
+**If material:**
+
+1. Reconcile only the canonical documents the change affects (§4.2) — usually `CURRENT_STATE.md` and `SESSION_CONTEXT.md`, plus `DECISIONS.md`, `TODO.md`, `ROADMAP.md` or a domain document when the change touches them.
+2. Record the exact evidence: PR number, commit SHA, CI result, deployment record (§4.3, §5).
+3. Keep it concise: record state and decisions, and link to GitHub for history instead of copying it (§4.3, rules 6–7).
+4. A backend change is followed by a `docs/` PR in `myandijan-frontend` (§4.3, rule 4).
+
+**Report the outcome in every final report:** `memory impact: updated` with the files changed (and the PR, if separate), or `memory impact: none` with why the change is not material. Memory updates go through the normal branch → PR → CI flow; the agent stops before merging (§6, rule 3).
 
 ### 4.2 What to record
 

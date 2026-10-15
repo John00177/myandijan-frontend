@@ -71,7 +71,7 @@ Say "not verified" rather than implying success. Quote failures, don't paraphras
 
 ## 6. Record
 
-After a **major** session, update canonical memory per `MEMORY_CONTRACT.md` §4 — `CURRENT_STATE.md` top section, `SESSION_CONTEXT.md`, and `DECISIONS.md` if a decision was made — in a `docs/` PR in `myandijan-frontend`. Skip it for trivial work.
+After every **material** change, run the memory-impact check in `MEMORY_CONTRACT.md` §4.1 — reconcile only the affected docs (`CURRENT_STATE.md` top section, `SESSION_CONTEXT.md`, `DECISIONS.md` if a decision was made, others as applicable) in a `docs/` PR in `myandijan-frontend`, and state `memory impact: updated` or `memory impact: none` in the report. Skip it for trivial work.
 
 ---
 

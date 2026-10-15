@@ -156,7 +156,7 @@ Completed the review moderation workflow (`ARCHITECTURE.md` §23): added the mis
 | --- | --- | --- |
 | Owner dashboard shell | **IMPLEMENTED** | 8 views |
 | My businesses | **IMPLEMENTED** | Lean list + full-detail fetch. **Phase 16D:** every status labelled (HIDDEN no longer renders an empty badge, here and on the dashboard home); a REJECTED or SUSPENDED listing shows the admin's reason (`rejectionReason`). No owner resubmit yet — the API has no owner path from REJECTED back to PENDING |
-| Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours |
+| Edit business | **IMPLEMENTED** | `EditBusinessModal`; details + 7-day hours. **Hours-overwrite fix on branch `fix/16-owner-edit-hours` (2026-10-11, not deployed):** the owner modal now loads real hours for every status via `GET /me/businesses/:id` and sends `PUT /businesses/:id/hours` only for an intentional hours edit (stored days verbatim, `is24Hours` kept, no placeholder days); a details-only save sends no hours. Until merged and deployed, production keeps the old overwrite behavior |
 | Owner KPIs | **IMPLEMENTED** | `GET /me/stats` |
 | Reviews + reply | **IMPLEMENTED** | |
 | My events (list) | **IMPLEMENTED** | **Phase 5:** create wired — a "Yangi tadbir" modal (business picker + title/description/dates/venue) now calls `POST /me/events`, replacing the previously dead button. **Edit and delete endpoints still have no UI** — deprioritized this phase for scope, not blocked |
